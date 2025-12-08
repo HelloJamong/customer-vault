@@ -1,10 +1,12 @@
 import os
+import re
+import uuid
 from functools import wraps
-from flask import Flask, render_template, redirect, url_for, flash, request, abort
+from flask import Flask, render_template, redirect, url_for, flash, request, abort, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -22,6 +24,24 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# 세션 타임아웃 미들웨어
+@app.before_request
+def before_request():
+    """모든 요청 전에 세션 타임아웃 체크"""
+    if current_user.is_authenticated:
+        if not check_session_timeout():
+            logout_user()
+            session.clear()
+            flash('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning')
+            return redirect(url_for('login'))
+
+        # 세션 활동 시간 업데이트 (DB)
+        if 'session_id' in session:
+            user_session = UserSession.query.filter_by(session_id=session['session_id']).first()
+            if user_session:
+                user_session.last_activity = datetime.utcnow()
+                db.session.commit()
 
 # 권한 상수
 ROLE_SUPER_ADMIN = 'super_admin'
@@ -152,6 +172,124 @@ class UserSession(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# ========== 헬퍼 함수 ==========
+def get_system_settings():
+    """시스템 설정 가져오기 (없으면 기본값으로 생성)"""
+    settings = SystemSettings.query.first()
+    if not settings:
+        settings = SystemSettings()
+        db.session.add(settings)
+        db.session.commit()
+    return settings
+
+def validate_password(password):
+    """패스워드가 시스템 설정의 복잡성 요구사항을 충족하는지 검증"""
+    settings = get_system_settings()
+
+    # 길이 검증
+    if len(password) < settings.password_min_length:
+        return False, f'패스워드는 최소 {settings.password_min_length}자 이상이어야 합니다.'
+    if len(password) > settings.password_max_length:
+        return False, f'패스워드는 최대 {settings.password_max_length}자 이하여야 합니다.'
+
+    # 대문자 검증
+    if settings.password_require_uppercase and not re.search(r'[A-Z]', password):
+        return False, '패스워드에 대문자가 포함되어야 합니다.'
+
+    # 특수문자 검증
+    if settings.password_require_special and not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, '패스워드에 특수문자가 포함되어야 합니다.'
+
+    # 숫자 검증
+    if settings.password_require_number and not re.search(r'\d', password):
+        return False, '패스워드에 숫자가 포함되어야 합니다.'
+
+    return True, '패스워드가 요구사항을 충족합니다.'
+
+def get_client_ip():
+    """클라이언트 IP 주소 가져오기"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0]
+    return request.remote_addr
+
+def record_login_attempt(user_id, success):
+    """로그인 시도 기록"""
+    attempt = LoginAttempt(
+        user_id=user_id,
+        success=success,
+        ip_address=get_client_ip()
+    )
+    db.session.add(attempt)
+    db.session.commit()
+
+def check_account_lock(user):
+    """계정 잠금 상태 확인 및 처리"""
+    if user.is_account_locked():
+        remaining_time = (user.locked_until - datetime.utcnow()).total_seconds() / 60
+        return True, f'계정이 잠겨있습니다. {int(remaining_time)}분 후에 다시 시도하세요.'
+    return False, None
+
+def handle_failed_login(user):
+    """로그인 실패 처리 - 실패 횟수 증가 및 계정 잠금"""
+    settings = get_system_settings()
+    user.failed_login_attempts += 1
+
+    if user.failed_login_attempts >= settings.login_failure_limit:
+        user.is_locked = True
+        user.locked_until = datetime.utcnow() + timedelta(minutes=settings.account_lock_minutes)
+        db.session.commit()
+        return f'로그인 {settings.login_failure_limit}회 실패로 계정이 {settings.account_lock_minutes}분간 잠겼습니다.'
+
+    db.session.commit()
+    remaining = settings.login_failure_limit - user.failed_login_attempts
+    return f'로그인 실패. {remaining}회 더 실패하면 계정이 잠깁니다.'
+
+def reset_failed_login_attempts(user):
+    """로그인 성공 시 실패 횟수 초기화"""
+    user.failed_login_attempts = 0
+    user.is_locked = False
+    user.locked_until = None
+    db.session.commit()
+
+def manage_user_session(user_id):
+    """사용자 세션 관리 - 중복 로그인 방지"""
+    settings = get_system_settings()
+
+    if settings.prevent_duplicate_login:
+        # 기존 세션 모두 삭제
+        UserSession.query.filter_by(user_id=user_id).delete()
+        db.session.commit()
+
+    # 새 세션 생성
+    session_id = str(uuid.uuid4())
+    new_session = UserSession(
+        user_id=user_id,
+        session_id=session_id,
+        ip_address=get_client_ip()
+    )
+    db.session.add(new_session)
+    db.session.commit()
+
+    session['session_id'] = session_id
+    return session_id
+
+def check_session_timeout():
+    """세션 타임아웃 체크"""
+    settings = get_system_settings()
+
+    if not settings.session_timeout_enabled:
+        return True
+
+    if 'last_activity' in session:
+        last_activity = datetime.fromisoformat(session['last_activity'])
+        timeout_delta = timedelta(minutes=settings.session_timeout_minutes)
+
+        if datetime.utcnow() - last_activity > timeout_delta:
+            return False
+
+    session['last_activity'] = datetime.utcnow().isoformat()
+    return True
+
 # 권한 체크 데코레이터
 def role_required(*roles):
     """지정된 role만 접근 가능하도록 하는 데코레이터"""
@@ -200,11 +338,26 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user:
+            # 1. 계정 활성화 확인
             if not user.is_active:
                 flash('비활성화된 계정입니다. 관리자에게 문의하세요.', 'danger')
                 return render_template('login.html')
 
+            # 2. 계정 잠금 확인
+            is_locked, lock_message = check_account_lock(user)
+            if is_locked:
+                flash(lock_message, 'danger')
+                return render_template('login.html')
+
+            # 3. 비밀번호 확인
             if user.check_password(password):
+                # 로그인 성공
+                reset_failed_login_attempts(user)
+                record_login_attempt(user.id, success=True)
+
+                # 세션 관리 (중복 로그인 방지 포함)
+                manage_user_session(user.id)
+
                 login_user(user)
                 flash(f'환영합니다, {user.username}님!', 'success')
 
@@ -220,7 +373,10 @@ def login():
                 else:  # 일반 사용자
                     return redirect(url_for('user_dashboard'))
             else:
-                flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'danger')
+                # 로그인 실패
+                record_login_attempt(user.id, success=False)
+                error_message = handle_failed_login(user)
+                flash(error_message, 'danger')
         else:
             flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'danger')
 
@@ -229,7 +385,14 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    # 세션 정리
+    if 'session_id' in session:
+        UserSession.query.filter_by(session_id=session['session_id']).delete()
+        db.session.commit()
+
     logout_user()
+    session.clear()
+    flash('로그아웃되었습니다.', 'info')
     return redirect(url_for('login'))
 
 # ========== 슈퍼 관리자 전용 페이지 ==========
