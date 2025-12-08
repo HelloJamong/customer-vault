@@ -66,11 +66,13 @@ class User(UserMixin, db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    password_changed_at = db.Column(db.DateTime, default=datetime.utcnow)  # 패스워드 마지막 변경 시각
 
     customer = db.relationship('Customer', backref='user', uselist=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        self.password_changed_at = datetime.utcnow()  # 패스워드 변경 시 시간 업데이트
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -96,6 +98,21 @@ class User(UserMixin, db.Model):
             db.session.commit()
             return False
         return True
+
+    def is_password_expired(self, settings=None):
+        """패스워드가 만료되었는지 확인"""
+        if not settings:
+            from app import get_system_settings
+            settings = get_system_settings()
+
+        if not settings.password_expiry_enabled:
+            return False
+
+        if not self.password_changed_at:
+            return True  # 변경 이력이 없으면 만료로 간주
+
+        days_since_change = (datetime.utcnow() - self.password_changed_at).days
+        return days_since_change >= settings.password_expiry_days
 
 class Customer(db.Model):
     __tablename__ = 'customers'
@@ -145,6 +162,10 @@ class SystemSettings(db.Model):
     # 로그인 실패 설정
     login_failure_limit = db.Column(db.Integer, default=5)  # 1-5회
     account_lock_minutes = db.Column(db.Integer, default=10)  # 5-30분
+
+    # 패스워드 변경 주기 설정
+    password_expiry_enabled = db.Column(db.Boolean, default=False)
+    password_expiry_days = db.Column(db.Integer, default=90)  # 30-365일
 
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -359,6 +380,13 @@ def login():
                 manage_user_session(user.id)
 
                 login_user(user)
+
+                # 4. 패스워드 만료 확인
+                settings = get_system_settings()
+                if user.is_password_expired(settings):
+                    flash('패스워드가 만료되었습니다. 패스워드를 변경해주세요.', 'warning')
+                    return redirect(url_for('change_password', expired='true'))
+
                 flash(f'환영합니다, {user.username}님!', 'success')
 
                 # 권한별 리다이렉트
@@ -394,6 +422,67 @@ def logout():
     session.clear()
     flash('로그아웃되었습니다.', 'info')
     return redirect(url_for('login'))
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    """패스워드 변경"""
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        # 1. 현재 비밀번호 확인
+        if not current_user.check_password(current_password):
+            flash('현재 비밀번호가 올바르지 않습니다.', 'danger')
+            return render_template('change_password.html')
+
+        # 2. 새 비밀번호 확인
+        if new_password != confirm_password:
+            flash('새 비밀번호가 일치하지 않습니다.', 'danger')
+            return render_template('change_password.html')
+
+        # 3. 현재 비밀번호와 동일한지 확인
+        if current_password == new_password:
+            flash('새 비밀번호는 현재 비밀번호와 달라야 합니다.', 'danger')
+            return render_template('change_password.html')
+
+        # 4. 패스워드 복잡성 검증
+        is_valid, message = validate_password(new_password)
+        if not is_valid:
+            flash(message, 'danger')
+            return render_template('change_password.html')
+
+        # 5. 패스워드 변경
+        current_user.set_password(new_password)
+        db.session.commit()
+
+        flash('패스워드가 성공적으로 변경되었습니다.', 'success')
+
+        # 패스워드 만료로 인한 변경인 경우 대시보드로 리다이렉트
+        if request.args.get('expired') == 'true':
+            if current_user.is_super_admin():
+                return redirect(url_for('super_admin_dashboard'))
+            elif current_user.is_admin():
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for('user_dashboard'))
+
+        return redirect(url_for('index'))
+
+    # 패스워드 만료 확인
+    settings = get_system_settings()
+    password_expired = current_user.is_password_expired(settings)
+    days_until_expiry = None
+
+    if settings.password_expiry_enabled and current_user.password_changed_at:
+        days_since_change = (datetime.utcnow() - current_user.password_changed_at).days
+        days_until_expiry = settings.password_expiry_days - days_since_change
+
+    return render_template('change_password.html',
+                         password_expired=password_expired,
+                         days_until_expiry=days_until_expiry,
+                         settings=settings)
 
 # ========== 슈퍼 관리자 전용 페이지 ==========
 @app.route('/super-admin/dashboard')
@@ -468,6 +557,11 @@ def system_settings():
 
         lock_time = int(request.form.get('account_lock_minutes', 10))
         settings.account_lock_minutes = max(5, min(30, lock_time))  # 5-30분 제한
+
+        # 패스워드 변경 주기 설정
+        settings.password_expiry_enabled = request.form.get('password_expiry_enabled') == 'on'
+        expiry_days = int(request.form.get('password_expiry_days', 90))
+        settings.password_expiry_days = max(30, min(365, expiry_days))  # 30-365일 제한
 
         settings.updated_by = current_user.id
         db.session.commit()

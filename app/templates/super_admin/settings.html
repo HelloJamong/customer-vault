@@ -129,6 +129,38 @@
             </div>
         </div>
 
+        <!-- 패스워드 변경 주기 설정 -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-calendar-x"></i> 패스워드 변경 주기 설정</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="password_expiry_enabled"
+                               id="password_expiry_enabled"
+                               {% if settings.password_expiry_enabled %}checked{% endif %}
+                               onchange="togglePasswordExpiry()">
+                        <label class="form-check-label" for="password_expiry_enabled">
+                            패스워드 변경 주기 활성화
+                        </label>
+                        <div class="form-text">
+                            활성화 시 지정된 일자 후 패스워드 변경이 필요합니다.
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="password_expiry_settings">
+                        <label class="form-label">변경 주기 (30-365일)</label>
+                        <input type="number" class="form-control" name="password_expiry_days"
+                               value="{{ settings.password_expiry_days }}" min="30" max="365" required>
+                        <div class="form-text">
+                            마지막 변경 후 이 기간이 지나면 패스워드 변경이 필요합니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 설정 요약 -->
         <div class="col-md-6 mb-4">
             <div class="card h-100">
@@ -172,6 +204,15 @@
 
                         <dt class="col-sm-6">계정 잠금 시간:</dt>
                         <dd class="col-sm-6">{{ settings.account_lock_minutes }}분</dd>
+
+                        <dt class="col-sm-6">패스워드 변경 주기:</dt>
+                        <dd class="col-sm-6">
+                            {% if settings.password_expiry_enabled %}
+                            <span class="badge bg-danger">{{ settings.password_expiry_days }}일</span>
+                            {% else %}
+                            <span class="badge bg-secondary">비활성화</span>
+                            {% endif %}
+                        </dd>
                     </dl>
 
                     {% if settings.updated_at %}
@@ -210,9 +251,20 @@ function toggleSessionTimeout() {
     }
 }
 
+function togglePasswordExpiry() {
+    var enabled = document.getElementById('password_expiry_enabled').checked;
+    var settings = document.getElementById('password_expiry_settings');
+    if (enabled) {
+        settings.style.display = 'block';
+    } else {
+        settings.style.display = 'none';
+    }
+}
+
 // 페이지 로드 시 초기 상태 설정
 document.addEventListener('DOMContentLoaded', function() {
     toggleSessionTimeout();
+    togglePasswordExpiry();
 });
 </script>
 {% endblock %}
