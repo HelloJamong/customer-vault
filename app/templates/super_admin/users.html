@@ -25,7 +25,6 @@
                         <th>계정</th>
                         <th>이름</th>
                         <th>이메일</th>
-                        <th>고객사</th>
                         <th>상태</th>
                         <th>생성일</th>
                         <th>작업</th>
@@ -41,13 +40,6 @@
                             </td>
                             <td>{{ user.name }}</td>
                             <td>{{ user.email if user.email else '-' }}</td>
-                            <td>
-                                {% if user.customer %}
-                                {{ user.customer.company or user.customer.name }}
-                                {% else %}
-                                <span class="text-muted">미연결</span>
-                                {% endif %}
-                            </td>
                             <td>
                                 {% if user.is_active %}
                                 <span class="badge bg-success">활성</span>
@@ -83,7 +75,7 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted">
+                            <td colspan="7" class="text-center text-muted">
                                 등록된 일반 사용자가 없습니다.
                             </td>
                         </tr>
@@ -118,18 +110,6 @@
                         <label class="form-label">이메일</label>
                         <input type="email" class="form-control" name="email" placeholder="선택 사항">
                         <div class="form-text">이메일은 선택 사항입니다.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">고객사</label>
-                        <select class="form-select" name="customer_id">
-                            <option value="">선택 안 함</option>
-                            {% if customers %}
-                                {% for customer in customers %}
-                                <option value="{{ customer.id }}">{{ customer.company or customer.name }}</option>
-                                {% endfor %}
-                            {% endif %}
-                        </select>
-                        <div class="form-text">고객사를 연결할 수 있습니다 (선택 사항).</div>
                     </div>
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i>

@@ -285,6 +285,20 @@
     });
     </script>
     {% endif %}
+
+    <script>
+    // 플래시 메시지 자동 사라짐 (2초 후)
+    document.addEventListener('DOMContentLoaded', function() {
+        var alerts = document.querySelectorAll('.alert-dismissible');
+        alerts.forEach(function(alert) {
+            setTimeout(function() {
+                var bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }, 2000);
+        });
+    });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

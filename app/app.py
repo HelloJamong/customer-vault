@@ -442,6 +442,15 @@ def logout():
 @login_required
 def change_password():
     """패스워드 변경"""
+    # 패스워드 만료 확인 (GET/POST 모두에서 사용)
+    settings = get_system_settings()
+    password_expired = current_user.is_password_expired(settings)
+    days_until_expiry = None
+
+    if settings.password_expiry_enabled and current_user.password_changed_at:
+        days_since_change = (datetime.utcnow() - current_user.password_changed_at).days
+        days_until_expiry = settings.password_expiry_days - days_since_change
+
     if request.method == 'POST':
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
@@ -450,23 +459,35 @@ def change_password():
         # 1. 현재 비밀번호 확인
         if not current_user.check_password(current_password):
             flash('현재 비밀번호가 올바르지 않습니다.', 'danger')
-            return render_template('change_password.html')
+            return render_template('change_password.html',
+                                 password_expired=password_expired,
+                                 days_until_expiry=days_until_expiry,
+                                 settings=settings)
 
         # 2. 새 비밀번호 확인
         if new_password != confirm_password:
             flash('새 비밀번호가 일치하지 않습니다.', 'danger')
-            return render_template('change_password.html')
+            return render_template('change_password.html',
+                                 password_expired=password_expired,
+                                 days_until_expiry=days_until_expiry,
+                                 settings=settings)
 
         # 3. 현재 비밀번호와 동일한지 확인
         if current_password == new_password:
             flash('새 비밀번호는 현재 비밀번호와 달라야 합니다.', 'danger')
-            return render_template('change_password.html')
+            return render_template('change_password.html',
+                                 password_expired=password_expired,
+                                 days_until_expiry=days_until_expiry,
+                                 settings=settings)
 
         # 4. 패스워드 복잡성 검증
         is_valid, message = validate_password(new_password)
         if not is_valid:
             flash(message, 'danger')
-            return render_template('change_password.html')
+            return render_template('change_password.html',
+                                 password_expired=password_expired,
+                                 days_until_expiry=days_until_expiry,
+                                 settings=settings)
 
         # 5. 패스워드 변경
         current_user.set_password(new_password)
@@ -484,15 +505,6 @@ def change_password():
                 return redirect(url_for('user_dashboard'))
 
         return redirect(url_for('index'))
-
-    # 패스워드 만료 확인
-    settings = get_system_settings()
-    password_expired = current_user.is_password_expired(settings)
-    days_until_expiry = None
-
-    if settings.password_expiry_enabled and current_user.password_changed_at:
-        days_since_change = (datetime.utcnow() - current_user.password_changed_at).days
-        days_until_expiry = settings.password_expiry_days - days_since_change
 
     return render_template('change_password.html',
                          password_expired=password_expired,
