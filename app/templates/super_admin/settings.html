@@ -11,7 +11,108 @@
 </div>
 
 <form method="POST" action="{{ url_for('system_settings') }}">
+    <!-- 설정 요약 (전체 너비) -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> 현재 설정 요약</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">기본 패스워드</dt>
+                            <dd class="mb-0"><code>{{ settings.default_password }}</code></dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">패스워드 길이</dt>
+                            <dd class="mb-0">{{ settings.password_min_length }}-{{ settings.password_max_length }}자</dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">대문자 필수</dt>
+                            <dd class="mb-0">
+                                {% if settings.password_require_uppercase %}
+                                <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">중복 로그인 방지</dt>
+                            <dd class="mb-0">
+                                {% if settings.prevent_duplicate_login %}
+                                <span class="badge bg-warning">활성화</span>
+                                {% else %}
+                                <span class="badge bg-secondary">비활성화</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">세션 타임아웃</dt>
+                            <dd class="mb-0">
+                                {% if settings.session_timeout_enabled %}
+                                <span class="badge bg-info">{{ settings.session_timeout_minutes }}분</span>
+                                {% else %}
+                                <span class="badge bg-secondary">비활성화</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">로그인 실패 제한</dt>
+                            <dd class="mb-0"><span class="badge bg-danger">{{ settings.login_failure_limit }}회</span></dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">계정 잠금 시간</dt>
+                            <dd class="mb-0"><span class="badge bg-warning text-dark">{{ settings.account_lock_minutes }}분</span></dd>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <dt class="text-muted small">패스워드 변경 주기</dt>
+                            <dd class="mb-0">
+                                {% if settings.password_expiry_enabled %}
+                                <span class="badge bg-danger">{{ settings.password_expiry_days }}일</span>
+                                {% else %}
+                                <span class="badge bg-secondary">비활성화</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </div>
+                    {% if settings.updated_at %}
+                    <hr class="mt-2 mb-2">
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-clock"></i> 마지막 업데이트: {{ settings.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
+        <!-- 기본 패스워드 설정 -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-key-fill"></i> 기본 패스워드 설정</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">기본 패스워드</label>
+                        <input type="text" class="form-control" name="default_password"
+                               value="{{ settings.default_password }}" required>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 신규 계정 생성 시 또는 패스워드 초기화 시 사용되는 기본 패스워드입니다.
+                            <br>기본 패스워드는 복잡성 규칙을 따르지 않습니다.
+                        </div>
+                    </div>
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>주의:</strong> 사용자는 최초 로그인 후 반드시 패스워드를 변경해야 합니다.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 패스워드 복잡성 설정 -->
         <div class="col-md-6 mb-4">
             <div class="card h-100">
@@ -157,70 +258,6 @@
                             마지막 변경 후 이 기간이 지나면 패스워드 변경이 필요합니다.
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 설정 요약 -->
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> 현재 설정 요약</h5>
-                </div>
-                <div class="card-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-6">패스워드 길이:</dt>
-                        <dd class="col-sm-6">{{ settings.password_min_length }}-{{ settings.password_max_length }}자</dd>
-
-                        <dt class="col-sm-6">대문자 필수:</dt>
-                        <dd class="col-sm-6">
-                            {% if settings.password_require_uppercase %}
-                            <span class="badge bg-success">Yes</span>
-                            {% else %}
-                            <span class="badge bg-secondary">No</span>
-                            {% endif %}
-                        </dd>
-
-                        <dt class="col-sm-6">중복 로그인 방지:</dt>
-                        <dd class="col-sm-6">
-                            {% if settings.prevent_duplicate_login %}
-                            <span class="badge bg-warning">활성화</span>
-                            {% else %}
-                            <span class="badge bg-secondary">비활성화</span>
-                            {% endif %}
-                        </dd>
-
-                        <dt class="col-sm-6">세션 타임아웃:</dt>
-                        <dd class="col-sm-6">
-                            {% if settings.session_timeout_enabled %}
-                            <span class="badge bg-info">{{ settings.session_timeout_minutes }}분</span>
-                            {% else %}
-                            <span class="badge bg-secondary">비활성화</span>
-                            {% endif %}
-                        </dd>
-
-                        <dt class="col-sm-6">로그인 실패 제한:</dt>
-                        <dd class="col-sm-6">{{ settings.login_failure_limit }}회</dd>
-
-                        <dt class="col-sm-6">계정 잠금 시간:</dt>
-                        <dd class="col-sm-6">{{ settings.account_lock_minutes }}분</dd>
-
-                        <dt class="col-sm-6">패스워드 변경 주기:</dt>
-                        <dd class="col-sm-6">
-                            {% if settings.password_expiry_enabled %}
-                            <span class="badge bg-danger">{{ settings.password_expiry_days }}일</span>
-                            {% else %}
-                            <span class="badge bg-secondary">비활성화</span>
-                            {% endif %}
-                        </dd>
-                    </dl>
-
-                    {% if settings.updated_at %}
-                    <hr>
-                    <p class="text-muted small mb-0">
-                        마지막 업데이트: {{ settings.updated_at.strftime('%Y-%m-%d %H:%M') }}
-                    </p>
-                    {% endif %}
                 </div>
             </div>
         </div>

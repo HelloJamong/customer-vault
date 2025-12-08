@@ -22,7 +22,8 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>사용자명</th>
+                        <th>계정</th>
+                        <th>이름</th>
                         <th>이메일</th>
                         <th>고객사</th>
                         <th>상태</th>
@@ -36,9 +37,10 @@
                         <tr>
                             <td>{{ user.id }}</td>
                             <td>
-                                <i class="bi bi-person-fill text-success"></i> {{ user.username }}
+                                <i class="bi bi-person-fill text-success"></i> <strong>{{ user.username }}</strong>
                             </td>
-                            <td>{{ user.email }}</td>
+                            <td>{{ user.name }}</td>
+                            <td>{{ user.email if user.email else '-' }}</td>
                             <td>
                                 {% if user.customer %}
                                 {{ user.customer.company or user.customer.name }}
@@ -52,27 +54,36 @@
                                 {% else %}
                                 <span class="badge bg-secondary">비활성</span>
                                 {% endif %}
+                                {% if user.is_first_login %}
+                                <span class="badge bg-warning text-dark">최초 로그인 필요</span>
+                                {% endif %}
                             </td>
                             <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
                             <td>
-                                <button class="btn btn-sm btn-warning">
-                                    <i class="bi bi-key"></i> 비밀번호 초기화
-                                </button>
+                                <form method="POST" action="{{ url_for('reset_password', user_id=user.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('패스워드를 기본 패스워드로 초기화하시겠습니까?')">
+                                        <i class="bi bi-key"></i> 비밀번호 초기화
+                                    </button>
+                                </form>
                                 {% if user.is_active %}
-                                <button class="btn btn-sm btn-secondary">
-                                    <i class="bi bi-pause-circle"></i> 비활성화
-                                </button>
+                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=user.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-secondary">
+                                        <i class="bi bi-pause-circle"></i> 비활성화
+                                    </button>
+                                </form>
                                 {% else %}
-                                <button class="btn btn-sm btn-success">
-                                    <i class="bi bi-play-circle"></i> 활성화
-                                </button>
+                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=user.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="bi bi-play-circle"></i> 활성화
+                                    </button>
+                                </form>
                                 {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">
+                            <td colspan="8" class="text-center text-muted">
                                 등록된 일반 사용자가 없습니다.
                             </td>
                         </tr>
@@ -87,33 +98,50 @@
 <div class="modal fade" id="createUserModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-success text-white">
                 <h5 class="modal-title"><i class="bi bi-person"></i> 사용자 계정 생성</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="#">
+                <form method="POST" action="{{ url_for('create_user') }}">
                     <div class="mb-3">
-                        <label class="form-label">사용자명</label>
-                        <input type="text" class="form-control" name="username" required>
+                        <label class="form-label">계정 ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="username" required placeholder="로그인 시 사용할 계정 ID">
+                        <div class="form-text">로그인 시 사용할 계정 ID를 입력하세요.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">이름 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required placeholder="실명 또는 표시명">
+                        <div class="form-text">실명 또는 표시명을 입력하세요.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">이메일</label>
-                        <input type="email" class="form-control" name="email" required>
+                        <input type="email" class="form-control" name="email" placeholder="선택 사항">
+                        <div class="form-text">이메일은 선택 사항입니다.</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">비밀번호</label>
-                        <input type="password" class="form-control" name="password" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">고객사 (선택)</label>
+                        <label class="form-label">고객사</label>
                         <select class="form-select" name="customer_id">
                             <option value="">선택 안 함</option>
-                            <!-- TODO: 고객사 목록 동적 로드 -->
+                            {% if customers %}
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}">{{ customer.company or customer.name }}</option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
+                        <div class="form-text">고객사를 연결할 수 있습니다 (선택 사항).</div>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success">생성</button>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>참고:</strong> 패스워드는 시스템 설정의 기본 패스워드로 자동 설정됩니다. 사용자는 최초 로그인 후 패스워드를 변경해야 합니다.
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> 생성
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> 취소
+                        </button>
                     </div>
                 </form>
             </div>

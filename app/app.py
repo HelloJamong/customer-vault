@@ -52,9 +52,10 @@ ROLE_USER = 'user'
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)  # 로그인용 계정 ID
+    name = db.Column(db.String(100), nullable=False)  # 실명/표시명
     password_hash = db.Column(db.String(255), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)  # 선택 사항
     role = db.Column(db.String(20), nullable=False, default=ROLE_USER)  # super_admin, admin, user
     is_active = db.Column(db.Boolean, default=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)  # 일반 사용자만 연결
@@ -63,6 +64,9 @@ class User(UserMixin, db.Model):
     is_locked = db.Column(db.Boolean, default=False)
     locked_until = db.Column(db.DateTime, nullable=True)
     failed_login_attempts = db.Column(db.Integer, default=0)
+
+    # 최초 로그인 여부 (기본 패스워드 변경 필요)
+    is_first_login = db.Column(db.Boolean, default=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -73,6 +77,7 @@ class User(UserMixin, db.Model):
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
         self.password_changed_at = datetime.utcnow()  # 패스워드 변경 시 시간 업데이트
+        self.is_first_login = False  # 패스워드 변경 후 최초 로그인 플래그 해제
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -144,6 +149,9 @@ class Document(db.Model):
 class SystemSettings(db.Model):
     __tablename__ = 'system_settings'
     id = db.Column(db.Integer, primary_key=True)
+
+    # 기본 패스워드 설정
+    default_password = db.Column(db.String(50), default='Welcome1!')
 
     # 패스워드 복잡성 설정
     password_min_length = db.Column(db.Integer, default=8)
@@ -381,7 +389,12 @@ def login():
 
                 login_user(user)
 
-                # 4. 패스워드 만료 확인
+                # 4. 최초 로그인 확인 (기본 패스워드 변경 필요)
+                if user.is_first_login:
+                    flash('최초 로그인입니다. 보안을 위해 패스워드를 변경해주세요.', 'warning')
+                    return redirect(url_for('change_password', first_login='true'))
+
+                # 5. 패스워드 만료 확인
                 settings = get_system_settings()
                 if user.is_password_expired(settings):
                     flash('패스워드가 만료되었습니다. 패스워드를 변경해주세요.', 'warning')
@@ -516,7 +529,8 @@ def manage_admins():
 def manage_users():
     """일반 사용자 목록 및 관리"""
     users = User.query.filter_by(role=ROLE_USER).all()
-    return render_template('super_admin/users.html', users=users)
+    customers = Customer.query.all()
+    return render_template('super_admin/users.html', users=users, customers=customers)
 
 @app.route('/super-admin/customers')
 @super_admin_required
@@ -524,6 +538,157 @@ def manage_customers():
     """고객사 목록 및 관리"""
     customers_list = Customer.query.all()
     return render_template('super_admin/customers.html', customers=customers_list)
+
+@app.route('/super-admin/create-admin', methods=['POST'])
+@super_admin_required
+def create_admin():
+    """관리자 계정 생성"""
+    username = request.form.get('username')
+    name = request.form.get('name')
+    email = request.form.get('email') if request.form.get('email') else None
+
+    # 중복 체크
+    if User.query.filter_by(username=username).first():
+        flash('이미 존재하는 계정 ID입니다.', 'danger')
+        return redirect(url_for('manage_admins'))
+
+    if email and User.query.filter_by(email=email).first():
+        flash('이미 사용 중인 이메일입니다.', 'danger')
+        return redirect(url_for('manage_admins'))
+
+    # 기본 패스워드 가져오기
+    settings = get_system_settings()
+
+    # 관리자 생성
+    admin = User(
+        username=username,
+        name=name,
+        email=email,
+        role=ROLE_ADMIN,
+        is_active=True
+    )
+    # 기본 패스워드로 설정하되, is_first_login은 True로 유지
+    admin.password_hash = generate_password_hash(settings.default_password)
+    admin.password_changed_at = datetime.utcnow()
+    admin.is_first_login = True
+
+    db.session.add(admin)
+    db.session.commit()
+
+    flash(f'관리자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
+    return redirect(url_for('manage_admins'))
+
+@app.route('/super-admin/create-user', methods=['POST'])
+@super_admin_required
+def create_user():
+    """일반 사용자 계정 생성"""
+    username = request.form.get('username')
+    name = request.form.get('name')
+    email = request.form.get('email') if request.form.get('email') else None
+    customer_id = request.form.get('customer_id') if request.form.get('customer_id') else None
+
+    # 중복 체크
+    if User.query.filter_by(username=username).first():
+        flash('이미 존재하는 계정 ID입니다.', 'danger')
+        return redirect(url_for('manage_users'))
+
+    if email and User.query.filter_by(email=email).first():
+        flash('이미 사용 중인 이메일입니다.', 'danger')
+        return redirect(url_for('manage_users'))
+
+    # 기본 패스워드 가져오기
+    settings = get_system_settings()
+
+    # 사용자 생성
+    user = User(
+        username=username,
+        name=name,
+        email=email,
+        role=ROLE_USER,
+        is_active=True,
+        customer_id=int(customer_id) if customer_id else None
+    )
+    # 기본 패스워드로 설정하되, is_first_login은 True로 유지
+    user.password_hash = generate_password_hash(settings.default_password)
+    user.password_changed_at = datetime.utcnow()
+    user.is_first_login = True
+
+    db.session.add(user)
+    db.session.commit()
+
+    flash(f'사용자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
+    return redirect(url_for('manage_users'))
+
+@app.route('/super-admin/reset-password/<int:user_id>', methods=['POST'])
+@super_admin_required
+def reset_password(user_id):
+    """사용자 패스워드 초기화"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼 관리자 자신은 초기화할 수 없음
+    if user.id == current_user.id:
+        flash('자신의 패스워드는 초기화할 수 없습니다.', 'danger')
+        return redirect(request.referrer or url_for('super_admin_dashboard'))
+
+    # 기본 패스워드로 초기화
+    settings = get_system_settings()
+    user.password_hash = generate_password_hash(settings.default_password)
+    user.password_changed_at = datetime.utcnow()
+    user.is_first_login = True
+    db.session.commit()
+
+    flash(f'{user.username}의 패스워드가 기본 패스워드로 초기화되었습니다.', 'success')
+    return redirect(request.referrer or url_for('super_admin_dashboard'))
+
+@app.route('/super-admin/delete-user/<int:user_id>', methods=['POST'])
+@super_admin_required
+def delete_user(user_id):
+    """사용자 삭제"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼 관리자 자신은 삭제할 수 없음
+    if user.id == current_user.id:
+        flash('자신의 계정은 삭제할 수 없습니다.', 'danger')
+        return redirect(request.referrer or url_for('super_admin_dashboard'))
+
+    # 슈퍼 관리자는 삭제할 수 없음
+    if user.role == ROLE_SUPER_ADMIN:
+        flash('슈퍼 관리자 계정은 삭제할 수 없습니다.', 'danger')
+        return redirect(request.referrer or url_for('super_admin_dashboard'))
+
+    username = user.username
+
+    # 관련 데이터 삭제 (외래 키 제약 조건 해결)
+    # 1. 로그인 시도 기록 삭제
+    LoginAttempt.query.filter_by(user_id=user.id).delete()
+
+    # 2. 사용자 세션 삭제
+    UserSession.query.filter_by(user_id=user.id).delete()
+
+    # 3. 사용자 삭제
+    db.session.delete(user)
+    db.session.commit()
+
+    flash(f'계정 "{username}"이 삭제되었습니다.', 'success')
+    return redirect(request.referrer or url_for('super_admin_dashboard'))
+
+@app.route('/super-admin/toggle-active/<int:user_id>', methods=['POST'])
+@super_admin_required
+def toggle_user_active(user_id):
+    """사용자 활성화/비활성화 토글"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼 관리자 자신은 비활성화할 수 없음
+    if user.id == current_user.id:
+        flash('자신의 계정은 비활성화할 수 없습니다.', 'danger')
+        return redirect(request.referrer or url_for('super_admin_dashboard'))
+
+    user.is_active = not user.is_active
+    db.session.commit()
+
+    status = '활성화' if user.is_active else '비활성화'
+    flash(f'{user.username} 계정이 {status}되었습니다.', 'success')
+    return redirect(request.referrer or url_for('super_admin_dashboard'))
 
 @app.route('/super-admin/settings', methods=['GET', 'POST'])
 @super_admin_required
@@ -538,6 +703,9 @@ def system_settings():
         db.session.commit()
 
     if request.method == 'POST':
+        # 기본 패스워드 설정
+        settings.default_password = request.form.get('default_password', 'Welcome1!')
+
         # 패스워드 복잡성 설정
         settings.password_min_length = int(request.form.get('password_min_length', 8))
         settings.password_max_length = int(request.form.get('password_max_length', 20))
@@ -698,7 +866,16 @@ def api_change_password():
             'message': '새 패스워드는 현재 패스워드와 달라야 합니다.'
         })
 
-    # 4. 패스워드 복잡성 검증
+    # 4. 최초 로그인 시 기본 패스워드 재사용 방지
+    if current_user.is_first_login:
+        settings = get_system_settings()
+        if new_password == settings.default_password:
+            return jsonify({
+                'success': False,
+                'message': '기본 패스워드는 재사용할 수 없습니다. 새로운 패스워드를 설정해주세요.'
+            })
+
+    # 5. 패스워드 복잡성 검증
     is_valid, message = validate_password(new_password)
     if not is_valid:
         return jsonify({
@@ -706,7 +883,7 @@ def api_change_password():
             'message': message
         })
 
-    # 5. 패스워드 변경
+    # 6. 패스워드 변경
     current_user.set_password(new_password)
     db.session.commit()
 
@@ -728,9 +905,11 @@ def init_db():
         if not User.query.filter_by(username='vmadm').first():
             super_admin = User(
                 username='vmadm',
+                name='슈퍼관리자',
                 email='vmadm@example.com',
                 role=ROLE_SUPER_ADMIN,
-                is_active=True
+                is_active=True,
+                is_first_login=False  # 슈퍼 관리자는 최초 로그인 플래그 해제
             )
             super_admin.set_password('vmadm!2024')  # 운영 환경에서는 반드시 변경 필요!
             db.session.add(super_admin)
