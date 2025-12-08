@@ -2,7 +2,7 @@ import os
 import re
 import uuid
 from functools import wraps
-from flask import Flask, render_template, redirect, url_for, flash, request, abort, session
+from flask import Flask, render_template, redirect, url_for, flash, request, abort, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -387,9 +387,7 @@ def login():
                     flash('패스워드가 만료되었습니다. 패스워드를 변경해주세요.', 'warning')
                     return redirect(url_for('change_password', expired='true'))
 
-                flash(f'환영합니다, {user.username}님!', 'success')
-
-                # 권한별 리다이렉트
+                # 권한별 리다이렉트 (환영 메시지 제거)
                 next_page = request.args.get('next')
                 if next_page:
                     return redirect(next_page)
@@ -420,7 +418,11 @@ def logout():
 
     logout_user()
     session.clear()
-    flash('로그아웃되었습니다.', 'info')
+
+    # 패스워드 변경 후 로그아웃인 경우 메시지 표시
+    if request.args.get('password_changed') == 'true':
+        flash('패스워드가 변경되었습니다. 새 패스워드로 다시 로그인해주세요.', 'success')
+
     return redirect(url_for('login'))
 
 @app.route('/change-password', methods=['GET', 'POST'])
@@ -653,6 +655,65 @@ def upload_document():
         return redirect(url_for('user_dashboard'))
 
     return render_template('user/upload_document.html')
+
+@app.route('/api/password-requirements')
+@login_required
+def get_password_requirements():
+    """패스워드 요구사항 반환 (API)"""
+    settings = get_system_settings()
+    return jsonify({
+        'min_length': settings.password_min_length,
+        'max_length': settings.password_max_length,
+        'require_uppercase': settings.password_require_uppercase,
+        'require_special': settings.password_require_special,
+        'require_number': settings.password_require_number
+    })
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def api_change_password():
+    """패스워드 변경 API - JSON 응답"""
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    # 1. 현재 비밀번호 확인
+    if not current_user.check_password(current_password):
+        return jsonify({
+            'success': False,
+            'message': '현재 패스워드가 올바르지 않습니다.'
+        })
+
+    # 2. 새 비밀번호 확인
+    if new_password != confirm_password:
+        return jsonify({
+            'success': False,
+            'message': '새 패스워드가 일치하지 않습니다.'
+        })
+
+    # 3. 현재 비밀번호와 동일한지 확인
+    if current_password == new_password:
+        return jsonify({
+            'success': False,
+            'message': '새 패스워드는 현재 패스워드와 달라야 합니다.'
+        })
+
+    # 4. 패스워드 복잡성 검증
+    is_valid, message = validate_password(new_password)
+    if not is_valid:
+        return jsonify({
+            'success': False,
+            'message': message
+        })
+
+    # 5. 패스워드 변경
+    current_user.set_password(new_password)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': '패스워드가 변경되었습니다. 다시 로그인해주세요.'
+    })
 
 @app.route('/health')
 def health():

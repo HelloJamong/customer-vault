@@ -100,7 +100,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('change_password') }}">
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                     <i class="bi bi-key"></i> 패스워드 변경
                                 </a>
                             </li>
@@ -133,7 +133,158 @@
         {% block content %}{% endblock %}
     </div>
 
+    <!-- 패스워드 변경 모달 -->
+    {% if current_user.is_authenticated %}
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="changePasswordModalLabel">
+                        <i class="bi bi-key"></i> 패스워드 변경
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changePasswordForm">
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">현재 패스워드 <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">새 패스워드 <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" required>
+                            <div class="form-text" id="password_requirements">
+                                <i class="bi bi-info-circle"></i> 패스워드 요구사항을 불러오는 중...
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">새 패스워드 확인 <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+
+                        <div id="passwordChangeAlert" class="alert d-none" role="alert"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> 취소
+                    </button>
+                    <button type="button" class="btn btn-primary" id="submitPasswordChange">
+                        <i class="bi bi-check-circle"></i> 패스워드 변경
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% if current_user.is_authenticated %}
+    <script>
+    // 패스워드 변경 모달이 열릴 때 패스워드 요구사항 로드
+    document.getElementById('changePasswordModal').addEventListener('show.bs.modal', function () {
+        // 폼 초기화
+        document.getElementById('changePasswordForm').reset();
+        document.getElementById('passwordChangeAlert').classList.add('d-none');
+
+        // 패스워드 요구사항 로드
+        fetch('/api/password-requirements')
+            .then(response => response.json())
+            .then(data => {
+                let requirementsHtml = '<i class="bi bi-info-circle"></i> 패스워드 요구사항:<ul class="mb-0 mt-1">';
+                requirementsHtml += '<li>길이: ' + data.min_length + '-' + data.max_length + '자</li>';
+                if (data.require_uppercase) {
+                    requirementsHtml += '<li>대문자 포함 필수</li>';
+                }
+                if (data.require_special) {
+                    requirementsHtml += '<li>특수문자 포함 필수</li>';
+                }
+                if (data.require_number) {
+                    requirementsHtml += '<li>숫자 포함 필수</li>';
+                }
+                requirementsHtml += '</ul>';
+                document.getElementById('password_requirements').innerHTML = requirementsHtml;
+            });
+    });
+
+    // 패스워드 일치 확인
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        var newPassword = document.getElementById('new_password').value;
+        var confirmPassword = this.value;
+
+        if (confirmPassword && newPassword !== confirmPassword) {
+            this.setCustomValidity('패스워드가 일치하지 않습니다.');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+
+    // 새 패스워드 입력 시에도 확인
+    document.getElementById('new_password').addEventListener('input', function() {
+        var confirmPasswordField = document.getElementById('confirm_password');
+        if (confirmPasswordField.value) {
+            confirmPasswordField.dispatchEvent(new Event('input'));
+        }
+    });
+
+    // 패스워드 변경 제출
+    document.getElementById('submitPasswordChange').addEventListener('click', function() {
+        var form = document.getElementById('changePasswordForm');
+
+        // 폼 유효성 검사
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        var formData = new FormData(form);
+        var alertDiv = document.getElementById('passwordChangeAlert');
+
+        // 제출 버튼 비활성화
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 변경 중...';
+
+        fetch('/api/change-password', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 성공 메시지 표시
+                alertDiv.className = 'alert alert-success';
+                alertDiv.textContent = data.message;
+                alertDiv.classList.remove('d-none');
+
+                // 2초 후 로그아웃하고 로그인 페이지로 리다이렉트
+                setTimeout(function() {
+                    window.location.href = '/logout?password_changed=true';
+                }, 2000);
+            } else {
+                // 에러 메시지 표시
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = data.message;
+                alertDiv.classList.remove('d-none');
+
+                // 제출 버튼 다시 활성화
+                document.getElementById('submitPasswordChange').disabled = false;
+                document.getElementById('submitPasswordChange').innerHTML = '<i class="bi bi-check-circle"></i> 패스워드 변경';
+            }
+        })
+        .catch(error => {
+            alertDiv.className = 'alert alert-danger';
+            alertDiv.textContent = '패스워드 변경 중 오류가 발생했습니다.';
+            alertDiv.classList.remove('d-none');
+
+            // 제출 버튼 다시 활성화
+            document.getElementById('submitPasswordChange').disabled = false;
+            document.getElementById('submitPasswordChange').innerHTML = '<i class="bi bi-check-circle"></i> 패스워드 변경';
+        });
+    });
+    </script>
+    {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>
