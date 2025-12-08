@@ -38,6 +38,12 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), nullable=False, default=ROLE_USER)  # super_admin, admin, user
     is_active = db.Column(db.Boolean, default=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)  # 일반 사용자만 연결
+
+    # 계정 잠금 관련
+    is_locked = db.Column(db.Boolean, default=False)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -57,6 +63,19 @@ class User(UserMixin, db.Model):
 
     def is_normal_user(self):
         return self.role == ROLE_USER
+
+    def is_account_locked(self):
+        """계정이 잠겨있는지 확인"""
+        if not self.is_locked:
+            return False
+        if self.locked_until and datetime.utcnow() > self.locked_until:
+            # 잠금 시간이 지났으면 잠금 해제
+            self.is_locked = False
+            self.locked_until = None
+            self.failed_login_attempts = 0
+            db.session.commit()
+            return False
+        return True
 
 class Customer(db.Model):
     __tablename__ = 'customers'
@@ -82,8 +101,52 @@ class Document(db.Model):
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     inspection_date = db.Column(db.Date)
-    
+
     uploader = db.relationship('User', backref='documents')
+
+class SystemSettings(db.Model):
+    __tablename__ = 'system_settings'
+    id = db.Column(db.Integer, primary_key=True)
+
+    # 패스워드 복잡성 설정
+    password_min_length = db.Column(db.Integer, default=8)
+    password_max_length = db.Column(db.Integer, default=20)
+    password_require_uppercase = db.Column(db.Boolean, default=True)
+    password_require_special = db.Column(db.Boolean, default=True)
+    password_require_number = db.Column(db.Boolean, default=True)
+
+    # 중복 로그인 설정
+    prevent_duplicate_login = db.Column(db.Boolean, default=False)
+
+    # 세션 타임아웃 설정
+    session_timeout_enabled = db.Column(db.Boolean, default=False)
+    session_timeout_minutes = db.Column(db.Integer, default=30)  # 3-60분
+
+    # 로그인 실패 설정
+    login_failure_limit = db.Column(db.Integer, default=5)  # 1-5회
+    account_lock_minutes = db.Column(db.Integer, default=10)  # 5-30분
+
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+class LoginAttempt(db.Model):
+    """로그인 시도 기록"""
+    __tablename__ = 'login_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    attempt_time = db.Column(db.DateTime, default=datetime.utcnow)
+    success = db.Column(db.Boolean, default=False)
+    ip_address = db.Column(db.String(45))
+
+class UserSession(db.Model):
+    """사용자 세션 관리"""
+    __tablename__ = 'user_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    session_id = db.Column(db.String(255), unique=True, nullable=False)
+    login_time = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(45))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -207,6 +270,49 @@ def manage_customers():
     """고객사 목록 및 관리"""
     customers_list = Customer.query.all()
     return render_template('super_admin/customers.html', customers=customers_list)
+
+@app.route('/super-admin/settings', methods=['GET', 'POST'])
+@super_admin_required
+def system_settings():
+    """시스템 설정 관리"""
+    settings = SystemSettings.query.first()
+
+    # 설정이 없으면 기본값으로 생성
+    if not settings:
+        settings = SystemSettings()
+        db.session.add(settings)
+        db.session.commit()
+
+    if request.method == 'POST':
+        # 패스워드 복잡성 설정
+        settings.password_min_length = int(request.form.get('password_min_length', 8))
+        settings.password_max_length = int(request.form.get('password_max_length', 20))
+        settings.password_require_uppercase = request.form.get('password_require_uppercase') == 'on'
+        settings.password_require_special = request.form.get('password_require_special') == 'on'
+        settings.password_require_number = request.form.get('password_require_number') == 'on'
+
+        # 중복 로그인 설정
+        settings.prevent_duplicate_login = request.form.get('prevent_duplicate_login') == 'on'
+
+        # 세션 타임아웃 설정
+        settings.session_timeout_enabled = request.form.get('session_timeout_enabled') == 'on'
+        session_timeout = int(request.form.get('session_timeout_minutes', 30))
+        settings.session_timeout_minutes = max(3, min(60, session_timeout))  # 3-60분 제한
+
+        # 로그인 실패 설정
+        login_limit = int(request.form.get('login_failure_limit', 5))
+        settings.login_failure_limit = max(1, min(5, login_limit))  # 1-5회 제한
+
+        lock_time = int(request.form.get('account_lock_minutes', 10))
+        settings.account_lock_minutes = max(5, min(30, lock_time))  # 5-30분 제한
+
+        settings.updated_by = current_user.id
+        db.session.commit()
+
+        flash('시스템 설정이 저장되었습니다.', 'success')
+        return redirect(url_for('system_settings'))
+
+    return render_template('super_admin/settings.html', settings=settings)
 
 # ========== 일반 관리자 전용 페이지 ==========
 @app.route('/admin/dashboard')
