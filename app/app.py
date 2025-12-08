@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template, redirect, url_for, flash, request
+from functools import wraps
+from flask import Flask, render_template, redirect, url_for, flash, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -22,6 +23,11 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# 권한 상수
+ROLE_SUPER_ADMIN = 'super_admin'
+ROLE_ADMIN = 'admin'
+ROLE_USER = 'user'
+
 # 데이터베이스 모델
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -29,13 +35,28 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
+    role = db.Column(db.String(20), nullable=False, default=ROLE_USER)  # super_admin, admin, user
+    is_active = db.Column(db.Boolean, default=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)  # 일반 사용자만 연결
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    customer = db.relationship('Customer', backref='user', uselist=False)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def is_super_admin(self):
+        return self.role == ROLE_SUPER_ADMIN
+
+    def is_admin(self):
+        return self.role == ROLE_ADMIN
+
+    def is_normal_user(self):
+        return self.role == ROLE_USER
 
 class Customer(db.Model):
     __tablename__ = 'customers'
@@ -68,25 +89,78 @@ class Document(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# 권한 체크 데코레이터
+def role_required(*roles):
+    """지정된 role만 접근 가능하도록 하는 데코레이터"""
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_active:
+                flash('비활성화된 계정입니다. 관리자에게 문의하세요.', 'danger')
+                return redirect(url_for('login'))
+            if current_user.role not in roles:
+                flash('접근 권한이 없습니다.', 'danger')
+                abort(403)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def super_admin_required(f):
+    """슈퍼 관리자만 접근 가능"""
+    return role_required(ROLE_SUPER_ADMIN)(f)
+
+def admin_required(f):
+    """슈퍼 관리자 또는 일반 관리자만 접근 가능"""
+    return role_required(ROLE_SUPER_ADMIN, ROLE_ADMIN)(f)
+
 # 라우트
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    """메인 페이지 - 권한별 대시보드로 리다이렉트"""
+    if current_user.is_super_admin():
+        return redirect(url_for('super_admin_dashboard'))
+    elif current_user.is_admin():
+        return redirect(url_for('admin_dashboard'))
+    else:
+        return redirect(url_for('user_dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            login_user(user)
-            return redirect(url_for('index'))
+
+        if user:
+            if not user.is_active:
+                flash('비활성화된 계정입니다. 관리자에게 문의하세요.', 'danger')
+                return render_template('login.html')
+
+            if user.check_password(password):
+                login_user(user)
+                flash(f'환영합니다, {user.username}님!', 'success')
+
+                # 권한별 리다이렉트
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+
+                if user.is_super_admin():
+                    return redirect(url_for('super_admin_dashboard'))
+                elif user.is_admin():
+                    return redirect(url_for('admin_dashboard'))
+                else:  # 일반 사용자
+                    return redirect(url_for('user_dashboard'))
+            else:
+                flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'danger')
         else:
-            flash('로그인 정보가 올바르지 않습니다.', 'danger')
-    
+            flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'danger')
+
     return render_template('login.html')
 
 @app.route('/logout')
@@ -95,11 +169,127 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/customers')
-@login_required
-def customers():
+# ========== 슈퍼 관리자 전용 페이지 ==========
+@app.route('/super-admin/dashboard')
+@super_admin_required
+def super_admin_dashboard():
+    """슈퍼 관리자 대시보드 - 모든 메뉴 접근 가능"""
+    total_users = User.query.count()
+    total_admins = User.query.filter_by(role=ROLE_ADMIN).count()
+    total_normal_users = User.query.filter_by(role=ROLE_USER).count()
+    total_customers = Customer.query.count()
+    total_documents = Document.query.count()
+
+    return render_template('super_admin/dashboard.html',
+                         total_users=total_users,
+                         total_admins=total_admins,
+                         total_normal_users=total_normal_users,
+                         total_customers=total_customers,
+                         total_documents=total_documents)
+
+@app.route('/super-admin/admins')
+@super_admin_required
+def manage_admins():
+    """일반 관리자 목록 및 관리"""
+    admins = User.query.filter_by(role=ROLE_ADMIN).all()
+    return render_template('super_admin/admins.html', admins=admins)
+
+@app.route('/super-admin/users')
+@super_admin_required
+def manage_users():
+    """일반 사용자 목록 및 관리"""
+    users = User.query.filter_by(role=ROLE_USER).all()
+    return render_template('super_admin/users.html', users=users)
+
+@app.route('/super-admin/customers')
+@super_admin_required
+def manage_customers():
+    """고객사 목록 및 관리"""
     customers_list = Customer.query.all()
-    return render_template('customers.html', customers=customers_list)
+    return render_template('super_admin/customers.html', customers=customers_list)
+
+# ========== 일반 관리자 전용 페이지 ==========
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    """일반 관리자 대시보드 - 일반 사용자 관리, 패스워드 초기화, 서비스 로그 확인"""
+    total_users = User.query.filter_by(role=ROLE_USER).count()
+    total_customers = Customer.query.count()
+    total_documents = Document.query.count()
+    active_users = User.query.filter_by(role=ROLE_USER, is_active=True).count()
+
+    return render_template('admin/dashboard.html',
+                         total_users=total_users,
+                         total_customers=total_customers,
+                         total_documents=total_documents,
+                         active_users=active_users)
+
+@app.route('/admin/users')
+@admin_required
+def admin_manage_users():
+    """일반 사용자 계정 생성 및 관리"""
+    users = User.query.filter_by(role=ROLE_USER).all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/logs')
+@admin_required
+def admin_service_logs():
+    """서비스 로그 확인"""
+    # TODO: 로그 시스템 구현
+    return render_template('admin/logs.html')
+
+# ========== 일반 사용자 전용 페이지 ==========
+@app.route('/user/dashboard')
+@role_required(ROLE_USER)
+def user_dashboard():
+    """일반 사용자 대시보드 - 본인 고객사 정보 및 점검서 관리"""
+    if not current_user.customer_id:
+        flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
+        return render_template('user/no_customer.html')
+
+    customer = Customer.query.get(current_user.customer_id)
+    documents = Document.query.filter_by(customer_id=current_user.customer_id).all()
+
+    return render_template('user/dashboard.html',
+                         customer=customer,
+                         documents=documents)
+
+@app.route('/user/customer/edit', methods=['GET', 'POST'])
+@role_required(ROLE_USER)
+def edit_customer_info():
+    """본인 고객사 정보 수정"""
+    if not current_user.customer_id:
+        flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
+        return redirect(url_for('user_dashboard'))
+
+    customer = Customer.query.get(current_user.customer_id)
+
+    if request.method == 'POST':
+        customer.name = request.form.get('name')
+        customer.company = request.form.get('company')
+        customer.contact = request.form.get('contact')
+        customer.email = request.form.get('email')
+        customer.address = request.form.get('address')
+        db.session.commit()
+        flash('고객사 정보가 수정되었습니다.', 'success')
+        return redirect(url_for('user_dashboard'))
+
+    return render_template('user/edit_customer.html', customer=customer)
+
+@app.route('/user/documents/upload', methods=['GET', 'POST'])
+@role_required(ROLE_USER)
+def upload_document():
+    """점검서 업로드"""
+    if not current_user.customer_id:
+        flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
+        return redirect(url_for('user_dashboard'))
+
+    if request.method == 'POST':
+        # TODO: 파일 업로드 로직 구현
+        flash('점검서가 업로드되었습니다.', 'success')
+        return redirect(url_for('user_dashboard'))
+
+    return render_template('user/upload_document.html')
 
 @app.route('/health')
 def health():
@@ -109,14 +299,24 @@ def health():
 def init_db():
     with app.app_context():
         db.create_all()
-        
-        # 기본 관리자 계정 생성 (존재하지 않을 경우)
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', email='admin@example.com')
-            admin.set_password('admin123')  # 운영 환경에서는 반드시 변경 필요!
-            db.session.add(admin)
+
+        # 슈퍼 관리자 계정 생성 (존재하지 않을 경우)
+        if not User.query.filter_by(username='vmadm').first():
+            super_admin = User(
+                username='vmadm',
+                email='vmadm@example.com',
+                role=ROLE_SUPER_ADMIN,
+                is_active=True
+            )
+            super_admin.set_password('vmadm!2024')  # 운영 환경에서는 반드시 변경 필요!
+            db.session.add(super_admin)
             db.session.commit()
-            print("기본 관리자 계정이 생성되었습니다. (username: admin, password: admin123)")
+            print("="*50)
+            print("슈퍼 관리자 계정이 생성되었습니다!")
+            print("Username: vmadm")
+            print("Password: vmadm!2024")
+            print("⚠️  운영 환경에서는 반드시 비밀번호를 변경하세요!")
+            print("="*50)
 
 if __name__ == '__main__':
     init_db()

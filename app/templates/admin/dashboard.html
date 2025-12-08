@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}관리자 대시보드{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-speedometer2"></i> 관리자 대시보드</h2>
+        <p class="text-muted">일반 사용자를 관리하고 서비스 로그를 확인할 수 있습니다.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-people-fill"></i> 전체 사용자</h5>
+                <h2 class="mb-0">{{ total_users }}</h2>
+                <p class="mb-0 small">명</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-check-circle-fill"></i> 활성 사용자</h5>
+                <h2 class="mb-0">{{ active_users }}</h2>
+                <p class="mb-0 small">명</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-building"></i> 고객사</h5>
+                <h2 class="mb-0">{{ total_customers }}</h2>
+                <p class="mb-0 small">개</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-file-earmark-text"></i> 등록 문서</h5>
+                <h2 class="mb-0">{{ total_documents }}</h2>
+                <p class="mb-0 small">개</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-tools"></i> 관리 작업</h5>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('admin_manage_users') }}" class="btn btn-outline-success">
+                        <i class="bi bi-people"></i> 사용자 계정 생성 및 관리
+                    </a>
+                    <a href="{{ url_for('admin_service_logs') }}" class="btn btn-outline-info">
+                        <i class="bi bi-file-text"></i> 서비스 로그 확인
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> 권한 안내</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li><i class="bi bi-check-circle text-success"></i> 일반 사용자 계정 생성</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 사용자 비밀번호 초기화</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 서비스 로그 확인</li>
+                    <li><i class="bi bi-x-circle text-danger"></i> 관리자 계정 관리 불가</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

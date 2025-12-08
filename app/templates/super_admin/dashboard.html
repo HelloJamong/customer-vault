@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}슈퍼 관리자 대시보드{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-speedometer2"></i> 슈퍼 관리자 대시보드</h2>
+        <p class="text-muted">시스템 전체를 관리할 수 있습니다.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-people-fill"></i> 전체 사용자</h5>
+                <h2 class="mb-0">{{ total_users }}</h2>
+                <p class="mb-0 small">명</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-person-badge-fill"></i> 관리자</h5>
+                <h2 class="mb-0">{{ total_admins }}</h2>
+                <p class="mb-0 small">명</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-person-fill"></i> 일반 사용자</h5>
+                <h2 class="mb-0">{{ total_normal_users }}</h2>
+                <p class="mb-0 small">명</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-building"></i> 고객사</h5>
+                <h2 class="mb-0">{{ total_customers }}</h2>
+                <p class="mb-0 small">개</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-file-earmark-text"></i> 등록된 문서</h5>
+                <h2>{{ total_documents }}</h2>
+                <p class="text-muted">개의 점검서가 업로드되었습니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-tools"></i> 빠른 작업</h5>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('manage_admins') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-person-badge"></i> 관리자 관리
+                    </a>
+                    <a href="{{ url_for('manage_users') }}" class="btn btn-outline-success">
+                        <i class="bi bi-people"></i> 사용자 관리
+                    </a>
+                    <a href="{{ url_for('manage_customers') }}" class="btn btn-outline-warning">
+                        <i class="bi bi-building"></i> 고객사 관리
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

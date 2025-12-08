@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}서비스 로그{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-file-text"></i> 서비스 로그</h2>
+        <p class="text-muted">시스템 활동 로그를 확인할 수 있습니다.</p>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-clockwise"></i> 새로고침
+        </button>
+        <button class="btn btn-outline-primary">
+            <i class="bi bi-download"></i> 다운로드
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#login-logs">
+                    <i class="bi bi-box-arrow-in-right"></i> 로그인 로그
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#upload-logs">
+                    <i class="bi bi-cloud-upload"></i> 업로드 로그
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#system-logs">
+                    <i class="bi bi-gear"></i> 시스템 로그
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="login-logs">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>사용자</th>
+                                <th>IP 주소</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    로그 기능이 곧 추가됩니다.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="upload-logs">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>사용자</th>
+                                <th>파일명</th>
+                                <th>크기</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    로그 기능이 곧 추가됩니다.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="system-logs">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 시스템 로그는 슈퍼 관리자만 확인할 수 있습니다.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

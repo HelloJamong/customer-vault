@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}사용자 관리{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-people"></i> 일반 사용자 관리</h2>
+        <p class="text-muted">일반 사용자 계정을 관리합니다.</p>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createUserModal">
+            <i class="bi bi-plus-circle"></i> 사용자 생성
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>사용자명</th>
+                        <th>이메일</th>
+                        <th>고객사</th>
+                        <th>상태</th>
+                        <th>생성일</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if users %}
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>
+                                <i class="bi bi-person-fill text-success"></i> {{ user.username }}
+                            </td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                {% if user.customer %}
+                                {{ user.customer.company or user.customer.name }}
+                                {% else %}
+                                <span class="text-muted">미연결</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                <span class="badge bg-success">활성</span>
+                                {% else %}
+                                <span class="badge bg-secondary">비활성</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning">
+                                    <i class="bi bi-key"></i> 비밀번호 초기화
+                                </button>
+                                {% if user.is_active %}
+                                <button class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-pause-circle"></i> 비활성화
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-success">
+                                    <i class="bi bi-play-circle"></i> 활성화
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                등록된 일반 사용자가 없습니다.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 사용자 생성 모달 -->
+<div class="modal fade" id="createUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person"></i> 사용자 계정 생성</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="#">
+                    <div class="mb-3">
+                        <label class="form-label">사용자명</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">이메일</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">비밀번호</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">고객사 (선택)</label>
+                        <select class="form-select" name="customer_id">
+                            <option value="">선택 안 함</option>
+                            <!-- TODO: 고객사 목록 동적 로드 -->
+                        </select>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">생성</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
