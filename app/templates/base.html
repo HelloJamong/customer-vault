@@ -89,11 +89,13 @@
                             <i class="bi bi-building"></i> 고객사 관리
                         </a>
                     </li>
+                    {% if current_user.department == '기술팀' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('upload_document') }}">
                             <i class="bi bi-cloud-upload"></i> 점검서 업로드
                         </a>
                     </li>
+                    {% endif %}
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">

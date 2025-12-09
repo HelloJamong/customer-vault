@@ -76,13 +76,13 @@
                                     </button>
                                 </form>
                                 {% if user.is_active %}
-                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=user.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('toggle_user_active_unified', user_id=user.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-secondary">
                                         <i class="bi bi-pause-circle"></i> 비활성화
                                     </button>
                                 </form>
                                 {% else %}
-                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=user.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('toggle_user_active_unified', user_id=user.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-success">
                                         <i class="bi bi-play-circle"></i> 활성화
                                     </button>

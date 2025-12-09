@@ -264,6 +264,7 @@ class Document(db.Model):
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     inspection_date = db.Column(db.Date)
+    inspection_type = db.Column(db.String(20))  # '방문' 또는 '원격'
 
     uploader = db.relationship('User', backref='documents')
 
@@ -883,6 +884,29 @@ def serve_document(document_id):
     document = Document.query.get_or_404(document_id)
     return send_file(document.filepath, mimetype='application/pdf')
 
+@app.route('/documents/<int:document_id>/delete', methods=['POST'])
+@admin_required
+def delete_document(document_id):
+    """점검서 삭제 - 관리자만 가능"""
+    document = Document.query.get_or_404(document_id)
+    customer_id = document.customer_id
+    
+    try:
+        # 파일 삭제
+        if os.path.exists(document.filepath):
+            os.remove(document.filepath)
+        
+        # 데이터베이스 레코드 삭제
+        db.session.delete(document)
+        db.session.commit()
+        
+        flash('점검서가 삭제되었습니다.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'점검서 삭제 중 오류가 발생했습니다: {str(e)}', 'danger')
+    
+    return redirect(url_for('customer_documents', customer_id=customer_id))
+
 @app.route('/create-admin', methods=['POST'])
 @super_admin_required
 def create_admin():
@@ -1325,17 +1349,96 @@ def edit_customer_info():
 @app.route('/documents/upload', methods=['GET', 'POST'])
 @role_required(ROLE_USER)
 def upload_document():
-    """점검서 업로드"""
-    if not current_user.customer_id:
-        flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
+    """점검서 업로드 - 기술팀만 가능"""
+    # 기술팀이 아닌 경우 접근 차단
+    if current_user.department != '기술팀':
+        flash('점검서 업로드는 기술팀만 가능합니다.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # 담당 고객사 목록 가져오기
+    customers = current_user.assigned_customers.all()
+    
+    if not customers:
+        flash('담당 고객사가 없습니다. 관리자에게 문의하세요.', 'warning')
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        # TODO: 파일 업로드 로직 구현
-        flash('점검서가 업로드되었습니다.', 'success')
-        return redirect(url_for('dashboard'))
+        customer_id = request.form.get('customer_id')
+        inspection_type = request.form.get('inspection_type')
+        file = request.files.get('file')
+        
+        if not customer_id or not inspection_type or not file:
+            flash('모든 필드를 입력해주세요.', 'danger')
+            return render_template('user/upload_document.html', customers=customers)
+        
+        # 고객사 확인
+        customer = Customer.query.get_or_404(customer_id)
+        
+        # 담당 고객사인지 확인
+        if customer not in current_user.assigned_customers:
+            flash('담당 고객사가 아닙니다.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # PDF 파일인지 확인
+        if not file.filename.endswith('.pdf'):
+            flash('PDF 파일만 업로드 가능합니다.', 'danger')
+            return render_template('user/upload_document.html', customers=customers)
+        
+        # 파일명 생성: 점검 주기에 따른 형식
+        current_date = datetime.now()
+        cycle_type = customer.inspection_cycle_type
+        
+        if cycle_type == '매월':
+            title = f"{current_date.month}월_{customer.name}_점검내역서"
+        elif cycle_type == '분기':
+            quarter = (current_date.month - 1) // 3 + 1
+            title = f"{quarter}분기({current_date.month}월)_{customer.name}_점검내역서"
+        elif cycle_type == '반기':
+            half = 1 if current_date.month <= 6 else 2
+            title = f"{half}분기({current_date.month}월)_{customer.name}_점검내역서"
+        elif cycle_type == '연1회':
+            title = f"{current_date.year}년_{customer.name}_점검내역서"
+        else:
+            title = f"{current_date.strftime('%Y%m%d')}_{customer.name}_점검내역서"
+        
+        # 파일 저장
+        filename = f"{uuid.uuid4().hex}_{file.filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        try:
+            file.save(filepath)
+            file_size = os.path.getsize(filepath)
+            
+            # 문서 레코드 생성
+            document = Document(
+                customer_id=customer.id,
+                title=title,
+                description=f"{inspection_type} 점검",
+                filename=filename,
+                filepath=filepath,
+                file_size=file_size,
+                uploaded_by=current_user.id,
+                inspection_date=current_date.date(),
+                inspection_type=inspection_type
+            )
+            
+            # 고객사의 마지막 점검일 업데이트
+            customer.last_inspection_date = current_date.date()
+            
+            db.session.add(document)
+            db.session.commit()
+            
+            flash('점검서가 성공적으로 업로드되었습니다.', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            flash(f'파일 업로드 중 오류가 발생했습니다: {str(e)}', 'danger')
+            return render_template('user/upload_document.html', customers=customers)
 
-    return render_template('user/upload_document.html')
+    return render_template('user/upload_document.html', customers=customers)
 
 @app.route('/api/password-requirements')
 @login_required

@@ -6,7 +6,7 @@
 <div class="row mb-4">
     <div class="col">
         <h2><i class="bi bi-cloud-upload"></i> 점검서 업로드</h2>
-        <p class="text-muted">점검서 파일을 업로드할 수 있습니다.</p>
+        <p class="text-muted">담당 고객사의 점검서 PDF 파일을 업로드할 수 있습니다.</p>
     </div>
 </div>
 
@@ -16,35 +16,57 @@
             <div class="card-body">
                 <form method="POST" action="{{ url_for('upload_document') }}" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="title" class="form-label">점검서 제목 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="title" name="title"
-                               placeholder="예: 2024년 1분기 점검서" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="description" class="form-label">설명</label>
-                        <textarea class="form-control" id="description" name="description"
-                                  rows="3" placeholder="점검서에 대한 간단한 설명을 입력하세요."></textarea>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="inspection_date" class="form-label">점검일</label>
-                        <input type="date" class="form-control" id="inspection_date" name="inspection_date">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="file" class="form-label">파일 <span class="text-danger">*</span></label>
-                        <input type="file" class="form-control" id="file" name="file"
-                               accept=".pdf,.doc,.docx,.xlsx,.xls" required>
+                        <label for="customer_id" class="form-label">고객사 선택 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="customer_id" name="customer_id" required>
+                            <option value="">고객사를 선택하세요</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}">
+                                {{ customer.name }} 
+                                {% if customer.inspection_cycle_type %}
+                                ({{ customer.inspection_cycle_type }})
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
                         <div class="form-text">
                             <i class="bi bi-info-circle"></i>
-                            지원 형식: PDF, Word, Excel (최대 16MB)
+                            담당 고객사만 표시됩니다.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="inspection_type" class="form-label">점검 방식 <span class="text-danger">*</span></label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="inspection_type" id="visit" value="방문" required>
+                            <label class="btn btn-outline-primary" for="visit">
+                                <i class="bi bi-person-walking"></i> 방문 점검
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="inspection_type" id="remote" value="원격" required>
+                            <label class="btn btn-outline-primary" for="remote">
+                                <i class="bi bi-laptop"></i> 원격 점검
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="file" class="form-label">점검서 파일 (PDF) <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" id="file" name="file"
+                               accept=".pdf" required>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            PDF 파일만 업로드 가능합니다 (최대 16MB)
                         </div>
                     </div>
 
                     <div class="alert alert-info">
                         <i class="bi bi-exclamation-circle"></i>
-                        <strong>안내:</strong> 업로드한 파일은 관리자가 확인할 수 있으며, 삭제는 관리자에게 문의해주세요.
+                        <strong>안내:</strong> 
+                        <ul class="mb-0 mt-2">
+                            <li>점검서 파일명은 자동으로 생성됩니다 (예: 12월_고객사명_점검내역서)</li>
+                            <li>업로드 시 해당 고객사의 점검 완료 상태가 자동으로 업데이트됩니다</li>
+                            <li>업로드한 점검서는 "고객사 관리 > 점검서보기"에서 확인할 수 있습니다</li>
+                        </ul>
                     </div>
 
                     <div class="d-flex gap-2">
