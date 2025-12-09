@@ -1025,6 +1025,7 @@ def delete_document(document_id):
         
         # 서비스 로그 생성
         create_service_log(
+            user_id=current_user.id,
             log_type='경고',
             action='점검서 삭제',
             description=f'고객사: {customer.name}, 파일: {deleted_filename}.pdf'
@@ -1214,6 +1215,54 @@ def delete_user(user_id):
 
     flash(f'계정 "{username}"이 삭제되었습니다.', 'success')
     return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/update-user/<int:user_id>', methods=['POST'])
+@admin_required
+def update_user_unified(user_id):
+    """사용자 정보 수정 - 슈퍼 관리자와 일반 관리자 통합"""
+    user = User.query.get_or_404(user_id)
+    
+    # 슈퍼 관리자는 수정 불가
+    if user.role == ROLE_SUPER_ADMIN:
+        flash('슈퍼 관리자 계정은 수정할 수 없습니다.', 'danger')
+        return redirect(request.referrer or url_for('manage_users_unified'))
+    
+    # 일반 관리자는 일반 사용자만 수정 가능
+    if current_user.is_admin() and user.role != ROLE_USER:
+        flash('권한이 없습니다.', 'danger')
+        return redirect(request.referrer or url_for('manage_users_unified'))
+    
+    try:
+        # 이름 수정
+        name = request.form.get('name', '').strip()
+        if name:
+            user.name = name
+        
+        # 이메일 수정
+        email = request.form.get('email', '').strip()
+        user.email = email if email else None
+        
+        # 소속(부서) 수정 - 일반 사용자만 가능
+        if user.role == ROLE_USER:
+            department = request.form.get('department', '').strip()
+            user.department = department if department else None
+        
+        db.session.commit()
+        
+        # 서비스 로그 생성
+        create_service_log(
+            user_id=current_user.id,
+            log_type='정보',
+            action='사용자 정보 수정',
+            description=f'수정된 사용자: {user.name} ({user.username}), 역할: {user.role}'
+        )
+        
+        flash(f'사용자 "{user.name}"의 정보가 수정되었습니다.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'사용자 정보 수정 중 오류가 발생했습니다: {str(e)}', 'danger')
+    
+    return redirect(request.referrer or url_for('manage_users_unified'))
 
 @app.route('/toggle-active/<int:user_id>', methods=['POST'])
 @admin_required
@@ -1690,6 +1739,7 @@ def upload_document():
             
             # 서비스 로그 생성
             create_service_log(
+                user_id=current_user.id,
                 log_type='정상',
                 action='점검서 업로드',
                 description=f'고객사: {customer.name}, 파일: {title}.pdf, 점검 유형: {inspection_type}'

@@ -70,6 +70,9 @@
                                 {% endif %}
                             </td>
                             <td>
+                                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}">
+                                    <i class="bi bi-pencil"></i> 수정
+                                </button>
                                 <form method="POST" action="{{ url_for('reset_password_unified', user_id=user.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('패스워드를 기본 패스워드로 초기화하시겠습니까?')">
                                         <i class="bi bi-key"></i> 비밀번호 초기화
@@ -95,6 +98,52 @@
                                 </form>
                             </td>
                         </tr>
+                        
+                        <!-- 사용자 수정 모달 -->
+                        <div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-primary text-white">
+                                        <h5 class="modal-title"><i class="bi bi-pencil"></i> 사용자 정보 수정</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form method="POST" action="{{ url_for('update_user_unified', user_id=user.id) }}">
+                                            <div class="mb-3">
+                                                <label class="form-label">계정 ID</label>
+                                                <input type="text" class="form-control" value="{{ user.username }}" disabled>
+                                                <div class="form-text text-muted">계정 ID는 변경할 수 없습니다.</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">이름 <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" name="name" value="{{ user.name }}" required placeholder="실명 또는 표시명">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">소속</label>
+                                                <select class="form-select" name="department">
+                                                    <option value="">선택 안 함</option>
+                                                    <option value="기술팀" {% if user.department == '기술팀' %}selected{% endif %}>기술팀</option>
+                                                    <option value="영업팀" {% if user.department == '영업팀' %}selected{% endif %}>영업팀</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">이메일</label>
+                                                <input type="email" class="form-control" name="email" value="{{ user.email or '' }}" placeholder="선택 사항">
+                                            </div>
+                                            <div class="d-grid gap-2">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="bi bi-check-circle"></i> 수정
+                                                </button>
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                    <i class="bi bi-x-circle"></i> 취소
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         {% endfor %}
                     {% else %}
                         <tr>
