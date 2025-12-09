@@ -270,7 +270,7 @@
                         <option value="">선택 안함</option>
                         {% for engineer in engineers %}
                         <option value="{{ engineer.id }}" {% if customer.engineer_id == engineer.id %}selected{% endif %}>
-                            {{ engineer.name }} ({{ engineer.username }})
+                            {{ engineer.name }}
                         </option>
                         {% endfor %}
                     </select>
@@ -282,7 +282,7 @@
                         <option value="">선택 안함</option>
                         {% for engineer in engineers %}
                         <option value="{{ engineer.id }}" {% if customer.engineer_sub_id == engineer.id %}selected{% endif %}>
-                            {{ engineer.name }} ({{ engineer.username }})
+                            {{ engineer.name }}
                         </option>
                         {% endfor %}
                     </select>
@@ -294,7 +294,7 @@
                         <option value="">선택 안함</option>
                         {% for sale in sales %}
                         <option value="{{ sale.id }}" {% if customer.sales_id == sale.id %}selected{% endif %}>
-                            {{ sale.name }} ({{ sale.username }})
+                            {{ sale.name }}
                         </option>
                         {% endfor %}
                     </select>

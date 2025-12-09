@@ -890,6 +890,8 @@ def delete_document(document_id):
     """점검서 삭제 - 관리자만 가능"""
     document = Document.query.get_or_404(document_id)
     customer_id = document.customer_id
+    customer = Customer.query.get_or_404(customer_id)
+    deleted_inspection_date = document.inspection_date
     
     try:
         # 파일 삭제
@@ -899,6 +901,23 @@ def delete_document(document_id):
         # 데이터베이스 레코드 삭제
         db.session.delete(document)
         db.session.commit()
+        
+        # 삭제된 점검서가 가장 최근 점검인 경우, last_inspection_date 업데이트
+        if customer.last_inspection_date == deleted_inspection_date:
+            # 해당 고객사의 남은 점검서 중 가장 최근 것 찾기
+            latest_document = Document.query.filter_by(customer_id=customer_id)\
+                .filter(Document.inspection_date.isnot(None))\
+                .order_by(Document.inspection_date.desc())\
+                .first()
+            
+            if latest_document:
+                # 이전 점검서가 있으면 그 날짜로 업데이트
+                customer.last_inspection_date = latest_document.inspection_date
+            else:
+                # 남은 점검서가 없으면 NULL로 설정
+                customer.last_inspection_date = None
+            
+            db.session.commit()
         
         flash('점검서가 삭제되었습니다.', 'success')
     except Exception as e:
