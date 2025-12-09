@@ -134,26 +134,28 @@
         <div class="card-body">
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">담당 엔지니어</label>
+                    <label class="form-label">담당 엔지니어 (기술팀)</label>
                     <select class="form-select" name="engineer_id">
                         <option value="">선택 안함</option>
-                        {% for user in users %}
-                        <option value="{{ user.id }}" {% if customer.engineer_id == user.id %}selected{% endif %}>
-                            {{ user.name }} ({{ user.username }})
+                        {% for engineer in engineers %}
+                        <option value="{{ engineer.id }}" {% if customer.engineer_id == engineer.id %}selected{% endif %}>
+                            {{ engineer.name }} ({{ engineer.username }})
                         </option>
                         {% endfor %}
                     </select>
+                    <div class="form-text">기술팀 소속 사용자만 선택 가능합니다.</div>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">담당 영업</label>
+                    <label class="form-label">담당 영업 (영업팀)</label>
                     <select class="form-select" name="sales_id">
                         <option value="">선택 안함</option>
-                        {% for user in users %}
-                        <option value="{{ user.id }}" {% if customer.sales_id == user.id %}selected{% endif %}>
-                            {{ user.name }} ({{ user.username }})
+                        {% for sale in sales %}
+                        <option value="{{ sale.id }}" {% if customer.sales_id == sale.id %}selected{% endif %}>
+                            {{ sale.name }} ({{ sale.username }})
                         </option>
                         {% endfor %}
                     </select>
+                    <div class="form-text">영업팀 소속 사용자만 선택 가능합니다.</div>
                 </div>
             </div>
         </div>

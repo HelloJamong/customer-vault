@@ -65,6 +65,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)  # 선택 사항
     role = db.Column(db.String(20), nullable=False, default=ROLE_USER)  # super_admin, admin, user
+    department = db.Column(db.String(20), nullable=True)  # 기술팀, 영업팀 (일반 사용자만 해당)
     is_active = db.Column(db.Boolean, default=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)  # 일반 사용자만 연결
 
@@ -613,48 +614,18 @@ def super_admin_dashboard():
     total_documents = Document.query.count()
 
     # 이번 달 점검 대상 및 완료 현황 계산
-    today = date.today()
-    current_month_start = date(today.year, today.month, 1)
-
-    # 다음 달 1일 (이번 달 마지막 날 다음)
-    if today.month == 12:
-        next_month_start = date(today.year + 1, 1, 1)
-    else:
-        next_month_start = date(today.year, today.month + 1, 1)
-
-    # 이번 달 점검 대상 고객사 계산
     monthly_inspection_targets = 0
     monthly_inspection_completed = 0
 
     all_customers = Customer.query.all()
     for customer in all_customers:
-        # 점검 주기가 설정되어 있고, 이번 달에 점검이 필요한지 확인
-        if customer.inspection_cycle:
-            needs_inspection = False
+        # 이번 달 점검 대상인지 확인
+        if customer.is_inspection_needed_this_month():
+            monthly_inspection_targets += 1
 
-            if customer.last_inspection_date is None:
-                # 한 번도 점검하지 않은 경우 - 이번 달 점검 대상
-                needs_inspection = True
-            else:
-                # 마지막 점검일 기준으로 다음 점검 예정일 계산
-                next_inspection_date = customer.last_inspection_date + relativedelta(months=customer.inspection_cycle)
-
-                # 다음 점검 예정일이 이번 달에 속하는지 확인
-                if current_month_start <= next_inspection_date < next_month_start:
-                    needs_inspection = True
-
-            if needs_inspection:
-                monthly_inspection_targets += 1
-
-                # 이번 달에 점검 완료했는지 확인 (이번 달에 업로드된 문서가 있는지)
-                completed = Document.query.filter(
-                    Document.customer_id == customer.id,
-                    Document.inspection_date >= current_month_start,
-                    Document.inspection_date < next_month_start
-                ).first()
-
-                if completed:
-                    monthly_inspection_completed += 1
+            # 이번 달 점검 완료했는지 확인
+            if customer.is_inspection_completed_this_month():
+                monthly_inspection_completed += 1
 
     return render_template('super_admin/dashboard.html',
                          total_users=total_users,
@@ -719,9 +690,10 @@ def create_customer():
 def customer_detail(customer_id):
     """고객사 세부 정보 조회"""
     customer = Customer.query.get_or_404(customer_id)
-    # 일반 사용자 목록 (담당자 선택용)
-    users = User.query.filter_by(role=ROLE_USER, is_active=True).all()
-    return render_template('super_admin/customer_detail.html', customer=customer, users=users)
+    # 부서별 사용자 목록
+    engineers = User.query.filter_by(role=ROLE_USER, is_active=True, department='기술팀').all()
+    sales = User.query.filter_by(role=ROLE_USER, is_active=True, department='영업팀').all()
+    return render_template('super_admin/customer_detail.html', customer=customer, engineers=engineers, sales=sales)
 
 @app.route('/super-admin/customers/<int:customer_id>/update', methods=['POST'])
 @super_admin_required
@@ -981,48 +953,18 @@ def admin_dashboard():
     active_users = User.query.filter_by(role=ROLE_USER, is_active=True).count()
 
     # 이번 달 점검 대상 및 완료 현황 계산
-    today = date.today()
-    current_month_start = date(today.year, today.month, 1)
-
-    # 다음 달 1일 (이번 달 마지막 날 다음)
-    if today.month == 12:
-        next_month_start = date(today.year + 1, 1, 1)
-    else:
-        next_month_start = date(today.year, today.month + 1, 1)
-
-    # 이번 달 점검 대상 고객사 계산
     monthly_inspection_targets = 0
     monthly_inspection_completed = 0
 
     all_customers = Customer.query.all()
     for customer in all_customers:
-        # 점검 주기가 설정되어 있고, 이번 달에 점검이 필요한지 확인
-        if customer.inspection_cycle:
-            needs_inspection = False
+        # 이번 달 점검 대상인지 확인
+        if customer.is_inspection_needed_this_month():
+            monthly_inspection_targets += 1
 
-            if customer.last_inspection_date is None:
-                # 한 번도 점검하지 않은 경우 - 이번 달 점검 대상
-                needs_inspection = True
-            else:
-                # 마지막 점검일 기준으로 다음 점검 예정일 계산
-                next_inspection_date = customer.last_inspection_date + relativedelta(months=customer.inspection_cycle)
-
-                # 다음 점검 예정일이 이번 달에 속하는지 확인
-                if current_month_start <= next_inspection_date < next_month_start:
-                    needs_inspection = True
-
-            if needs_inspection:
-                monthly_inspection_targets += 1
-
-                # 이번 달에 점검 완료했는지 확인 (이번 달에 업로드된 문서가 있는지)
-                completed = Document.query.filter(
-                    Document.customer_id == customer.id,
-                    Document.inspection_date >= current_month_start,
-                    Document.inspection_date < next_month_start
-                ).first()
-
-                if completed:
-                    monthly_inspection_completed += 1
+            # 이번 달 점검 완료했는지 확인
+            if customer.is_inspection_completed_this_month():
+                monthly_inspection_completed += 1
 
     return render_template('admin/dashboard.html',
                          total_users=total_users,
@@ -1053,6 +995,12 @@ def admin_create_user():
     username = request.form.get('username')
     name = request.form.get('name')
     email = request.form.get('email') if request.form.get('email') else None
+    department = request.form.get('department')
+
+    # 필수 필드 확인
+    if not department:
+        flash('소속을 선택해주세요.', 'danger')
+        return redirect(url_for('admin_manage_users'))
 
     # 중복 체크
     if User.query.filter_by(username=username).first():
@@ -1071,6 +1019,7 @@ def admin_create_user():
         username=username,
         name=name,
         email=email,
+        department=department,
         role=ROLE_USER,
         is_active=True,
         customer_id=None
@@ -1125,6 +1074,33 @@ def admin_toggle_user_active(user_id):
     flash(f'{user.username} 계정이 {status}되었습니다.', 'success')
     return redirect(request.referrer or url_for('admin_manage_users'))
 
+@app.route('/admin/delete-user/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_delete_user(user_id):
+    """일반 관리자용 - 일반 사용자 계정 삭제"""
+    user = User.query.get_or_404(user_id)
+
+    # 일반 사용자만 삭제 가능
+    if user.role != ROLE_USER:
+        flash('일반 사용자만 삭제할 수 있습니다.', 'danger')
+        return redirect(request.referrer or url_for('admin_manage_users'))
+
+    username = user.username
+
+    # 외래 키 제약 조건을 위해 관련 레코드 먼저 삭제
+    # 1. 로그인 시도 기록 삭제
+    LoginAttempt.query.filter_by(user_id=user_id).delete()
+
+    # 2. 사용자 세션 삭제
+    UserSession.query.filter_by(user_id=user_id).delete()
+
+    # 3. 사용자 삭제
+    db.session.delete(user)
+    db.session.commit()
+
+    flash(f'사용자 계정 "{username}"이 삭제되었습니다.', 'success')
+    return redirect(url_for('admin_manage_users'))
+
 # ========== 일반 사용자 전용 페이지 ==========
 @app.route('/user/dashboard')
 @role_required(ROLE_USER)
@@ -1142,46 +1118,17 @@ def user_dashboard():
     total_assigned_customers = len(assigned_customers)
 
     # 이번 달 점검 대상 및 완료 현황 계산
-    today = date.today()
-    current_month_start = date(today.year, today.month, 1)
-
-    # 다음 달 1일
-    if today.month == 12:
-        next_month_start = date(today.year + 1, 1, 1)
-    else:
-        next_month_start = date(today.year, today.month + 1, 1)
-
     monthly_inspection_targets = 0
     monthly_inspection_completed = 0
 
     for customer in assigned_customers:
-        # 점검 주기가 설정되어 있고, 이번 달에 점검이 필요한지 확인
-        if customer.inspection_cycle:
-            needs_inspection = False
+        # 이번 달 점검 대상인지 확인
+        if customer.is_inspection_needed_this_month():
+            monthly_inspection_targets += 1
 
-            if customer.last_inspection_date is None:
-                # 한 번도 점검하지 않은 경우 - 이번 달 점검 대상
-                needs_inspection = True
-            else:
-                # 마지막 점검일 기준으로 다음 점검 예정일 계산
-                next_inspection_date = customer.last_inspection_date + relativedelta(months=customer.inspection_cycle)
-
-                # 다음 점검 예정일이 이번 달에 속하는지 확인
-                if current_month_start <= next_inspection_date < next_month_start:
-                    needs_inspection = True
-
-            if needs_inspection:
-                monthly_inspection_targets += 1
-
-                # 이번 달에 점검 완료했는지 확인
-                completed = Document.query.filter(
-                    Document.customer_id == customer.id,
-                    Document.inspection_date >= current_month_start,
-                    Document.inspection_date < next_month_start
-                ).first()
-
-                if completed:
-                    monthly_inspection_completed += 1
+            # 이번 달 점검 완료했는지 확인
+            if customer.is_inspection_completed_this_month():
+                monthly_inspection_completed += 1
 
     # 모든 담당 고객사의 문서 가져오기
     customer_ids = [c.id for c in assigned_customers]
