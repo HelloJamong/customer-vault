@@ -363,7 +363,17 @@ def create_service_log(user_id, log_type, action, description, ip_address=None):
     """서비스 로그 생성"""
     try:
         if ip_address is None:
-            ip_address = request.remote_addr if request else None
+            # 프록시 환경에서 실제 클라이언트 IP 가져오기
+            # X-Forwarded-For, X-Real-IP 헤더 확인
+            if request:
+                ip_address = request.headers.get('X-Forwarded-For', 
+                             request.headers.get('X-Real-IP', 
+                             request.remote_addr))
+                # X-Forwarded-For는 여러 IP가 쉼표로 구분될 수 있으므로 첫 번째 IP 사용
+                if ip_address and ',' in ip_address:
+                    ip_address = ip_address.split(',')[0].strip()
+            else:
+                ip_address = None
         
         log = ServiceLog(
             user_id=user_id,
@@ -877,6 +887,14 @@ def create_customer():
     
     db.session.commit()
 
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='고객사 생성',
+        description=f'고객사명: {name}'
+    )
+
     flash('고객사가 생성되었습니다. 세부 정보를 입력해주세요.', 'success')
     return redirect(url_for('customer_detail', customer_id=customer.id))
 
@@ -896,20 +914,65 @@ def update_customer(customer_id):
     """고객사 세부 정보 업데이트 - 모든 로그인 사용자 가능"""
     customer = Customer.query.get_or_404(customer_id)
 
+    # 변경 사항 추적을 위한 이전 값 저장
+    old_name = customer.name
+    old_contract_type = customer.contract_type
+    old_inspection_cycle = customer.inspection_cycle_type
+    
+    # 담당자 정보 이전 값
+    old_contact_name = customer.contact_name
+    old_contact_mobile = customer.contact_mobile
+    old_contact_email = customer.contact_email
+    
+    # 부담당자 정보 이전 값
+    old_contact_name_sub1 = customer.contact_name_sub1
+    old_contact_name_sub2 = customer.contact_name_sub2
+    old_contact_name_sub3 = customer.contact_name_sub3
+    
+    # 사내 담당자 이전 값
+    old_engineer = customer.engineer
+    old_engineer_sub = customer.engineer_sub
+    old_sales = customer.sales
+    
+    changes = []
+
     # 고객사 기본 정보
-    customer.name = request.form.get('name')
+    new_name = request.form.get('name')
+    if old_name != new_name:
+        changes.append(f'고객사명: "{old_name}" → "{new_name}"')
+    customer.name = new_name
     customer.location = request.form.get('location')
 
     # 고객사 담당자 정보 (정 담당자)
-    customer.contact_name = request.form.get('contact_name')
+    new_contact_name = request.form.get('contact_name')
+    new_contact_mobile = request.form.get('contact_mobile')
+    new_contact_email = request.form.get('contact_email')
+    
+    if old_contact_name != new_contact_name:
+        changes.append(f'담당자명: "{old_contact_name or "없음"}" → "{new_contact_name or "없음"}"')
+    if old_contact_mobile != new_contact_mobile:
+        changes.append(f'담당자 연락처: "{old_contact_mobile or "없음"}" → "{new_contact_mobile or "없음"}"')
+    if old_contact_email != new_contact_email:
+        changes.append(f'담당자 이메일: "{old_contact_email or "없음"}" → "{new_contact_email or "없음"}"')
+    
+    customer.contact_name = new_contact_name
     customer.contact_position = request.form.get('contact_position')
     customer.contact_department = request.form.get('contact_department')
-    customer.contact_mobile = request.form.get('contact_mobile')
+    customer.contact_mobile = new_contact_mobile
     customer.contact_phone = request.form.get('contact_phone')
-    customer.contact_email = request.form.get('contact_email')
+    customer.contact_email = new_contact_email
 
     # 고객사 부담당자 정보 (부담당자 1)
-    customer.contact_name_sub1 = request.form.get('contact_name_sub1')
+    new_contact_name_sub1 = request.form.get('contact_name_sub1')
+    if old_contact_name_sub1 != new_contact_name_sub1:
+        if old_contact_name_sub1 and new_contact_name_sub1:
+            changes.append(f'부담당자1: "{old_contact_name_sub1}" → "{new_contact_name_sub1}"')
+        elif new_contact_name_sub1:
+            changes.append(f'부담당자1 추가: "{new_contact_name_sub1}"')
+        elif old_contact_name_sub1:
+            changes.append(f'부담당자1 삭제: "{old_contact_name_sub1}"')
+    
+    customer.contact_name_sub1 = new_contact_name_sub1
     customer.contact_position_sub1 = request.form.get('contact_position_sub1')
     customer.contact_department_sub1 = request.form.get('contact_department_sub1')
     customer.contact_mobile_sub1 = request.form.get('contact_mobile_sub1')
@@ -917,7 +980,16 @@ def update_customer(customer_id):
     customer.contact_email_sub1 = request.form.get('contact_email_sub1')
 
     # 고객사 부담당자 정보 (부담당자 2)
-    customer.contact_name_sub2 = request.form.get('contact_name_sub2')
+    new_contact_name_sub2 = request.form.get('contact_name_sub2')
+    if old_contact_name_sub2 != new_contact_name_sub2:
+        if old_contact_name_sub2 and new_contact_name_sub2:
+            changes.append(f'부담당자2: "{old_contact_name_sub2}" → "{new_contact_name_sub2}"')
+        elif new_contact_name_sub2:
+            changes.append(f'부담당자2 추가: "{new_contact_name_sub2}"')
+        elif old_contact_name_sub2:
+            changes.append(f'부담당자2 삭제: "{old_contact_name_sub2}"')
+    
+    customer.contact_name_sub2 = new_contact_name_sub2
     customer.contact_position_sub2 = request.form.get('contact_position_sub2')
     customer.contact_department_sub2 = request.form.get('contact_department_sub2')
     customer.contact_mobile_sub2 = request.form.get('contact_mobile_sub2')
@@ -925,7 +997,16 @@ def update_customer(customer_id):
     customer.contact_email_sub2 = request.form.get('contact_email_sub2')
 
     # 고객사 부담당자 정보 (부담당자 3)
-    customer.contact_name_sub3 = request.form.get('contact_name_sub3')
+    new_contact_name_sub3 = request.form.get('contact_name_sub3')
+    if old_contact_name_sub3 != new_contact_name_sub3:
+        if old_contact_name_sub3 and new_contact_name_sub3:
+            changes.append(f'부담당자3: "{old_contact_name_sub3}" → "{new_contact_name_sub3}"')
+        elif new_contact_name_sub3:
+            changes.append(f'부담당자3 추가: "{new_contact_name_sub3}"')
+        elif old_contact_name_sub3:
+            changes.append(f'부담당자3 삭제: "{old_contact_name_sub3}"')
+    
+    customer.contact_name_sub3 = new_contact_name_sub3
     customer.contact_position_sub3 = request.form.get('contact_position_sub3')
     customer.contact_department_sub3 = request.form.get('contact_department_sub3')
     customer.contact_mobile_sub3 = request.form.get('contact_mobile_sub3')
@@ -933,14 +1014,20 @@ def update_customer(customer_id):
     customer.contact_email_sub3 = request.form.get('contact_email_sub3')
 
     # 계약 정보
-    customer.contract_type = request.form.get('contract_type')
+    new_contract_type = request.form.get('contract_type')
+    if old_contract_type != new_contract_type:
+        changes.append(f'계약형태: "{old_contract_type or "없음"}" → "{new_contract_type or "없음"}"')
+    customer.contract_type = new_contract_type
     contract_start = request.form.get('contract_start_date')
     contract_end = request.form.get('contract_end_date')
     customer.contract_start_date = datetime.strptime(contract_start, '%Y-%m-%d').date() if contract_start else None
     customer.contract_end_date = datetime.strptime(contract_end, '%Y-%m-%d').date() if contract_end else None
 
     # 점검 정보
-    customer.inspection_cycle_type = request.form.get('inspection_cycle_type')
+    new_inspection_cycle = request.form.get('inspection_cycle_type')
+    if old_inspection_cycle != new_inspection_cycle:
+        changes.append(f'점검주기: "{old_inspection_cycle or "없음"}" → "{new_inspection_cycle or "없음"}"')
+    customer.inspection_cycle_type = new_inspection_cycle
     cycle_month = request.form.get('inspection_cycle_month')
     customer.inspection_cycle_month = int(cycle_month) if cycle_month else None
 
@@ -951,13 +1038,58 @@ def update_customer(customer_id):
     engineer = request.form.get('engineer_id')
     engineer_sub = request.form.get('engineer_sub_id')
     sales = request.form.get('sales_id')
-    customer.engineer_id = int(engineer) if engineer else None
-    customer.engineer_sub_id = int(engineer_sub) if engineer_sub else None
-    customer.sales_id = int(sales) if sales else None
+    
+    new_engineer_id = int(engineer) if engineer else None
+    new_engineer_sub_id = int(engineer_sub) if engineer_sub else None
+    new_sales_id = int(sales) if sales else None
+    
+    # 담당 엔지니어 변경 확인
+    if (old_engineer and old_engineer.id != new_engineer_id) or (not old_engineer and new_engineer_id):
+        new_engineer = User.query.get(new_engineer_id) if new_engineer_id else None
+        old_name_eng = old_engineer.name if old_engineer else "없음"
+        new_name_eng = new_engineer.name if new_engineer else "없음"
+        if old_name_eng != new_name_eng:
+            changes.append(f'담당 엔지니어: "{old_name_eng}" → "{new_name_eng}"')
+    elif old_engineer and not new_engineer_id:
+        changes.append(f'담당 엔지니어 삭제: "{old_engineer.name}"')
+    
+    # 부담당 엔지니어 변경 확인
+    if (old_engineer_sub and old_engineer_sub.id != new_engineer_sub_id) or (not old_engineer_sub and new_engineer_sub_id):
+        new_engineer_sub = User.query.get(new_engineer_sub_id) if new_engineer_sub_id else None
+        old_name_sub = old_engineer_sub.name if old_engineer_sub else "없음"
+        new_name_sub = new_engineer_sub.name if new_engineer_sub else "없음"
+        if old_name_sub != new_name_sub:
+            changes.append(f'부담당 엔지니어: "{old_name_sub}" → "{new_name_sub}"')
+    elif old_engineer_sub and not new_engineer_sub_id:
+        changes.append(f'부담당 엔지니어 삭제: "{old_engineer_sub.name}"')
+    
+    # 담당 영업 변경 확인
+    if (old_sales and old_sales.id != new_sales_id) or (not old_sales and new_sales_id):
+        new_sales = User.query.get(new_sales_id) if new_sales_id else None
+        old_name_sales = old_sales.name if old_sales else "없음"
+        new_name_sales = new_sales.name if new_sales else "없음"
+        if old_name_sales != new_name_sales:
+            changes.append(f'담당 영업: "{old_name_sales}" → "{new_name_sales}"')
+    elif old_sales and not new_sales_id:
+        changes.append(f'담당 영업 삭제: "{old_sales.name}"')
+    
+    customer.engineer_id = new_engineer_id
+    customer.engineer_sub_id = new_engineer_sub_id
+    customer.sales_id = new_sales_id
 
     customer.updated_at = datetime.utcnow()
 
     db.session.commit()
+    
+    # 서비스 로그 생성 (변경사항이 있을 때만)
+    if changes:
+        create_service_log(
+            user_id=current_user.id,
+            log_type='정보',
+            action='고객사 수정',
+            description=f'고객사: {customer.name}, 변경내역: {", ".join(changes)}'
+        )
+    
     flash('고객사 정보가 업데이트되었습니다.', 'success')
     return redirect(url_for('customer_detail', customer_id=customer.id))
 
@@ -978,6 +1110,14 @@ def delete_customer(customer_id):
     # 고객사 삭제 (관련 문서는 cascade='all, delete-orphan'으로 자동 삭제됨)
     db.session.delete(customer)
     db.session.commit()
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='경고',
+        action='고객사 삭제',
+        description=f'삭제된 고객사: {customer_name}'
+    )
 
     flash(f'고객사 "{customer_name}"이(가) 삭제되었습니다.', 'success')
     return redirect(url_for('manage_customers'))
@@ -1091,6 +1231,14 @@ def create_admin():
     db.session.add(admin)
     db.session.commit()
 
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='관리자 생성',
+        description=f'계정: {username}, 이름: {name}, 이메일: {email or "없음"}'
+    )
+
     flash(f'관리자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
     return redirect(url_for('manage_admins'))
 
@@ -1145,6 +1293,14 @@ def create_user():
 
     db.session.add(user)
     db.session.commit()
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='사용자 생성',
+        description=f'계정: {username}, 이름: {name}, 소속: {department}, 이메일: {email or "없음"}'
+    )
 
     flash(f'사용자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
     return redirect(url_for('manage_users_unified'))
@@ -1201,6 +1357,7 @@ def delete_user(user_id):
         return redirect(request.referrer or url_for('dashboard'))
 
     username = user.username
+    user_role = user.role
 
     # 관련 데이터 삭제 (외래 키 제약 조건 해결)
     # 1. 로그인 시도 기록 삭제
@@ -1212,6 +1369,15 @@ def delete_user(user_id):
     # 3. 사용자 삭제
     db.session.delete(user)
     db.session.commit()
+
+    # 서비스 로그 생성
+    role_text = '관리자' if user_role == ROLE_ADMIN else '사용자'
+    create_service_log(
+        user_id=current_user.id,
+        log_type='경고',
+        action=f'{role_text} 삭제',
+        description=f'삭제된 {role_text}: {username}'
+    )
 
     flash(f'계정 "{username}"이 삭제되었습니다.', 'success')
     return redirect(request.referrer or url_for('dashboard'))
@@ -1283,9 +1449,18 @@ def toggle_user_active(user_id):
         return redirect(request.referrer or url_for('dashboard'))
 
     user.is_active = not user.is_active
+    status = '활성화' if user.is_active else '비활성화'
     db.session.commit()
 
-    status = '활성화' if user.is_active else '비활성화'
+    # 서비스 로그 생성
+    role_text = '관리자' if user.role == ROLE_ADMIN else '사용자'
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action=f'{role_text} {status}',
+        description=f'{role_text}: {user.name} ({user.username})'
+    )
+
     flash(f'{user.username} 계정이 {status}되었습니다.', 'success')
     return redirect(request.referrer or url_for('dashboard'))
 
@@ -1302,38 +1477,89 @@ def system_settings():
         db.session.commit()
 
     if request.method == 'POST':
+        # 변경 사항 추적
+        changes = []
+        
         # 기본 패스워드 설정
-        settings.default_password = request.form.get('default_password', 'Welcome1!')
+        old_password = settings.default_password
+        new_password = request.form.get('default_password', 'Welcome1!')
+        if old_password != new_password:
+            changes.append(f'기본 패스워드 변경')
+        settings.default_password = new_password
 
         # 패스워드 복잡성 설정
-        settings.password_min_length = int(request.form.get('password_min_length', 8))
+        old_min_length = settings.password_min_length
+        new_min_length = int(request.form.get('password_min_length', 8))
+        if old_min_length != new_min_length:
+            changes.append(f'패스워드 최소 길이: {old_min_length} → {new_min_length}')
+        settings.password_min_length = new_min_length
+        
         settings.password_max_length = int(request.form.get('password_max_length', 20))
         settings.password_require_uppercase = request.form.get('password_require_uppercase') == 'on'
         settings.password_require_special = request.form.get('password_require_special') == 'on'
         settings.password_require_number = request.form.get('password_require_number') == 'on'
 
         # 중복 로그인 설정
-        settings.prevent_duplicate_login = request.form.get('prevent_duplicate_login') == 'on'
+        old_duplicate_login = settings.prevent_duplicate_login
+        new_duplicate_login = request.form.get('prevent_duplicate_login') == 'on'
+        if old_duplicate_login != new_duplicate_login:
+            changes.append(f'중복 로그인 방지: {old_duplicate_login} → {new_duplicate_login}')
+        settings.prevent_duplicate_login = new_duplicate_login
 
         # 세션 타임아웃 설정
-        settings.session_timeout_enabled = request.form.get('session_timeout_enabled') == 'on'
+        old_timeout_enabled = settings.session_timeout_enabled
+        new_timeout_enabled = request.form.get('session_timeout_enabled') == 'on'
+        if old_timeout_enabled != new_timeout_enabled:
+            changes.append(f'세션 타임아웃 활성화: {old_timeout_enabled} → {new_timeout_enabled}')
+        settings.session_timeout_enabled = new_timeout_enabled
+        
+        old_timeout_minutes = settings.session_timeout_minutes
         session_timeout = int(request.form.get('session_timeout_minutes', 30))
-        settings.session_timeout_minutes = max(3, min(60, session_timeout))  # 3-60분 제한
+        new_timeout_minutes = max(3, min(60, session_timeout))
+        if old_timeout_minutes != new_timeout_minutes:
+            changes.append(f'세션 타임아웃: {old_timeout_minutes}분 → {new_timeout_minutes}분')
+        settings.session_timeout_minutes = new_timeout_minutes
 
         # 로그인 실패 설정
+        old_login_limit = settings.login_failure_limit
         login_limit = int(request.form.get('login_failure_limit', 5))
-        settings.login_failure_limit = max(1, min(5, login_limit))  # 1-5회 제한
+        new_login_limit = max(1, min(5, login_limit))
+        if old_login_limit != new_login_limit:
+            changes.append(f'로그인 실패 제한: {old_login_limit}회 → {new_login_limit}회')
+        settings.login_failure_limit = new_login_limit
 
+        old_lock_time = settings.account_lock_minutes
         lock_time = int(request.form.get('account_lock_minutes', 10))
-        settings.account_lock_minutes = max(5, min(30, lock_time))  # 5-30분 제한
+        new_lock_time = max(5, min(30, lock_time))
+        if old_lock_time != new_lock_time:
+            changes.append(f'계정 잠금 시간: {old_lock_time}분 → {new_lock_time}분')
+        settings.account_lock_minutes = new_lock_time
 
         # 패스워드 변경 주기 설정
-        settings.password_expiry_enabled = request.form.get('password_expiry_enabled') == 'on'
+        old_expiry_enabled = settings.password_expiry_enabled
+        new_expiry_enabled = request.form.get('password_expiry_enabled') == 'on'
+        if old_expiry_enabled != new_expiry_enabled:
+            changes.append(f'패스워드 만료 활성화: {old_expiry_enabled} → {new_expiry_enabled}')
+        settings.password_expiry_enabled = new_expiry_enabled
+        
+        old_expiry_days = settings.password_expiry_days
         expiry_days = int(request.form.get('password_expiry_days', 90))
-        settings.password_expiry_days = max(30, min(365, expiry_days))  # 30-365일 제한
+        new_expiry_days = max(30, min(365, expiry_days))
+        if old_expiry_days != new_expiry_days:
+            changes.append(f'패스워드 만료 기간: {old_expiry_days}일 → {new_expiry_days}일')
+        settings.password_expiry_days = new_expiry_days
 
         settings.updated_by = current_user.id
         db.session.commit()
+
+        # 서비스 로그 생성 (변경사항이 있을 때만)
+        if changes:
+            create_service_log(
+                user_id=current_user.id,
+                log_type='정보',
+                action='시스템 설정 변경',
+                description=f'변경내역: {", ".join(changes)}'
+            )
 
         flash('시스템 설정이 저장되었습니다.', 'success')
         return redirect(url_for('system_settings'))
@@ -1531,6 +1757,14 @@ def admin_create_user():
 
     db.session.add(user)
     db.session.commit()
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='사용자 생성',
+        description=f'계정: {username}, 이름: {name}, 소속: {department}, 이메일: {email or "없음"}'
+    )
 
     flash(f'사용자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
     return redirect(url_for('manage_users_unified'))
