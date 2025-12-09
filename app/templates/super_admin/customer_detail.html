@@ -162,14 +162,75 @@
     </div>
 
     <!-- 저장 버튼 -->
-    <div class="d-grid gap-2 mb-4">
+    <div class="d-grid gap-2 mb-3">
         <button type="submit" class="btn btn-primary btn-lg">
             <i class="bi bi-check-circle"></i> 저장
         </button>
     </div>
 </form>
 
+<!-- 고객사 삭제 버튼 -->
+<div class="d-grid gap-2 mb-4">
+    <button type="button" class="btn btn-danger btn-lg" data-bs-toggle="modal" data-bs-target="#deleteCustomerModal">
+        <i class="bi bi-trash"></i> 고객사 삭제
+    </button>
+</div>
+
+<!-- 고객사 삭제 확인 모달 -->
+<div class="modal fade" id="deleteCustomerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 고객사 삭제 확인</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <strong>경고:</strong> 이 작업은 되돌릴 수 없습니다!
+                </div>
+                <p>정말로 이 고객사를 삭제하시겠습니까?</p>
+                <p>삭제하려면 고객사 이름 <strong class="text-danger">"{{ customer.name }}"</strong>을(를) 아래에 정확히 입력하세요.</p>
+
+                <form method="POST" action="{{ url_for('delete_customer', customer_id=customer.id) }}" id="deleteCustomerForm">
+                    <div class="mb-3">
+                        <label class="form-label">고객사 이름 확인</label>
+                        <input type="text" class="form-control" name="confirm_name" id="confirmNameInput" required placeholder="{{ customer.name }}">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger" id="confirmDeleteBtn" disabled>
+                            <i class="bi bi-trash"></i> 삭제 확인
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> 취소
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// 고객사 삭제 - 이름 확인 후 삭제 버튼 활성화
+document.getElementById('confirmNameInput').addEventListener('input', function() {
+    const customerName = "{{ customer.name }}";
+    const inputValue = this.value;
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+
+    if (inputValue === customerName) {
+        deleteBtn.disabled = false;
+    } else {
+        deleteBtn.disabled = true;
+    }
+});
+
+// 모달이 닫힐 때 입력 필드 초기화
+document.getElementById('deleteCustomerModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('confirmNameInput').value = '';
+    document.getElementById('confirmDeleteBtn').disabled = true;
+});
+
 // 계약 유형에 따라 날짜 필드 활성화/비활성화
 document.getElementById('contractType').addEventListener('change', function() {
     const contractDates = document.querySelectorAll('.contract-date');

@@ -652,7 +652,7 @@ def manage_users():
     return render_template('super_admin/users.html', users=users, customers=customers)
 
 @app.route('/super-admin/customers')
-@super_admin_required
+@admin_required
 def manage_customers():
     """고객사 목록 및 관리"""
     customers_list = Customer.query.all()
@@ -663,7 +663,7 @@ def manage_customers():
     return render_template('super_admin/customers.html', customers=customers_list)
 
 @app.route('/super-admin/customers/create', methods=['POST'])
-@super_admin_required
+@admin_required
 def create_customer():
     """고객사 생성 (회사명만 필수)"""
     name = request.form.get('name')
@@ -686,7 +686,7 @@ def create_customer():
     return redirect(url_for('customer_detail', customer_id=customer.id))
 
 @app.route('/super-admin/customers/<int:customer_id>')
-@super_admin_required
+@admin_required
 def customer_detail(customer_id):
     """고객사 세부 정보 조회"""
     customer = Customer.query.get_or_404(customer_id)
@@ -696,7 +696,7 @@ def customer_detail(customer_id):
     return render_template('super_admin/customer_detail.html', customer=customer, engineers=engineers, sales=sales)
 
 @app.route('/super-admin/customers/<int:customer_id>/update', methods=['POST'])
-@super_admin_required
+@admin_required
 def update_customer(customer_id):
     """고객사 세부 정보 업데이트"""
     customer = Customer.query.get_or_404(customer_id)
@@ -739,6 +739,27 @@ def update_customer(customer_id):
     db.session.commit()
     flash('고객사 정보가 업데이트되었습니다.', 'success')
     return redirect(url_for('customer_detail', customer_id=customer.id))
+
+@app.route('/super-admin/customers/<int:customer_id>/delete', methods=['POST'])
+@admin_required
+def delete_customer(customer_id):
+    """고객사 삭제"""
+    customer = Customer.query.get_or_404(customer_id)
+
+    # 고객사 이름 확인
+    confirm_name = request.form.get('confirm_name')
+    if confirm_name != customer.name:
+        flash('고객사 이름이 일치하지 않습니다.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer.id))
+
+    customer_name = customer.name
+
+    # 고객사 삭제 (관련 문서는 cascade='all, delete-orphan'으로 자동 삭제됨)
+    db.session.delete(customer)
+    db.session.commit()
+
+    flash(f'고객사 "{customer_name}"이(가) 삭제되었습니다.', 'success')
+    return redirect(url_for('manage_customers'))
 
 @app.route('/super-admin/create-admin', methods=['POST'])
 @super_admin_required
