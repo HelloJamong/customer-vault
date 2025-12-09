@@ -7,17 +7,6 @@
 {% endblock %}
 
 {% block content %}
-{% if total_assigned_customers == 0 %}
-<!-- 담당 고객사가 없는 경우 안내 메시지 -->
-<div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
-    <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 2rem;"></i>
-    <div>
-        <h5 class="alert-heading mb-1">담당 고객사가 없습니다</h5>
-        <p class="mb-0">관리자에게 문의하여 고객사를 배정받으세요.</p>
-    </div>
-</div>
-{% endif %}
-
 <div class="row mb-4">
     <div class="col">
         <h2><i class="bi bi-speedometer2"></i> 대시보드</h2>
@@ -115,6 +104,8 @@
     </div>
 </div>
 
+<!-- 최근 업로드한 점검서 -->
+{% if total_assigned_customers > 0 %}
 <!-- 최근 점검서 목록 -->
 <div class="card">
     <div class="card-header bg-success text-white">
@@ -162,6 +153,7 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
 <script>
 // 점검 완료율 원형 그래프

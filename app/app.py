@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import shutil
 from functools import wraps
 from flask import Flask, render_template, redirect, url_for, flash, request, abort, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -358,6 +359,36 @@ def get_system_settings():
         db.session.add(settings)
         db.session.commit()
     return settings
+
+def get_disk_usage():
+    """디스크 사용량 정보 가져오기"""
+    try:
+        # uploads 폴더가 있는 경로의 디스크 사용량 확인
+        upload_path = app.config['UPLOAD_FOLDER']
+        disk = shutil.disk_usage(upload_path)
+        
+        # 바이트를 GB로 변환
+        total_gb = disk.total / (1024 ** 3)
+        used_gb = disk.used / (1024 ** 3)
+        free_gb = disk.free / (1024 ** 3)
+        usage_percent = (disk.used / disk.total) * 100
+        
+        return {
+            'total_gb': round(total_gb, 2),
+            'used_gb': round(used_gb, 2),
+            'free_gb': round(free_gb, 2),
+            'usage_percent': round(usage_percent, 1),
+            'is_warning': usage_percent >= 80
+        }
+    except Exception as e:
+        print(f"Failed to get disk usage: {str(e)}")
+        return {
+            'total_gb': 0,
+            'used_gb': 0,
+            'free_gb': 0,
+            'usage_percent': 0,
+            'is_warning': False
+        }
 
 def create_service_log(user_id, log_type, action, description, ip_address=None):
     """서비스 로그 생성"""
@@ -814,6 +845,9 @@ def super_admin_dashboard():
             if customer.is_inspection_completed_this_month():
                 monthly_inspection_completed += 1
 
+    # 디스크 사용량 정보
+    disk_usage = get_disk_usage()
+
     return render_template('super_admin/dashboard.html',
                          total_users=total_users,
                          total_admins=total_admins,
@@ -821,7 +855,8 @@ def super_admin_dashboard():
                          total_customers=total_customers,
                          total_documents=total_documents,
                          monthly_inspection_targets=monthly_inspection_targets,
-                         monthly_inspection_completed=monthly_inspection_completed)
+                         monthly_inspection_completed=monthly_inspection_completed,
+                         disk_usage=disk_usage)
 
 @app.route('/admins')
 @super_admin_required
@@ -879,12 +914,6 @@ def create_customer():
     # 고객사 생성 (회사명만으로)
     customer = Customer(name=name)
     db.session.add(customer)
-    db.session.flush()  # ID를 생성하기 위해 flush
-    
-    # 일반 사용자가 생성한 경우 자동으로 담당자로 배정
-    if current_user.is_normal_user():
-        current_user.assigned_customers.append(customer)
-    
     db.session.commit()
 
     # 서비스 로그 생성
@@ -1076,6 +1105,24 @@ def update_customer(customer_id):
     customer.engineer_id = new_engineer_id
     customer.engineer_sub_id = new_engineer_sub_id
     customer.sales_id = new_sales_id
+
+    # user_customers 테이블 동기화 - 담당 엔지니어만 assigned_customers에 포함
+    # 기존 할당 관계 모두 제거 (리스트로 변환 후 제거)
+    current_assigned = list(customer.assigned_users.all())
+    for user in current_assigned:
+        customer.assigned_users.remove(user)
+    
+    # 담당 엔지니어가 지정된 경우 추가
+    if new_engineer_id:
+        engineer_user = User.query.get(new_engineer_id)
+        if engineer_user:
+            customer.assigned_users.append(engineer_user)
+    
+    # 부담당 엔지니어가 지정된 경우 추가
+    if new_engineer_sub_id:
+        engineer_sub_user = User.query.get(new_engineer_sub_id)
+        if engineer_sub_user:
+            customer.assigned_users.append(engineer_sub_user)
 
     customer.updated_at = datetime.utcnow()
 
@@ -1588,13 +1635,17 @@ def admin_dashboard():
             if customer.is_inspection_completed_this_month():
                 monthly_inspection_completed += 1
 
+    # 디스크 사용량 정보
+    disk_usage = get_disk_usage()
+
     return render_template('admin/dashboard.html',
                          total_users=total_users,
                          total_customers=total_customers,
                          total_documents=total_documents,
                          active_users=active_users,
                          monthly_inspection_targets=monthly_inspection_targets,
-                         monthly_inspection_completed=monthly_inspection_completed)
+                         monthly_inspection_completed=monthly_inspection_completed,
+                         disk_usage=disk_usage)
 
 @app.route('/logs')
 @admin_required
@@ -1860,12 +1911,16 @@ def user_dashboard():
     else:
         recent_documents = []
 
+    # 디스크 사용량 정보
+    disk_usage = get_disk_usage()
+
     return render_template('user/dashboard.html',
                          assigned_customers=assigned_customers,
                          total_assigned_customers=total_assigned_customers,
                          monthly_inspection_targets=monthly_inspection_targets,
                          monthly_inspection_completed=monthly_inspection_completed,
-                         recent_documents=recent_documents)
+                         recent_documents=recent_documents,
+                         disk_usage=disk_usage)
 
 @app.route('/customer/edit', methods=['GET', 'POST'])
 @role_required(ROLE_USER)

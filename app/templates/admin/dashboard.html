@@ -115,6 +115,51 @@
     </div>
 </div>
 
+<!-- 디스크 사용량 표시 -->
+<div class="row g-4 mt-2">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="bi bi-hdd"></i> 스토리지 사용량
+                </h5>
+                {% if disk_usage.is_warning %}
+                <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <div>
+                        <strong>저장 공간 부족!</strong> 디스크 사용량이 80%를 초과했습니다. 저장 공간을 확보해주세요.
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">
+                        <strong>{{ disk_usage.used_gb }} GB</strong> / {{ disk_usage.total_gb }} GB 사용 중
+                    </span>
+                    <span class="badge {% if disk_usage.is_warning %}bg-danger{% elif disk_usage.usage_percent >= 60 %}bg-warning{% else %}bg-success{% endif %} fs-6">
+                        {{ disk_usage.usage_percent }}%
+                    </span>
+                </div>
+                
+                <div class="progress" style="height: 30px;">
+                    <div class="progress-bar {% if disk_usage.is_warning %}bg-danger{% elif disk_usage.usage_percent >= 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                         role="progressbar" 
+                         style="width: {{ disk_usage.usage_percent }}%;" 
+                         aria-valuenow="{{ disk_usage.usage_percent }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        {{ disk_usage.usage_percent }}%
+                    </div>
+                </div>
+                
+                <div class="text-muted mt-2 small">
+                    <i class="bi bi-info-circle"></i> 여유 공간: {{ disk_usage.free_gb }} GB
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // 점검 완료율 원형 그래프
 const ctx = document.getElementById('adminInspectionChart');
