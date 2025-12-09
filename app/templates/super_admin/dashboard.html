@@ -2,6 +2,10 @@
 
 {% block title %}슈퍼 관리자 대시보드{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col">
@@ -52,34 +56,116 @@
     </div>
 </div>
 
-<div class="row mt-4">
+<!-- 점검 현황 대시보드 -->
+<div class="row mt-4 g-4">
+    <!-- 이번 달 점검 대상 고객사 수 -->
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-file-earmark-text"></i> 등록된 문서</h5>
-                <h2>{{ total_documents }}</h2>
-                <p class="text-muted">개의 점검서가 업로드되었습니다.</p>
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title mb-4">
+                    <i class="bi bi-calendar-check"></i> 이번 달 점검 대상 고객사
+                </h5>
+                <div class="display-1 text-primary mb-3" style="font-weight: 600;">
+                    {{ monthly_inspection_targets }}
+                </div>
+                <p class="text-muted fs-5">개 업체</p>
+                <hr>
+                <div class="row text-center mt-4">
+                    <div class="col-6">
+                        <div class="text-success">
+                            <i class="bi bi-check-circle-fill fs-3"></i>
+                            <p class="mb-0 mt-2">완료</p>
+                            <h4 class="mb-0">{{ monthly_inspection_completed }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-danger">
+                            <i class="bi bi-clock-fill fs-3"></i>
+                            <p class="mb-0 mt-2">미완료</p>
+                            <h4 class="mb-0">{{ monthly_inspection_targets - monthly_inspection_completed }}</h4>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- 점검 완료율 원형 그래프 -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-tools"></i> 빠른 작업</h5>
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('manage_admins') }}" class="btn btn-outline-primary">
-                        <i class="bi bi-person-badge"></i> 관리자 관리
-                    </a>
-                    <a href="{{ url_for('manage_users') }}" class="btn btn-outline-success">
-                        <i class="bi bi-people"></i> 사용자 관리
-                    </a>
-                    <a href="{{ url_for('manage_customers') }}" class="btn btn-outline-warning">
-                        <i class="bi bi-building"></i> 고객사 관리
-                    </a>
+                <h5 class="card-title text-center mb-4">
+                    <i class="bi bi-pie-chart-fill"></i> 이번 달 점검 완료율
+                </h5>
+                <div style="max-width: 300px; margin: 0 auto;">
+                    <canvas id="inspectionChart"></canvas>
+                </div>
+                <div class="text-center mt-4">
+                    {% if monthly_inspection_targets > 0 %}
+                    <h3 class="mb-0">
+                        {{ "%.1f"|format((monthly_inspection_completed / monthly_inspection_targets * 100)) }}%
+                    </h3>
+                    <p class="text-muted">완료율</p>
+                    {% else %}
+                    <h3 class="mb-0 text-muted">-</h3>
+                    <p class="text-muted">점검 대상 없음</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// 점검 완료율 원형 그래프
+const ctx = document.getElementById('inspectionChart');
+
+const completed = {{ monthly_inspection_completed }};
+const pending = {{ monthly_inspection_targets - monthly_inspection_completed }};
+
+new Chart(ctx, {
+    type: 'pie',
+    data: {
+        labels: ['완료', '미완료'],
+        datasets: [{
+            data: [completed, pending],
+            backgroundColor: [
+                'rgba(25, 135, 84, 0.8)',   // 완료 - 초록색
+                'rgba(220, 53, 69, 0.8)'     // 미완료 - 빨간색
+            ],
+            borderColor: [
+                'rgba(25, 135, 84, 1)',
+                'rgba(220, 53, 69, 1)'
+            ],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    font: {
+                        size: 14
+                    },
+                    padding: 20
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const total = completed + pending;
+                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                        return label + ': ' + value + '개 (' + percentage + '%)';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
 {% endblock %}

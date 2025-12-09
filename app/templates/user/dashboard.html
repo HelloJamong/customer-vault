@@ -2,103 +2,143 @@
 
 {% block title %}사용자 대시보드{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col">
         <h2><i class="bi bi-speedometer2"></i> 대시보드</h2>
-        <p class="text-muted">고객사 정보와 점검서를 관리할 수 있습니다.</p>
+        <p class="text-muted">담당 고객사 정보와 점검 현황을 확인할 수 있습니다.</p>
     </div>
 </div>
 
-<!-- 고객사 정보 카드 -->
-<div class="card mb-4">
-    <div class="card-header bg-primary text-white">
-        <h5 class="mb-0"><i class="bi bi-building"></i> 고객사 정보</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <dl class="row">
-                    <dt class="col-sm-4">고객명:</dt>
-                    <dd class="col-sm-8">{{ customer.name }}</dd>
-
-                    <dt class="col-sm-4">회사명:</dt>
-                    <dd class="col-sm-8">{{ customer.company or '-' }}</dd>
-
-                    <dt class="col-sm-4">연락처:</dt>
-                    <dd class="col-sm-8">{{ customer.contact or '-' }}</dd>
-                </dl>
-            </div>
-            <div class="col-md-6">
-                <dl class="row">
-                    <dt class="col-sm-4">이메일:</dt>
-                    <dd class="col-sm-8">{{ customer.email or '-' }}</dd>
-
-                    <dt class="col-sm-4">주소:</dt>
-                    <dd class="col-sm-8">{{ customer.address or '-' }}</dd>
-
-                    <dt class="col-sm-4">등록일:</dt>
-                    <dd class="col-sm-8">{{ customer.created_at.strftime('%Y-%m-%d') }}</dd>
-                </dl>
+<!-- 통계 카드 -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-building-fill"></i> 담당 고객사</h5>
+                <h2 class="mb-0">{{ total_assigned_customers }}</h2>
+                <p class="mb-0 small">개 업체</p>
             </div>
         </div>
-        <div class="mt-3">
-            <a href="{{ url_for('edit_customer_info') }}" class="btn btn-primary">
-                <i class="bi bi-pencil"></i> 정보 수정
-            </a>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-warning h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-calendar-check"></i> 이번 달 점검 대상</h5>
+                <h2 class="mb-0">{{ monthly_inspection_targets }}</h2>
+                <p class="mb-0 small">개 업체</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-success h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-check-circle"></i> 완료</h5>
+                <h2 class="mb-0">{{ monthly_inspection_completed }}</h2>
+                <p class="mb-0 small">개 업체</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-danger h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-clock"></i> 미완료</h5>
+                <h2 class="mb-0">{{ monthly_inspection_targets - monthly_inspection_completed }}</h2>
+                <p class="mb-0 small">개 업체</p>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- 점검서 목록 -->
+<!-- 점검 완료율 차트 -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title text-center mb-4">
+                    <i class="bi bi-pie-chart-fill"></i> 이번 달 점검 완료율
+                </h5>
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div style="max-width: 300px; margin: 0 auto;">
+                            <canvas id="userInspectionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-center">
+                        {% if monthly_inspection_targets > 0 %}
+                        <h1 class="display-3 mb-3">
+                            {{ "%.1f"|format((monthly_inspection_completed / monthly_inspection_targets * 100)) }}%
+                        </h1>
+                        <p class="text-muted fs-5">완료율</p>
+                        <hr>
+                        <div class="row text-center mt-4">
+                            <div class="col-6">
+                                <div class="text-success">
+                                    <i class="bi bi-check-circle-fill fs-1"></i>
+                                    <p class="mb-0 mt-2 fs-5">완료</p>
+                                    <h3 class="mb-0">{{ monthly_inspection_completed }}</h3>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-danger">
+                                    <i class="bi bi-clock-fill fs-1"></i>
+                                    <p class="mb-0 mt-2 fs-5">미완료</p>
+                                    <h3 class="mb-0">{{ monthly_inspection_targets - monthly_inspection_completed }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <h3 class="mb-0 text-muted">-</h3>
+                        <p class="text-muted">이번 달 점검 대상 없음</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 최근 점검서 목록 -->
 <div class="card">
-    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> 점검서 목록</h5>
-        <a href="{{ url_for('upload_document') }}" class="btn btn-light btn-sm">
-            <i class="bi bi-cloud-upload"></i> 점검서 업로드
-        </a>
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> 최근 점검서 (최대 10개)</h5>
     </div>
     <div class="card-body">
-        {% if documents %}
+        {% if recent_documents %}
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
                     <tr>
+                        <th>고객사</th>
                         <th>제목</th>
                         <th>파일명</th>
-                        <th>크기</th>
                         <th>점검일</th>
                         <th>업로드일</th>
-                        <th>작업</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for doc in documents %}
+                    {% for doc in recent_documents %}
                     <tr>
+                        <td>{{ doc.customer.name }}</td>
                         <td>{{ doc.title }}</td>
                         <td>
                             <i class="bi bi-file-earmark-pdf text-danger"></i> {{ doc.filename }}
                         </td>
                         <td>
-                            {% if doc.file_size %}
-                            {{ (doc.file_size / 1024 / 1024)|round(2) }} MB
-                            {% else %}
-                            -
-                            {% endif %}
-                        </td>
-                        <td>
                             {% if doc.inspection_date %}
                             {{ doc.inspection_date.strftime('%Y-%m-%d') }}
                             {% else %}
-                            -
+                            <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td>{{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td>
-                            <button class="btn btn-sm btn-primary">
-                                <i class="bi bi-download"></i> 다운로드
-                            </button>
-                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -108,11 +148,61 @@
         <div class="text-center py-5">
             <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
             <p class="text-muted mt-3">업로드된 점검서가 없습니다.</p>
-            <a href="{{ url_for('upload_document') }}" class="btn btn-success">
-                <i class="bi bi-cloud-upload"></i> 첫 점검서 업로드하기
-            </a>
         </div>
         {% endif %}
     </div>
 </div>
+
+<script>
+// 점검 완료율 원형 그래프
+const ctx = document.getElementById('userInspectionChart');
+
+const completed = {{ monthly_inspection_completed }};
+const pending = {{ monthly_inspection_targets - monthly_inspection_completed }};
+
+new Chart(ctx, {
+    type: 'pie',
+    data: {
+        labels: ['완료', '미완료'],
+        datasets: [{
+            data: [completed, pending],
+            backgroundColor: [
+                'rgba(25, 135, 84, 0.8)',   // 완료 - 초록색
+                'rgba(220, 53, 69, 0.8)'     // 미완료 - 빨간색
+            ],
+            borderColor: [
+                'rgba(25, 135, 84, 1)',
+                'rgba(220, 53, 69, 1)'
+            ],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    font: {
+                        size: 14
+                    },
+                    padding: 20
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const total = completed + pending;
+                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                        return label + ': ' + value + '개 (' + percentage + '%)';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
 {% endblock %}

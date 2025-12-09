@@ -6,7 +6,8 @@ from flask import Flask, render_template, redirect, url_for, flash, request, abo
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from dateutil.relativedelta import relativedelta
 
 app = Flask(__name__)
 
@@ -48,6 +49,13 @@ ROLE_SUPER_ADMIN = 'super_admin'
 ROLE_ADMIN = 'admin'
 ROLE_USER = 'user'
 
+# 사용자-고객사 연결 테이블 (다대다 관계)
+user_customers = db.Table('user_customers',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('customer_id', db.Integer, db.ForeignKey('customers.id'), primary_key=True),
+    db.Column('assigned_at', db.DateTime, default=datetime.utcnow)
+)
+
 # 데이터베이스 모델
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -71,8 +79,13 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     password_changed_at = db.Column(db.DateTime, default=datetime.utcnow)  # 패스워드 마지막 변경 시각
+    last_login = db.Column(db.DateTime, nullable=True)  # 마지막 로그인 시각
 
-    customer = db.relationship('Customer', backref='user', uselist=False)
+    # 기존 단일 고객사 관계 (하위 호환성 유지)
+    customer = db.relationship('Customer', backref='user', uselist=False, foreign_keys='Customer.id', primaryjoin='User.customer_id == Customer.id', viewonly=True)
+
+    # 새로운 다대다 관계 - 담당 고객사 목록
+    assigned_customers = db.relationship('Customer', secondary=user_customers, backref=db.backref('assigned_users', lazy='dynamic'), lazy='dynamic')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -127,6 +140,8 @@ class Customer(db.Model):
     contact = db.Column(db.String(100))
     email = db.Column(db.String(120))
     address = db.Column(db.Text)
+    inspection_cycle = db.Column(db.Integer, default=1)  # 점검 주기 (개월), 기본값 1개월
+    last_inspection_date = db.Column(db.Date, nullable=True)  # 마지막 점검일
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     documents = db.relationship('Document', backref='customer', lazy=True, cascade='all, delete-orphan')
@@ -384,6 +399,10 @@ def login():
                 reset_failed_login_attempts(user)
                 record_login_attempt(user.id, success=True)
 
+                # 마지막 로그인 시간 업데이트
+                user.last_login = datetime.utcnow()
+                db.session.commit()
+
                 # 세션 관리 (중복 로그인 방지 포함)
                 manage_user_session(user.id)
 
@@ -522,12 +541,58 @@ def super_admin_dashboard():
     total_customers = Customer.query.count()
     total_documents = Document.query.count()
 
+    # 이번 달 점검 대상 및 완료 현황 계산
+    today = date.today()
+    current_month_start = date(today.year, today.month, 1)
+
+    # 다음 달 1일 (이번 달 마지막 날 다음)
+    if today.month == 12:
+        next_month_start = date(today.year + 1, 1, 1)
+    else:
+        next_month_start = date(today.year, today.month + 1, 1)
+
+    # 이번 달 점검 대상 고객사 계산
+    monthly_inspection_targets = 0
+    monthly_inspection_completed = 0
+
+    all_customers = Customer.query.all()
+    for customer in all_customers:
+        # 점검 주기가 설정되어 있고, 이번 달에 점검이 필요한지 확인
+        if customer.inspection_cycle:
+            needs_inspection = False
+
+            if customer.last_inspection_date is None:
+                # 한 번도 점검하지 않은 경우 - 이번 달 점검 대상
+                needs_inspection = True
+            else:
+                # 마지막 점검일 기준으로 다음 점검 예정일 계산
+                next_inspection_date = customer.last_inspection_date + relativedelta(months=customer.inspection_cycle)
+
+                # 다음 점검 예정일이 이번 달에 속하는지 확인
+                if current_month_start <= next_inspection_date < next_month_start:
+                    needs_inspection = True
+
+            if needs_inspection:
+                monthly_inspection_targets += 1
+
+                # 이번 달에 점검 완료했는지 확인 (이번 달에 업로드된 문서가 있는지)
+                completed = Document.query.filter(
+                    Document.customer_id == customer.id,
+                    Document.inspection_date >= current_month_start,
+                    Document.inspection_date < next_month_start
+                ).first()
+
+                if completed:
+                    monthly_inspection_completed += 1
+
     return render_template('super_admin/dashboard.html',
                          total_users=total_users,
                          total_admins=total_admins,
                          total_normal_users=total_normal_users,
                          total_customers=total_customers,
-                         total_documents=total_documents)
+                         total_documents=total_documents,
+                         monthly_inspection_targets=monthly_inspection_targets,
+                         monthly_inspection_completed=monthly_inspection_completed)
 
 @app.route('/super-admin/admins')
 @super_admin_required
@@ -763,11 +828,57 @@ def admin_dashboard():
     total_documents = Document.query.count()
     active_users = User.query.filter_by(role=ROLE_USER, is_active=True).count()
 
+    # 이번 달 점검 대상 및 완료 현황 계산
+    today = date.today()
+    current_month_start = date(today.year, today.month, 1)
+
+    # 다음 달 1일 (이번 달 마지막 날 다음)
+    if today.month == 12:
+        next_month_start = date(today.year + 1, 1, 1)
+    else:
+        next_month_start = date(today.year, today.month + 1, 1)
+
+    # 이번 달 점검 대상 고객사 계산
+    monthly_inspection_targets = 0
+    monthly_inspection_completed = 0
+
+    all_customers = Customer.query.all()
+    for customer in all_customers:
+        # 점검 주기가 설정되어 있고, 이번 달에 점검이 필요한지 확인
+        if customer.inspection_cycle:
+            needs_inspection = False
+
+            if customer.last_inspection_date is None:
+                # 한 번도 점검하지 않은 경우 - 이번 달 점검 대상
+                needs_inspection = True
+            else:
+                # 마지막 점검일 기준으로 다음 점검 예정일 계산
+                next_inspection_date = customer.last_inspection_date + relativedelta(months=customer.inspection_cycle)
+
+                # 다음 점검 예정일이 이번 달에 속하는지 확인
+                if current_month_start <= next_inspection_date < next_month_start:
+                    needs_inspection = True
+
+            if needs_inspection:
+                monthly_inspection_targets += 1
+
+                # 이번 달에 점검 완료했는지 확인 (이번 달에 업로드된 문서가 있는지)
+                completed = Document.query.filter(
+                    Document.customer_id == customer.id,
+                    Document.inspection_date >= current_month_start,
+                    Document.inspection_date < next_month_start
+                ).first()
+
+                if completed:
+                    monthly_inspection_completed += 1
+
     return render_template('admin/dashboard.html',
                          total_users=total_users,
                          total_customers=total_customers,
                          total_documents=total_documents,
-                         active_users=active_users)
+                         active_users=active_users,
+                         monthly_inspection_targets=monthly_inspection_targets,
+                         monthly_inspection_completed=monthly_inspection_completed)
 
 @app.route('/admin/users')
 @admin_required
@@ -866,17 +977,72 @@ def admin_toggle_user_active(user_id):
 @app.route('/user/dashboard')
 @role_required(ROLE_USER)
 def user_dashboard():
-    """일반 사용자 대시보드 - 본인 고객사 정보 및 점검서 관리"""
-    if not current_user.customer_id:
-        flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
+    """일반 사용자 대시보드 - 담당 고객사 정보 및 점검 현황"""
+    # 담당 고객사 목록 가져오기
+    assigned_customers = current_user.assigned_customers.all()
+
+    # 담당 고객사가 없으면 경고 메시지
+    if not assigned_customers:
+        flash('담당 고객사가 없습니다. 관리자에게 문의하세요.', 'warning')
         return render_template('user/no_customer.html')
 
-    customer = Customer.query.get(current_user.customer_id)
-    documents = Document.query.filter_by(customer_id=current_user.customer_id).all()
+    # 담당 고객사 수
+    total_assigned_customers = len(assigned_customers)
+
+    # 이번 달 점검 대상 및 완료 현황 계산
+    today = date.today()
+    current_month_start = date(today.year, today.month, 1)
+
+    # 다음 달 1일
+    if today.month == 12:
+        next_month_start = date(today.year + 1, 1, 1)
+    else:
+        next_month_start = date(today.year, today.month + 1, 1)
+
+    monthly_inspection_targets = 0
+    monthly_inspection_completed = 0
+
+    for customer in assigned_customers:
+        # 점검 주기가 설정되어 있고, 이번 달에 점검이 필요한지 확인
+        if customer.inspection_cycle:
+            needs_inspection = False
+
+            if customer.last_inspection_date is None:
+                # 한 번도 점검하지 않은 경우 - 이번 달 점검 대상
+                needs_inspection = True
+            else:
+                # 마지막 점검일 기준으로 다음 점검 예정일 계산
+                next_inspection_date = customer.last_inspection_date + relativedelta(months=customer.inspection_cycle)
+
+                # 다음 점검 예정일이 이번 달에 속하는지 확인
+                if current_month_start <= next_inspection_date < next_month_start:
+                    needs_inspection = True
+
+            if needs_inspection:
+                monthly_inspection_targets += 1
+
+                # 이번 달에 점검 완료했는지 확인
+                completed = Document.query.filter(
+                    Document.customer_id == customer.id,
+                    Document.inspection_date >= current_month_start,
+                    Document.inspection_date < next_month_start
+                ).first()
+
+                if completed:
+                    monthly_inspection_completed += 1
+
+    # 모든 담당 고객사의 문서 가져오기
+    customer_ids = [c.id for c in assigned_customers]
+    recent_documents = Document.query.filter(
+        Document.customer_id.in_(customer_ids)
+    ).order_by(Document.uploaded_at.desc()).limit(10).all()
 
     return render_template('user/dashboard.html',
-                         customer=customer,
-                         documents=documents)
+                         assigned_customers=assigned_customers,
+                         total_assigned_customers=total_assigned_customers,
+                         monthly_inspection_targets=monthly_inspection_targets,
+                         monthly_inspection_completed=monthly_inspection_completed,
+                         recent_documents=recent_documents)
 
 @app.route('/user/customer/edit', methods=['GET', 'POST'])
 @role_required(ROLE_USER)
