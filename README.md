@@ -93,6 +93,33 @@ docker-compose exec db mysql -u customer_user -p customer_db
 docker-compose exec web bash
 ```
 
+## 데이터베이스 마이그레이션
+
+새로운 기능 추가 시 데이터베이스 스키마 변경이 필요한 경우:
+
+```bash
+# 방법 1: cat과 파이프 사용 (권장)
+cat migrations/add_sub_contacts.sql | docker-compose exec -T db mysql -u customer_user -pcustomer_password customer_db
+
+# 방법 2: 파일을 컨테이너로 복사 후 실행
+docker cp migrations/add_sub_contacts.sql customer-storage-db-1:/tmp/
+docker-compose exec db mysql -u customer_user -pcustomer_password customer_db -e "source /tmp/add_sub_contacts.sql"
+
+# 방법 3: docker exec 직접 사용
+docker exec -i customer-storage-db-1 mysql -u customer_user -pcustomer_password customer_db < migrations/add_sub_contacts.sql
+
+# 마이그레이션 확인
+docker-compose exec db mysql -u customer_user -pcustomer_password customer_db -e "DESCRIBE customers;"
+```
+
+**참고**: 
+- `customer_password`는 `.env` 파일의 `DB_PASSWORD` 값으로 변경하세요
+- `-T` 옵션은 TTY 할당을 비활성화합니다 (파이프 사용 시 필요)
+- 비밀번호를 명령어에 직접 입력하지 않으려면 방법 2를 사용하세요
+
+### 최근 마이그레이션
+- `add_sub_contacts.sql`: 고객사 부담당자 필드 추가 (정 1명, 부 3명) 및 사내 부담당 엔지니어 필드 추가
+
 ## 운영 환경 배포
 
 ### Rocky Linux 9 서버 설정

@@ -141,13 +141,37 @@ class Customer(db.Model):
     name = db.Column(db.String(200), nullable=False)  # 고객사명 (회사명)
     location = db.Column(db.String(200))  # 위치
 
-    # 고객사 담당자 정보
+    # 고객사 담당자 정보 (정 담당자)
     contact_name = db.Column(db.String(100))  # 담당자 이름
     contact_position = db.Column(db.String(100))  # 담당자 직급
     contact_department = db.Column(db.String(100))  # 담당자 소속
     contact_mobile = db.Column(db.String(50))  # 연락처(휴대전화)
     contact_phone = db.Column(db.String(50))  # 연락처(내선)
     contact_email = db.Column(db.String(120))  # 이메일
+
+    # 고객사 부담당자1 정보
+    contact_name_sub1 = db.Column(db.String(100))  # 부담당자1 이름
+    contact_position_sub1 = db.Column(db.String(100))  # 부담당자1 직급
+    contact_department_sub1 = db.Column(db.String(100))  # 부담당자1 소속
+    contact_mobile_sub1 = db.Column(db.String(50))  # 부담당자1 휴대전화
+    contact_phone_sub1 = db.Column(db.String(50))  # 부담당자1 내선
+    contact_email_sub1 = db.Column(db.String(120))  # 부담당자1 이메일
+
+    # 고객사 부담당자2 정보
+    contact_name_sub2 = db.Column(db.String(100))  # 부담당자2 이름
+    contact_position_sub2 = db.Column(db.String(100))  # 부담당자2 직급
+    contact_department_sub2 = db.Column(db.String(100))  # 부담당자2 소속
+    contact_mobile_sub2 = db.Column(db.String(50))  # 부담당자2 휴대전화
+    contact_phone_sub2 = db.Column(db.String(50))  # 부담당자2 내선
+    contact_email_sub2 = db.Column(db.String(120))  # 부담당자2 이메일
+
+    # 고객사 부담당자3 정보
+    contact_name_sub3 = db.Column(db.String(100))  # 부담당자3 이름
+    contact_position_sub3 = db.Column(db.String(100))  # 부담당자3 직급
+    contact_department_sub3 = db.Column(db.String(100))  # 부담당자3 소속
+    contact_mobile_sub3 = db.Column(db.String(50))  # 부담당자3 휴대전화
+    contact_phone_sub3 = db.Column(db.String(50))  # 부담당자3 내선
+    contact_email_sub3 = db.Column(db.String(120))  # 부담당자3 이메일
 
     # 계약 정보
     contract_type = db.Column(db.String(20), default='미계약')  # 무상, 유상, 미계약, 만료
@@ -164,6 +188,7 @@ class Customer(db.Model):
 
     # 사내 담당자
     engineer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 담당엔지니어
+    engineer_sub_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 부담당엔지니어
     sales_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 담당영업
 
     # 시스템 정보
@@ -173,6 +198,7 @@ class Customer(db.Model):
     # Relationships
     documents = db.relationship('Document', backref='customer', lazy=True, cascade='all, delete-orphan')
     engineer = db.relationship('User', foreign_keys=[engineer_id], backref='customers_as_engineer')
+    engineer_sub = db.relationship('User', foreign_keys=[engineer_sub_id], backref='customers_as_engineer_sub')
     sales = db.relationship('User', foreign_keys=[sales_id], backref='customers_as_sales')
 
     def is_inspection_needed_this_month(self):
@@ -652,10 +678,16 @@ def manage_users():
     return render_template('super_admin/users.html', users=users, customers=customers)
 
 @app.route('/super-admin/customers')
-@admin_required
+@login_required
 def manage_customers():
-    """고객사 목록 및 관리"""
-    customers_list = Customer.query.all()
+    """고객사 목록 및 관리 - 모든 로그인 사용자 접근 가능"""
+    # 사용자 권한에 따라 고객사 목록 필터링
+    if current_user.is_super_admin() or current_user.is_admin():
+        customers_list = Customer.query.all()
+    else:
+        # 일반 사용자는 담당 고객사만 조회
+        customers_list = current_user.assigned_customers.all()
+    
     # 점검 대상 여부와 완료 여부 계산
     for customer in customers_list:
         customer.is_monthly_target = customer.is_inspection_needed_this_month()
@@ -663,9 +695,9 @@ def manage_customers():
     return render_template('super_admin/customers.html', customers=customers_list)
 
 @app.route('/super-admin/customers/create', methods=['POST'])
-@admin_required
+@login_required
 def create_customer():
-    """고객사 생성 (회사명만 필수)"""
+    """고객사 생성 (회사명만 필수) - 모든 로그인 사용자 가능"""
     name = request.form.get('name')
 
     if not name:
@@ -680,15 +712,21 @@ def create_customer():
     # 고객사 생성 (회사명만으로)
     customer = Customer(name=name)
     db.session.add(customer)
+    db.session.flush()  # ID를 생성하기 위해 flush
+    
+    # 일반 사용자가 생성한 경우 자동으로 담당자로 배정
+    if current_user.is_normal_user():
+        current_user.assigned_customers.append(customer)
+    
     db.session.commit()
 
     flash('고객사가 생성되었습니다. 세부 정보를 입력해주세요.', 'success')
     return redirect(url_for('customer_detail', customer_id=customer.id))
 
 @app.route('/super-admin/customers/<int:customer_id>')
-@admin_required
+@login_required
 def customer_detail(customer_id):
-    """고객사 세부 정보 조회"""
+    """고객사 세부 정보 조회 - 모든 로그인 사용자 가능"""
     customer = Customer.query.get_or_404(customer_id)
     # 부서별 사용자 목록
     engineers = User.query.filter_by(role=ROLE_USER, is_active=True, department='기술팀').all()
@@ -696,22 +734,46 @@ def customer_detail(customer_id):
     return render_template('super_admin/customer_detail.html', customer=customer, engineers=engineers, sales=sales)
 
 @app.route('/super-admin/customers/<int:customer_id>/update', methods=['POST'])
-@admin_required
+@login_required
 def update_customer(customer_id):
-    """고객사 세부 정보 업데이트"""
+    """고객사 세부 정보 업데이트 - 모든 로그인 사용자 가능"""
     customer = Customer.query.get_or_404(customer_id)
 
     # 고객사 기본 정보
     customer.name = request.form.get('name')
     customer.location = request.form.get('location')
 
-    # 고객사 담당자 정보
+    # 고객사 담당자 정보 (정 담당자)
     customer.contact_name = request.form.get('contact_name')
     customer.contact_position = request.form.get('contact_position')
     customer.contact_department = request.form.get('contact_department')
     customer.contact_mobile = request.form.get('contact_mobile')
     customer.contact_phone = request.form.get('contact_phone')
     customer.contact_email = request.form.get('contact_email')
+
+    # 고객사 부담당자 정보 (부담당자 1)
+    customer.contact_name_sub1 = request.form.get('contact_name_sub1')
+    customer.contact_position_sub1 = request.form.get('contact_position_sub1')
+    customer.contact_department_sub1 = request.form.get('contact_department_sub1')
+    customer.contact_mobile_sub1 = request.form.get('contact_mobile_sub1')
+    customer.contact_phone_sub1 = request.form.get('contact_phone_sub1')
+    customer.contact_email_sub1 = request.form.get('contact_email_sub1')
+
+    # 고객사 부담당자 정보 (부담당자 2)
+    customer.contact_name_sub2 = request.form.get('contact_name_sub2')
+    customer.contact_position_sub2 = request.form.get('contact_position_sub2')
+    customer.contact_department_sub2 = request.form.get('contact_department_sub2')
+    customer.contact_mobile_sub2 = request.form.get('contact_mobile_sub2')
+    customer.contact_phone_sub2 = request.form.get('contact_phone_sub2')
+    customer.contact_email_sub2 = request.form.get('contact_email_sub2')
+
+    # 고객사 부담당자 정보 (부담당자 3)
+    customer.contact_name_sub3 = request.form.get('contact_name_sub3')
+    customer.contact_position_sub3 = request.form.get('contact_position_sub3')
+    customer.contact_department_sub3 = request.form.get('contact_department_sub3')
+    customer.contact_mobile_sub3 = request.form.get('contact_mobile_sub3')
+    customer.contact_phone_sub3 = request.form.get('contact_phone_sub3')
+    customer.contact_email_sub3 = request.form.get('contact_email_sub3')
 
     # 계약 정보
     customer.contract_type = request.form.get('contract_type')
@@ -730,8 +792,10 @@ def update_customer(customer_id):
 
     # 사내 담당자
     engineer = request.form.get('engineer_id')
+    engineer_sub = request.form.get('engineer_sub_id')
     sales = request.form.get('sales_id')
     customer.engineer_id = int(engineer) if engineer else None
+    customer.engineer_sub_id = int(engineer_sub) if engineer_sub else None
     customer.sales_id = int(sales) if sales else None
 
     customer.updated_at = datetime.utcnow()
@@ -1137,11 +1201,6 @@ def user_dashboard():
     # 담당 고객사 목록 가져오기
     assigned_customers = current_user.assigned_customers.all()
 
-    # 담당 고객사가 없으면 경고 메시지
-    if not assigned_customers:
-        flash('담당 고객사가 없습니다. 관리자에게 문의하세요.', 'warning')
-        return render_template('user/no_customer.html')
-
     # 담당 고객사 수
     total_assigned_customers = len(assigned_customers)
 
@@ -1149,20 +1208,23 @@ def user_dashboard():
     monthly_inspection_targets = 0
     monthly_inspection_completed = 0
 
-    for customer in assigned_customers:
-        # 이번 달 점검 대상인지 확인
-        if customer.is_inspection_needed_this_month():
-            monthly_inspection_targets += 1
+    if assigned_customers:
+        for customer in assigned_customers:
+            # 이번 달 점검 대상인지 확인
+            if customer.is_inspection_needed_this_month():
+                monthly_inspection_targets += 1
 
-            # 이번 달 점검 완료했는지 확인
-            if customer.is_inspection_completed_this_month():
-                monthly_inspection_completed += 1
+                # 이번 달 점검 완료했는지 확인
+                if customer.is_inspection_completed_this_month():
+                    monthly_inspection_completed += 1
 
-    # 모든 담당 고객사의 문서 가져오기
-    customer_ids = [c.id for c in assigned_customers]
-    recent_documents = Document.query.filter(
-        Document.customer_id.in_(customer_ids)
-    ).order_by(Document.uploaded_at.desc()).limit(10).all()
+        # 모든 담당 고객사의 문서 가져오기
+        customer_ids = [c.id for c in assigned_customers]
+        recent_documents = Document.query.filter(
+            Document.customer_id.in_(customer_ids)
+        ).order_by(Document.uploaded_at.desc()).limit(10).all()
+    else:
+        recent_documents = []
 
     return render_template('user/dashboard.html',
                          assigned_customers=assigned_customers,

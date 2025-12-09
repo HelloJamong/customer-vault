@@ -41,6 +41,8 @@
             <h5 class="mb-0"><i class="bi bi-person-circle"></i> 고객사 담당자 정보</h5>
         </div>
         <div class="card-body">
+            <!-- 정 담당자 -->
+            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-person-fill"></i> 정 담당자</h6>
             <div class="row">
                 <div class="col-md-4 mb-3">
                     <label class="form-label">이름</label>
@@ -67,6 +69,133 @@
                 <div class="col-md-4 mb-3">
                     <label class="form-label">이메일</label>
                     <input type="email" class="form-control" name="contact_email" value="{{ customer.contact_email or '' }}" placeholder="example@company.com">
+                </div>
+            </div>
+
+            <!-- 부담당자 추가 버튼 -->
+            <div class="text-center my-3" id="addSubContactBtnContainer">
+                <button type="button" class="btn btn-outline-success" id="addSubContactBtn">
+                    <i class="bi bi-plus-circle"></i> 부 담당자 추가
+                </button>
+            </div>
+
+            <!-- 부담당자 컨테이너 -->
+            <div id="subContactsContainer">
+                <!-- 부담당자 1 -->
+                <div class="sub-contact-section" id="subContact1" style="display: none;">
+                    <hr class="my-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-secondary mb-0"><i class="bi bi-person"></i> 부 담당자 1</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSubContact(1)">
+                            <i class="bi bi-x-circle"></i> 제거
+                        </button>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">이름</label>
+                            <input type="text" class="form-control" name="contact_name_sub1" value="{{ customer.contact_name_sub1 or '' }}" placeholder="담당자 이름">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">직급</label>
+                            <input type="text" class="form-control" name="contact_position_sub1" value="{{ customer.contact_position_sub1 or '' }}" placeholder="예: 과장">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">소속</label>
+                            <input type="text" class="form-control" name="contact_department_sub1" value="{{ customer.contact_department_sub1 or '' }}" placeholder="예: IT팀">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">연락처 (휴대전화)</label>
+                            <input type="text" class="form-control" name="contact_mobile_sub1" value="{{ customer.contact_mobile_sub1 or '' }}" placeholder="010-0000-0000">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">연락처 (내선)</label>
+                            <input type="text" class="form-control" name="contact_phone_sub1" value="{{ customer.contact_phone_sub1 or '' }}" placeholder="예: 1234">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">이메일</label>
+                            <input type="email" class="form-control" name="contact_email_sub1" value="{{ customer.contact_email_sub1 or '' }}" placeholder="example@company.com">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 부담당자 2 -->
+                <div class="sub-contact-section" id="subContact2" style="display: none;">
+                    <hr class="my-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-secondary mb-0"><i class="bi bi-person"></i> 부 담당자 2</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSubContact(2)">
+                            <i class="bi bi-x-circle"></i> 제거
+                        </button>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">이름</label>
+                            <input type="text" class="form-control" name="contact_name_sub2" value="{{ customer.contact_name_sub2 or '' }}" placeholder="담당자 이름">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">직급</label>
+                            <input type="text" class="form-control" name="contact_position_sub2" value="{{ customer.contact_position_sub2 or '' }}" placeholder="예: 대리">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">소속</label>
+                            <input type="text" class="form-control" name="contact_department_sub2" value="{{ customer.contact_department_sub2 or '' }}" placeholder="예: IT팀">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">연락처 (휴대전화)</label>
+                            <input type="text" class="form-control" name="contact_mobile_sub2" value="{{ customer.contact_mobile_sub2 or '' }}" placeholder="010-0000-0000">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">연락처 (내선)</label>
+                            <input type="text" class="form-control" name="contact_phone_sub2" value="{{ customer.contact_phone_sub2 or '' }}" placeholder="예: 1234">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">이메일</label>
+                            <input type="email" class="form-control" name="contact_email_sub2" value="{{ customer.contact_email_sub2 or '' }}" placeholder="example@company.com">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 부담당자 3 -->
+                <div class="sub-contact-section" id="subContact3" style="display: none;">
+                    <hr class="my-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-secondary mb-0"><i class="bi bi-person"></i> 부 담당자 3</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSubContact(3)">
+                            <i class="bi bi-x-circle"></i> 제거
+                        </button>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">이름</label>
+                            <input type="text" class="form-control" name="contact_name_sub3" value="{{ customer.contact_name_sub3 or '' }}" placeholder="담당자 이름">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">직급</label>
+                            <input type="text" class="form-control" name="contact_position_sub3" value="{{ customer.contact_position_sub3 or '' }}" placeholder="예: 사원">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">소속</label>
+                            <input type="text" class="form-control" name="contact_department_sub3" value="{{ customer.contact_department_sub3 or '' }}" placeholder="예: IT팀">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">연락처 (휴대전화)</label>
+                            <input type="text" class="form-control" name="contact_mobile_sub3" value="{{ customer.contact_mobile_sub3 or '' }}" placeholder="010-0000-0000">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">연락처 (내선)</label>
+                            <input type="text" class="form-control" name="contact_phone_sub3" value="{{ customer.contact_phone_sub3 or '' }}" placeholder="예: 1234">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">이메일</label>
+                            <input type="email" class="form-control" name="contact_email_sub3" value="{{ customer.contact_email_sub3 or '' }}" placeholder="example@company.com">
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -133,7 +262,7 @@
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
                     <label class="form-label">담당 엔지니어 (기술팀)</label>
                     <select class="form-select" name="engineer_id">
                         <option value="">선택 안함</option>
@@ -145,7 +274,19 @@
                     </select>
                     <div class="form-text">기술팀 소속 사용자만 선택 가능합니다.</div>
                 </div>
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">부담당 엔지니어 (기술팀)</label>
+                    <select class="form-select" name="engineer_sub_id">
+                        <option value="">선택 안함</option>
+                        {% for engineer in engineers %}
+                        <option value="{{ engineer.id }}" {% if customer.engineer_sub_id == engineer.id %}selected{% endif %}>
+                            {{ engineer.name }} ({{ engineer.username }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">필요 시 부담당을 지정할 수 있습니다.</div>
+                </div>
+                <div class="col-md-4 mb-3">
                     <label class="form-label">담당 영업 (영업팀)</label>
                     <select class="form-select" name="sales_id">
                         <option value="">선택 안함</option>
@@ -169,7 +310,8 @@
     </div>
 </form>
 
-<!-- 고객사 삭제 버튼 -->
+{% if current_user.is_super_admin() or current_user.is_admin() %}
+<!-- 고객사 삭제 버튼 (관리자 전용) -->
 <div class="d-grid gap-2 mb-4">
     <button type="button" class="btn btn-danger btn-lg" data-bs-toggle="modal" data-bs-target="#deleteCustomerModal">
         <i class="bi bi-trash"></i> 고객사 삭제
@@ -210,8 +352,102 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <script>
+// 부담당자 관리 변수
+let subContactCount = 0;
+const maxSubContacts = 3;
+
+// 페이지 로드 시 기존 부담당자 데이터 확인 및 표시
+window.addEventListener('load', function() {
+    // 기존 데이터가 있으면 해당 부담당자 섹션 표시
+    {% if customer.contact_name_sub1 %}
+        showSubContact(1);
+    {% endif %}
+    {% if customer.contact_name_sub2 %}
+        showSubContact(2);
+    {% endif %}
+    {% if customer.contact_name_sub3 %}
+        showSubContact(3);
+    {% endif %}
+
+    // 계약 유형 초기화
+    const contractType = document.getElementById('contractType').value;
+    const contractDates = document.querySelectorAll('.contract-date');
+    const isActive = contractType === '무상' || contractType === '유상';
+
+    contractDates.forEach(date => {
+        date.disabled = !isActive;
+    });
+
+    // 점검 주기 초기화
+    updateInspectionCycleOptions();
+    
+    // 버튼 상태 업데이트
+    updateAddButton();
+});
+
+// 부담당자 추가 버튼 클릭
+document.getElementById('addSubContactBtn').addEventListener('click', function() {
+    if (subContactCount < maxSubContacts) {
+        const nextIndex = findNextAvailableIndex();
+        if (nextIndex > 0) {
+            showSubContact(nextIndex);
+            updateAddButton();
+        }
+    }
+});
+
+// 다음 사용 가능한 인덱스 찾기
+function findNextAvailableIndex() {
+    for (let i = 1; i <= maxSubContacts; i++) {
+        const section = document.getElementById('subContact' + i);
+        if (section.style.display === 'none') {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// 부담당자 섹션 표시
+function showSubContact(index) {
+    const section = document.getElementById('subContact' + index);
+    if (section && section.style.display === 'none') {
+        section.style.display = 'block';
+        subContactCount++;
+        updateAddButton();
+    }
+}
+
+// 부담당자 제거
+function removeSubContact(index) {
+    const section = document.getElementById('subContact' + index);
+    if (section) {
+        // 입력 필드 초기화
+        const inputs = section.querySelectorAll('input');
+        inputs.forEach(input => input.value = '');
+        
+        section.style.display = 'none';
+        subContactCount--;
+        updateAddButton();
+    }
+}
+
+// 추가 버튼 상태 업데이트
+function updateAddButton() {
+    const addBtn = document.getElementById('addSubContactBtn');
+    const btnContainer = document.getElementById('addSubContactBtnContainer');
+    
+    if (subContactCount >= maxSubContacts) {
+        btnContainer.style.display = 'none';
+    } else {
+        btnContainer.style.display = 'block';
+        addBtn.innerHTML = '<i class="bi bi-plus-circle"></i> 부 담당자 추가 (' + subContactCount + '/' + maxSubContacts + ')';
+    }
+}
+
+{% if current_user.is_super_admin() or current_user.is_admin() %}
 // 고객사 삭제 - 이름 확인 후 삭제 버튼 활성화
 document.getElementById('confirmNameInput').addEventListener('input', function() {
     const customerName = "{{ customer.name }}";
@@ -230,6 +466,7 @@ document.getElementById('deleteCustomerModal').addEventListener('hidden.bs.modal
     document.getElementById('confirmNameInput').value = '';
     document.getElementById('confirmDeleteBtn').disabled = true;
 });
+{% endif %}
 
 // 계약 유형에 따라 날짜 필드 활성화/비활성화
 document.getElementById('contractType').addEventListener('change', function() {
@@ -242,20 +479,6 @@ document.getElementById('contractType').addEventListener('change', function() {
             date.value = '';
         }
     });
-});
-
-// 페이지 로드 시 초기화
-window.addEventListener('load', function() {
-    const contractType = document.getElementById('contractType').value;
-    const contractDates = document.querySelectorAll('.contract-date');
-    const isActive = contractType === '무상' || contractType === '유상';
-
-    contractDates.forEach(date => {
-        date.disabled = !isActive;
-    });
-
-    // 점검 주기 초기화
-    updateInspectionCycleOptions();
 });
 
 // 점검 주기 유형에 따라 선택 옵션 업데이트
