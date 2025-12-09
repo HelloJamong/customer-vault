@@ -135,16 +135,87 @@ class User(UserMixin, db.Model):
 class Customer(db.Model):
     __tablename__ = 'customers'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    company = db.Column(db.String(200))
-    contact = db.Column(db.String(100))
-    email = db.Column(db.String(120))
-    address = db.Column(db.Text)
-    inspection_cycle = db.Column(db.Integer, default=1)  # 점검 주기 (개월), 기본값 1개월
+
+    # 고객사 기본 정보
+    name = db.Column(db.String(200), nullable=False)  # 고객사명 (회사명)
+    location = db.Column(db.String(200))  # 위치
+
+    # 고객사 담당자 정보
+    contact_name = db.Column(db.String(100))  # 담당자 이름
+    contact_position = db.Column(db.String(100))  # 담당자 직급
+    contact_department = db.Column(db.String(100))  # 담당자 소속
+    contact_mobile = db.Column(db.String(50))  # 연락처(휴대전화)
+    contact_phone = db.Column(db.String(50))  # 연락처(내선)
+    contact_email = db.Column(db.String(120))  # 이메일
+
+    # 계약 정보
+    contract_type = db.Column(db.String(20), default='미계약')  # 무상, 유상, 미계약, 만료
+    contract_start_date = db.Column(db.Date, nullable=True)  # 계약 시작일
+    contract_end_date = db.Column(db.Date, nullable=True)  # 계약 종료일
+
+    # 점검 정보
+    inspection_cycle_type = db.Column(db.String(20), default='매월')  # 매월, 분기, 반기, 연1회
+    inspection_cycle_month = db.Column(db.Integer, nullable=True)  # 점검 주기 월 (분기: 1,2,3 / 반기: 1,2 / 연1회: 1-12)
     last_inspection_date = db.Column(db.Date, nullable=True)  # 마지막 점검일
+
+    # 비고
+    notes = db.Column(db.Text)  # 비고
+
+    # 사내 담당자
+    engineer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 담당엔지니어
+    sales_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 담당영업
+
+    # 시스템 정보
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
     documents = db.relationship('Document', backref='customer', lazy=True, cascade='all, delete-orphan')
+    engineer = db.relationship('User', foreign_keys=[engineer_id], backref='customers_as_engineer')
+    sales = db.relationship('User', foreign_keys=[sales_id], backref='customers_as_sales')
+
+    def is_inspection_needed_this_month(self):
+        """이번 달 점검 대상인지 확인"""
+        from dateutil.relativedelta import relativedelta
+        today = datetime.today().date()
+        current_month = today.month
+        current_year = today.year
+
+        if self.inspection_cycle_type == '매월':
+            return True
+
+        if not self.inspection_cycle_month:
+            return False
+
+        if self.inspection_cycle_type == '분기':
+            # 분기별: 1(1,4,7,10월), 2(2,5,8,11월), 3(3,6,9,12월)
+            quarter_months = {1: [1, 4, 7, 10], 2: [2, 5, 8, 11], 3: [3, 6, 9, 12]}
+            return current_month in quarter_months.get(self.inspection_cycle_month, [])
+
+        elif self.inspection_cycle_type == '반기':
+            # 반기별: 1(1,7월), 2(2,8월), 3(3,9월), 4(4,10월), 5(5,11월), 6(6,12월)
+            half_year_months = {1: [1, 7], 2: [2, 8], 3: [3, 9], 4: [4, 10], 5: [5, 11], 6: [6, 12]}
+            return current_month in half_year_months.get(self.inspection_cycle_month, [])
+
+        elif self.inspection_cycle_type == '연1회':
+            # 연1회: 지정된 월
+            return current_month == self.inspection_cycle_month
+
+        return False
+
+    def is_inspection_completed_this_month(self):
+        """이번 달 점검 완료 여부 확인"""
+        if not self.last_inspection_date:
+            return False
+
+        today = datetime.today().date()
+        current_month = today.month
+        current_year = today.year
+
+        inspection_month = self.last_inspection_date.month
+        inspection_year = self.last_inspection_date.year
+
+        return inspection_month == current_month and inspection_year == current_year
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -614,7 +685,88 @@ def manage_users():
 def manage_customers():
     """고객사 목록 및 관리"""
     customers_list = Customer.query.all()
+    # 점검 대상 여부와 완료 여부 계산
+    for customer in customers_list:
+        customer.is_monthly_target = customer.is_inspection_needed_this_month()
+        customer.is_monthly_completed = customer.is_inspection_completed_this_month()
     return render_template('super_admin/customers.html', customers=customers_list)
+
+@app.route('/super-admin/customers/create', methods=['POST'])
+@super_admin_required
+def create_customer():
+    """고객사 생성 (회사명만 필수)"""
+    name = request.form.get('name')
+
+    if not name:
+        flash('회사명을 입력해주세요.', 'danger')
+        return redirect(url_for('manage_customers'))
+
+    # 중복 체크
+    if Customer.query.filter_by(name=name).first():
+        flash('이미 존재하는 고객사명입니다.', 'danger')
+        return redirect(url_for('manage_customers'))
+
+    # 고객사 생성 (회사명만으로)
+    customer = Customer(name=name)
+    db.session.add(customer)
+    db.session.commit()
+
+    flash('고객사가 생성되었습니다. 세부 정보를 입력해주세요.', 'success')
+    return redirect(url_for('customer_detail', customer_id=customer.id))
+
+@app.route('/super-admin/customers/<int:customer_id>')
+@super_admin_required
+def customer_detail(customer_id):
+    """고객사 세부 정보 조회"""
+    customer = Customer.query.get_or_404(customer_id)
+    # 일반 사용자 목록 (담당자 선택용)
+    users = User.query.filter_by(role=ROLE_USER, is_active=True).all()
+    return render_template('super_admin/customer_detail.html', customer=customer, users=users)
+
+@app.route('/super-admin/customers/<int:customer_id>/update', methods=['POST'])
+@super_admin_required
+def update_customer(customer_id):
+    """고객사 세부 정보 업데이트"""
+    customer = Customer.query.get_or_404(customer_id)
+
+    # 고객사 기본 정보
+    customer.name = request.form.get('name')
+    customer.location = request.form.get('location')
+
+    # 고객사 담당자 정보
+    customer.contact_name = request.form.get('contact_name')
+    customer.contact_position = request.form.get('contact_position')
+    customer.contact_department = request.form.get('contact_department')
+    customer.contact_mobile = request.form.get('contact_mobile')
+    customer.contact_phone = request.form.get('contact_phone')
+    customer.contact_email = request.form.get('contact_email')
+
+    # 계약 정보
+    customer.contract_type = request.form.get('contract_type')
+    contract_start = request.form.get('contract_start_date')
+    contract_end = request.form.get('contract_end_date')
+    customer.contract_start_date = datetime.strptime(contract_start, '%Y-%m-%d').date() if contract_start else None
+    customer.contract_end_date = datetime.strptime(contract_end, '%Y-%m-%d').date() if contract_end else None
+
+    # 점검 정보
+    customer.inspection_cycle_type = request.form.get('inspection_cycle_type')
+    cycle_month = request.form.get('inspection_cycle_month')
+    customer.inspection_cycle_month = int(cycle_month) if cycle_month else None
+
+    # 비고
+    customer.notes = request.form.get('notes')
+
+    # 사내 담당자
+    engineer = request.form.get('engineer_id')
+    sales = request.form.get('sales_id')
+    customer.engineer_id = int(engineer) if engineer else None
+    customer.sales_id = int(sales) if sales else None
+
+    customer.updated_at = datetime.utcnow()
+
+    db.session.commit()
+    flash('고객사 정보가 업데이트되었습니다.', 'success')
+    return redirect(url_for('customer_detail', customer_id=customer.id))
 
 @app.route('/super-admin/create-admin', methods=['POST'])
 @super_admin_required

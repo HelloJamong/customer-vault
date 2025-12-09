@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}고객사 세부 정보 - {{ customer.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-building-fill"></i> 고객사 세부 정보</h2>
+        <p class="text-muted">고객사의 상세 정보를 관리합니다.</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('manage_customers') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> 목록으로
+        </a>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('update_customer', customer_id=customer.id) }}">
+    <!-- 고객사 정보 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-info-circle"></i> 고객사 정보</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">회사명 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="name" value="{{ customer.name }}" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">위치</label>
+                    <input type="text" class="form-control" name="location" value="{{ customer.location or '' }}" placeholder="예: 서울시 강남구">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 고객사 담당자 정보 -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-person-circle"></i> 고객사 담당자 정보</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">이름</label>
+                    <input type="text" class="form-control" name="contact_name" value="{{ customer.contact_name or '' }}" placeholder="담당자 이름">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">직급</label>
+                    <input type="text" class="form-control" name="contact_position" value="{{ customer.contact_position or '' }}" placeholder="예: 부장">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">소속</label>
+                    <input type="text" class="form-control" name="contact_department" value="{{ customer.contact_department or '' }}" placeholder="예: IT팀">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">연락처 (휴대전화)</label>
+                    <input type="text" class="form-control" name="contact_mobile" value="{{ customer.contact_mobile or '' }}" placeholder="010-0000-0000">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">연락처 (내선)</label>
+                    <input type="text" class="form-control" name="contact_phone" value="{{ customer.contact_phone or '' }}" placeholder="예: 1234">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">이메일</label>
+                    <input type="email" class="form-control" name="contact_email" value="{{ customer.contact_email or '' }}" placeholder="example@company.com">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 계약 항목 -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-white">
+            <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> 계약 항목</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">유지보수 계약 여부</label>
+                    <select class="form-select" name="contract_type" id="contractType">
+                        <option value="미계약" {% if customer.contract_type == '미계약' %}selected{% endif %}>미계약</option>
+                        <option value="무상" {% if customer.contract_type == '무상' %}selected{% endif %}>무상</option>
+                        <option value="유상" {% if customer.contract_type == '유상' %}selected{% endif %}>유상</option>
+                        <option value="만료" {% if customer.contract_type == '만료' %}selected{% endif %}>만료</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">계약 시작일</label>
+                    <input type="date" class="form-control contract-date" name="contract_start_date" id="contractStartDate"
+                           value="{{ customer.contract_start_date.strftime('%Y-%m-%d') if customer.contract_start_date else '' }}">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">계약 종료일</label>
+                    <input type="date" class="form-control contract-date" name="contract_end_date" id="contractEndDate"
+                           value="{{ customer.contract_end_date.strftime('%Y-%m-%d') if customer.contract_end_date else '' }}">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">점검 주기</label>
+                    <select class="form-select" name="inspection_cycle_type" id="inspectionCycleType">
+                        <option value="매월" {% if customer.inspection_cycle_type == '매월' %}selected{% endif %}>매월</option>
+                        <option value="분기" {% if customer.inspection_cycle_type == '분기' %}selected{% endif %}>분기</option>
+                        <option value="반기" {% if customer.inspection_cycle_type == '반기' %}selected{% endif %}>반기</option>
+                        <option value="연1회" {% if customer.inspection_cycle_type == '연1회' %}selected{% endif %}>연1회</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">점검 주기 선택</label>
+                    <select class="form-select" name="inspection_cycle_month" id="inspectionCycleMonth">
+                        <option value="">선택</option>
+                    </select>
+                    <div class="form-text" id="cycleHelpText"></div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12 mb-3">
+                    <label class="form-label">비고</label>
+                    <textarea class="form-control" name="notes" rows="3" placeholder="추가 메모사항을 입력하세요">{{ customer.notes or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사내 담당자 -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-people-fill"></i> 사내 담당자</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">담당 엔지니어</label>
+                    <select class="form-select" name="engineer_id">
+                        <option value="">선택 안함</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if customer.engineer_id == user.id %}selected{% endif %}>
+                            {{ user.name }} ({{ user.username }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">담당 영업</label>
+                    <select class="form-select" name="sales_id">
+                        <option value="">선택 안함</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if customer.sales_id == user.id %}selected{% endif %}>
+                            {{ user.name }} ({{ user.username }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 저장 버튼 -->
+    <div class="d-grid gap-2 mb-4">
+        <button type="submit" class="btn btn-primary btn-lg">
+            <i class="bi bi-check-circle"></i> 저장
+        </button>
+    </div>
+</form>
+
+<script>
+// 계약 유형에 따라 날짜 필드 활성화/비활성화
+document.getElementById('contractType').addEventListener('change', function() {
+    const contractDates = document.querySelectorAll('.contract-date');
+    const isActive = this.value === '무상' || this.value === '유상';
+
+    contractDates.forEach(date => {
+        date.disabled = !isActive;
+        if (!isActive) {
+            date.value = '';
+        }
+    });
+});
+
+// 페이지 로드 시 초기화
+window.addEventListener('load', function() {
+    const contractType = document.getElementById('contractType').value;
+    const contractDates = document.querySelectorAll('.contract-date');
+    const isActive = contractType === '무상' || contractType === '유상';
+
+    contractDates.forEach(date => {
+        date.disabled = !isActive;
+    });
+
+    // 점검 주기 초기화
+    updateInspectionCycleOptions();
+});
+
+// 점검 주기 유형에 따라 선택 옵션 업데이트
+document.getElementById('inspectionCycleType').addEventListener('change', updateInspectionCycleOptions);
+
+function updateInspectionCycleOptions() {
+    const cycleType = document.getElementById('inspectionCycleType').value;
+    const cycleMonth = document.getElementById('inspectionCycleMonth');
+    const helpText = document.getElementById('cycleHelpText');
+
+    cycleMonth.innerHTML = '<option value="">선택</option>';
+
+    if (cycleType === '매월') {
+        cycleMonth.disabled = true;
+        helpText.textContent = '매월 점검이 필요합니다.';
+    } else if (cycleType === '분기') {
+        cycleMonth.disabled = false;
+        cycleMonth.innerHTML = `
+            <option value="">선택</option>
+            <option value="1" {{ 'selected' if customer.inspection_cycle_month == 1 else '' }}>1분기 (1, 4, 7, 10월)</option>
+            <option value="2" {{ 'selected' if customer.inspection_cycle_month == 2 else '' }}>2분기 (2, 5, 8, 11월)</option>
+            <option value="3" {{ 'selected' if customer.inspection_cycle_month == 3 else '' }}>3분기 (3, 6, 9, 12월)</option>
+        `;
+        helpText.textContent = '점검이 필요한 분기를 선택하세요.';
+    } else if (cycleType === '반기') {
+        cycleMonth.disabled = false;
+        cycleMonth.innerHTML = `
+            <option value="">선택</option>
+            <option value="1" {{ 'selected' if customer.inspection_cycle_month == 1 else '' }}>1월, 7월</option>
+            <option value="2" {{ 'selected' if customer.inspection_cycle_month == 2 else '' }}>2월, 8월</option>
+            <option value="3" {{ 'selected' if customer.inspection_cycle_month == 3 else '' }}>3월, 9월</option>
+            <option value="4" {{ 'selected' if customer.inspection_cycle_month == 4 else '' }}>4월, 10월</option>
+            <option value="5" {{ 'selected' if customer.inspection_cycle_month == 5 else '' }}>5월, 11월</option>
+            <option value="6" {{ 'selected' if customer.inspection_cycle_month == 6 else '' }}>6월, 12월</option>
+        `;
+        helpText.textContent = '점검이 필요한 월을 선택하세요 (연 2회).';
+    } else if (cycleType === '연1회') {
+        cycleMonth.disabled = false;
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = i + '월';
+            if ({{ customer.inspection_cycle_month or 0 }} === i) {
+                option.selected = true;
+            }
+            cycleMonth.appendChild(option);
+        }
+        helpText.textContent = '점검이 필요한 월을 선택하세요 (연 1회).';
+    }
+}
+</script>
+{% endblock %}

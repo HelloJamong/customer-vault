@@ -22,10 +22,11 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>고객명</th>
-                        <th>회사명</th>
-                        <th>연락처</th>
-                        <th>이메일</th>
+                        <th>고객사명 (회사명)</th>
+                        <th>계약 형식</th>
+                        <th>점검 주기</th>
+                        <th>이번 달 점검 대상</th>
+                        <th>점검 완료</th>
                         <th>등록일</th>
                         <th>작업</th>
                     </tr>
@@ -36,23 +37,59 @@
                         <tr>
                             <td>{{ customer.id }}</td>
                             <td>{{ customer.name }}</td>
-                            <td>{{ customer.company or '-' }}</td>
-                            <td>{{ customer.contact or '-' }}</td>
-                            <td>{{ customer.email or '-' }}</td>
+                            <td>
+                                {% if customer.contract_type == '무상' %}
+                                <span class="badge bg-success">무상</span>
+                                {% elif customer.contract_type == '유상' %}
+                                <span class="badge bg-primary">유상</span>
+                                {% elif customer.contract_type == '만료' %}
+                                <span class="badge bg-danger">만료</span>
+                                {% else %}
+                                <span class="badge bg-secondary">미계약</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if customer.inspection_cycle_type == '매월' %}
+                                <span class="text-primary">매월</span>
+                                {% elif customer.inspection_cycle_type == '분기' %}
+                                <span class="text-info">분기 ({{ customer.inspection_cycle_month }})</span>
+                                {% elif customer.inspection_cycle_type == '반기' %}
+                                <span class="text-warning">반기 ({{ customer.inspection_cycle_month }})</span>
+                                {% elif customer.inspection_cycle_type == '연1회' %}
+                                <span class="text-success">연1회 ({{ customer.inspection_cycle_month }}월)</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if customer.is_monthly_target %}
+                                <i class="bi bi-check-circle-fill text-success" title="점검 대상"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle text-muted" title="점검 대상 아님"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if customer.is_monthly_target %}
+                                    {% if customer.is_monthly_completed %}
+                                    <span class="badge bg-success">완료</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">미완료</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>{{ customer.created_at.strftime('%Y-%m-%d') }}</td>
                             <td>
-                                <button class="btn btn-sm btn-primary">
-                                    <i class="bi bi-pencil"></i> 수정
-                                </button>
-                                <button class="btn btn-sm btn-info">
-                                    <i class="bi bi-file-earmark-text"></i> 문서 보기
-                                </button>
+                                <a href="{{ url_for('customer_detail', customer_id=customer.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-pencil"></i> 세부 정보
+                                </a>
                             </td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">
+                            <td colspan="8" class="text-center text-muted">
                                 등록된 고객사가 없습니다.
                             </td>
                         </tr>
@@ -65,40 +102,26 @@
 
 <!-- 고객사 생성 모달 -->
 <div class="modal fade" id="createCustomerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title"><i class="bi bi-building"></i> 고객사 생성</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="#">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">고객명</label>
-                            <input type="text" class="form-control" name="name" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">회사명</label>
-                            <input type="text" class="form-control" name="company">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">연락처</label>
-                            <input type="text" class="form-control" name="contact">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">이메일</label>
-                            <input type="email" class="form-control" name="email">
-                        </div>
-                    </div>
+                <form method="POST" action="{{ url_for('create_customer') }}">
                     <div class="mb-3">
-                        <label class="form-label">주소</label>
-                        <textarea class="form-control" name="address" rows="2"></textarea>
+                        <label class="form-label">고객사명 (회사명) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required placeholder="회사명을 입력하세요">
+                        <div class="form-text">고객사 생성 후 세부 정보를 입력할 수 있습니다.</div>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-warning">생성</button>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-plus-circle"></i> 생성
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> 취소
+                        </button>
                     </div>
                 </form>
             </div>
