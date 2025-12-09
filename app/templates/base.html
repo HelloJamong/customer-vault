@@ -24,7 +24,7 @@
                     {% if current_user.is_super_admin() %}
                     <!-- 슈퍼 관리자 메뉴 -->
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('super_admin_dashboard') }}">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
                             <i class="bi bi-speedometer2"></i> 대시보드
                         </a>
                     </li>
@@ -34,7 +34,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('manage_users') }}">
+                        <a class="nav-link" href="{{ url_for('manage_users_unified') }}">
                             <i class="bi bi-people"></i> 사용자 관리
                         </a>
                     </li>
@@ -44,7 +44,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin_service_logs') }}">
+                        <a class="nav-link" href="{{ url_for('service_logs') }}">
                             <i class="bi bi-file-text"></i> 서비스 로그
                         </a>
                     </li>
@@ -57,12 +57,12 @@
                     {% elif current_user.is_admin() %}
                     <!-- 일반 관리자 메뉴 -->
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
                             <i class="bi bi-speedometer2"></i> 대시보드
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin_manage_users') }}">
+                        <a class="nav-link" href="{{ url_for('manage_users_unified') }}">
                             <i class="bi bi-people"></i> 사용자 관리
                         </a>
                     </li>
@@ -72,7 +72,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin_service_logs') }}">
+                        <a class="nav-link" href="{{ url_for('service_logs') }}">
                             <i class="bi bi-file-text"></i> 서비스 로그
                         </a>
                     </li>
@@ -80,7 +80,7 @@
                     {% else %}
                     <!-- 일반 사용자 메뉴 -->
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('user_dashboard') }}">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
                             <i class="bi bi-speedometer2"></i> 대시보드
                         </a>
                     </li>

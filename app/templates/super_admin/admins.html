@@ -60,12 +60,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <form method="POST" action="{{ url_for('reset_password', user_id=admin.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('reset_password_unified', user_id=admin.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('패스워드를 기본 패스워드로 초기화하시겠습니까?')">
                                         <i class="bi bi-key"></i> 비밀번호 초기화
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ url_for('delete_user', user_id=admin.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('delete_user_unified', user_id=admin.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('정말 삭제하시겠습니까?')">
                                         <i class="bi bi-trash"></i> 삭제
                                     </button>

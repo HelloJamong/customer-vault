@@ -2,7 +2,7 @@ import os
 import re
 import uuid
 from functools import wraps
-from flask import Flask, render_template, redirect, url_for, flash, request, abort, session, jsonify
+from flask import Flask, render_template, redirect, url_for, flash, request, abort, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -179,7 +179,7 @@ class Customer(db.Model):
     contract_end_date = db.Column(db.Date, nullable=True)  # 계약 종료일
 
     # 점검 정보
-    inspection_cycle_type = db.Column(db.String(20), default='매월')  # 매월, 분기, 반기, 연1회
+    inspection_cycle_type = db.Column(db.String(20), default='매월')  # 매월, 분기, 반기, 연1회, 협력사진행, 무상기간
     inspection_cycle_month = db.Column(db.Integer, nullable=True)  # 점검 주기 월 (분기: 1,2,3 / 반기: 1,2 / 연1회: 1-12)
     last_inspection_date = db.Column(db.Date, nullable=True)  # 마지막 점검일
 
@@ -203,6 +203,14 @@ class Customer(db.Model):
 
     def is_inspection_needed_this_month(self):
         """이번 달 점검 대상인지 확인"""
+        # 계약 상태가 만료 또는 미계약이면 점검 대상 아님
+        if self.contract_type in ['만료', '미계약']:
+            return False
+        
+        # 점검 주기가 협력사진행 또는 무상기간이면 점검 대상 아님
+        if self.inspection_cycle_type in ['협력사진행', '무상기간']:
+            return False
+        
         from dateutil.relativedelta import relativedelta
         today = datetime.today().date()
         current_month = today.month
@@ -462,12 +470,7 @@ def admin_required(f):
 @login_required
 def index():
     """메인 페이지 - 권한별 대시보드로 리다이렉트"""
-    if current_user.is_super_admin():
-        return redirect(url_for('super_admin_dashboard'))
-    elif current_user.is_admin():
-        return redirect(url_for('admin_dashboard'))
-    else:
-        return redirect(url_for('user_dashboard'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -522,12 +525,7 @@ def login():
                 if next_page:
                     return redirect(next_page)
 
-                if user.is_super_admin():
-                    return redirect(url_for('super_admin_dashboard'))
-                elif user.is_admin():
-                    return redirect(url_for('admin_dashboard'))
-                else:  # 일반 사용자
-                    return redirect(url_for('user_dashboard'))
+                return redirect(url_for('dashboard'))
             else:
                 # 로그인 실패
                 record_login_attempt(user.id, success=False)
@@ -559,6 +557,26 @@ def logout():
 @login_required
 def change_password():
     """패스워드 변경"""
+    # GET 요청 시 직접 접근 차단: first_login 또는 expired 파라미터가 있을 때만 허용
+    if request.method == 'GET':
+        first_login = request.args.get('first_login')
+        expired = request.args.get('expired')
+        
+        # 파라미터가 없거나, 이미 패스워드를 변경한 경우 접근 차단
+        if not (first_login == 'true' or expired == 'true'):
+            flash('잘못된 접근입니다.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # 최초 로그인이 아니거나 패스워드가 만료되지 않은 경우 접근 차단
+        settings = get_system_settings()
+        if first_login == 'true' and not current_user.is_first_login:
+            flash('이미 패스워드를 변경하셨습니다.', 'info')
+            return redirect(url_for('dashboard'))
+        
+        if expired == 'true' and not current_user.is_password_expired(settings):
+            flash('패스워드가 만료되지 않았습니다.', 'info')
+            return redirect(url_for('dashboard'))
+    
     # 패스워드 만료 확인 (GET/POST 모두에서 사용)
     settings = get_system_settings()
     password_expired = current_user.is_password_expired(settings)
@@ -573,25 +591,34 @@ def change_password():
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
 
-        # 1. 현재 비밀번호 확인
-        if not current_user.check_password(current_password):
-            flash('현재 비밀번호가 올바르지 않습니다.', 'danger')
-            return render_template('change_password.html',
-                                 password_expired=password_expired,
-                                 days_until_expiry=days_until_expiry,
-                                 settings=settings)
+        # 최초 로그인이 아닌 경우에만 현재 비밀번호 확인
+        if not current_user.is_first_login:
+            # 1. 현재 비밀번호 확인
+            if not current_password:
+                flash('현재 패스워드를 입력해주세요.', 'danger')
+                return render_template('change_password.html',
+                                     password_expired=password_expired,
+                                     days_until_expiry=days_until_expiry,
+                                     settings=settings)
+            
+            if not current_user.check_password(current_password):
+                flash('현재 비밀번호가 올바르지 않습니다.', 'danger')
+                return render_template('change_password.html',
+                                     password_expired=password_expired,
+                                     days_until_expiry=days_until_expiry,
+                                     settings=settings)
+
+            # 3. 현재 비밀번호와 동일한지 확인
+            if current_password == new_password:
+                flash('새 비밀번호는 현재 비밀번호와 달라야 합니다.', 'danger')
+                return render_template('change_password.html',
+                                     password_expired=password_expired,
+                                     days_until_expiry=days_until_expiry,
+                                     settings=settings)
 
         # 2. 새 비밀번호 확인
         if new_password != confirm_password:
             flash('새 비밀번호가 일치하지 않습니다.', 'danger')
-            return render_template('change_password.html',
-                                 password_expired=password_expired,
-                                 days_until_expiry=days_until_expiry,
-                                 settings=settings)
-
-        # 3. 현재 비밀번호와 동일한지 확인
-        if current_password == new_password:
-            flash('새 비밀번호는 현재 비밀번호와 달라야 합니다.', 'danger')
             return render_template('change_password.html',
                                  password_expired=password_expired,
                                  days_until_expiry=days_until_expiry,
@@ -610,27 +637,30 @@ def change_password():
         current_user.set_password(new_password)
         db.session.commit()
 
-        flash('패스워드가 성공적으로 변경되었습니다.', 'success')
-
-        # 패스워드 만료로 인한 변경인 경우 대시보드로 리다이렉트
-        if request.args.get('expired') == 'true':
-            if current_user.is_super_admin():
-                return redirect(url_for('super_admin_dashboard'))
-            elif current_user.is_admin():
-                return redirect(url_for('admin_dashboard'))
-            else:
-                return redirect(url_for('user_dashboard'))
-
-        return redirect(url_for('index'))
+        # 로그아웃 처리
+        logout_user()
+        
+        flash('패스워드가 성공적으로 변경되었습니다. 새 패스워드로 다시 로그인해주세요.', 'success')
+        return redirect(url_for('login'))
 
     return render_template('change_password.html',
                          password_expired=password_expired,
                          days_until_expiry=days_until_expiry,
                          settings=settings)
 
+# ========== 통합 대시보드 (역할별 자동 라우팅) ==========
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """통합 대시보드 - 사용자 역할에 따라 적절한 대시보드로 연결"""
+    if current_user.is_super_admin():
+        return super_admin_dashboard()
+    elif current_user.is_admin():
+        return admin_dashboard()
+    else:
+        return user_dashboard()
+
 # ========== 슈퍼 관리자 전용 페이지 ==========
-@app.route('/super-admin/dashboard')
-@super_admin_required
 def super_admin_dashboard():
     """슈퍼 관리자 대시보드 - 모든 메뉴 접근 가능"""
     total_users = User.query.count()
@@ -662,22 +692,28 @@ def super_admin_dashboard():
                          monthly_inspection_targets=monthly_inspection_targets,
                          monthly_inspection_completed=monthly_inspection_completed)
 
-@app.route('/super-admin/admins')
+@app.route('/admins')
 @super_admin_required
 def manage_admins():
     """일반 관리자 목록 및 관리"""
     admins = User.query.filter_by(role=ROLE_ADMIN).all()
     return render_template('super_admin/admins.html', admins=admins)
 
-@app.route('/super-admin/users')
-@super_admin_required
-def manage_users():
-    """일반 사용자 목록 및 관리"""
-    users = User.query.filter_by(role=ROLE_USER).all()
-    customers = Customer.query.all()
-    return render_template('super_admin/users.html', users=users, customers=customers)
+@app.route('/users')
+@admin_required
+def manage_users_unified():
+    """사용자 관리 - 슈퍼 관리자와 일반 관리자 통합"""
+    if current_user.is_super_admin():
+        # 슈퍼 관리자는 모든 일반 사용자 관리
+        users = User.query.filter_by(role=ROLE_USER).all()
+        customers = Customer.query.all()
+        return render_template('super_admin/users.html', users=users, customers=customers)
+    else:
+        # 일반 관리자는 일반 사용자만 관리
+        users = User.query.filter_by(role=ROLE_USER).all()
+        return render_template('admin/users.html', users=users)
 
-@app.route('/super-admin/customers')
+@app.route('/customers')
 @login_required
 def manage_customers():
     """고객사 목록 및 관리 - 모든 로그인 사용자 접근 가능"""
@@ -694,7 +730,7 @@ def manage_customers():
         customer.is_monthly_completed = customer.is_inspection_completed_this_month()
     return render_template('super_admin/customers.html', customers=customers_list)
 
-@app.route('/super-admin/customers/create', methods=['POST'])
+@app.route('/customers/create', methods=['POST'])
 @login_required
 def create_customer():
     """고객사 생성 (회사명만 필수) - 모든 로그인 사용자 가능"""
@@ -723,7 +759,7 @@ def create_customer():
     flash('고객사가 생성되었습니다. 세부 정보를 입력해주세요.', 'success')
     return redirect(url_for('customer_detail', customer_id=customer.id))
 
-@app.route('/super-admin/customers/<int:customer_id>')
+@app.route('/customers/<int:customer_id>')
 @login_required
 def customer_detail(customer_id):
     """고객사 세부 정보 조회 - 모든 로그인 사용자 가능"""
@@ -733,7 +769,7 @@ def customer_detail(customer_id):
     sales = User.query.filter_by(role=ROLE_USER, is_active=True, department='영업팀').all()
     return render_template('super_admin/customer_detail.html', customer=customer, engineers=engineers, sales=sales)
 
-@app.route('/super-admin/customers/<int:customer_id>/update', methods=['POST'])
+@app.route('/customers/<int:customer_id>/update', methods=['POST'])
 @login_required
 def update_customer(customer_id):
     """고객사 세부 정보 업데이트 - 모든 로그인 사용자 가능"""
@@ -804,7 +840,7 @@ def update_customer(customer_id):
     flash('고객사 정보가 업데이트되었습니다.', 'success')
     return redirect(url_for('customer_detail', customer_id=customer.id))
 
-@app.route('/super-admin/customers/<int:customer_id>/delete', methods=['POST'])
+@app.route('/customers/<int:customer_id>/delete', methods=['POST'])
 @admin_required
 def delete_customer(customer_id):
     """고객사 삭제"""
@@ -825,7 +861,29 @@ def delete_customer(customer_id):
     flash(f'고객사 "{customer_name}"이(가) 삭제되었습니다.', 'success')
     return redirect(url_for('manage_customers'))
 
-@app.route('/super-admin/create-admin', methods=['POST'])
+@app.route('/customers/<int:customer_id>/documents')
+@login_required
+def customer_documents(customer_id):
+    """고객사 점검서 목록 조회"""
+    customer = Customer.query.get_or_404(customer_id)
+    documents = Document.query.filter_by(customer_id=customer_id).order_by(Document.uploaded_at.desc()).all()
+    return render_template('super_admin/customer_documents.html', customer=customer, documents=documents)
+
+@app.route('/documents/<int:document_id>/view')
+@login_required
+def view_document(document_id):
+    """점검서 PDF 뷰어"""
+    document = Document.query.get_or_404(document_id)
+    return render_template('super_admin/view_document.html', document=document)
+
+@app.route('/documents/<int:document_id>/file')
+@login_required
+def serve_document(document_id):
+    """점검서 파일 제공"""
+    document = Document.query.get_or_404(document_id)
+    return send_file(document.filepath, mimetype='application/pdf')
+
+@app.route('/create-admin', methods=['POST'])
 @super_admin_required
 def create_admin():
     """관리자 계정 생성"""
@@ -864,10 +922,17 @@ def create_admin():
     flash(f'관리자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
     return redirect(url_for('manage_admins'))
 
-@app.route('/super-admin/create-user', methods=['POST'])
-@super_admin_required
+@app.route('/create-user', methods=['POST'])
+@admin_required
+def create_user_unified():
+    """사용자 계정 생성 - 슈퍼 관리자와 일반 관리자 통합"""
+    if current_user.is_super_admin():
+        return create_user()
+    else:
+        return admin_create_user()
+
 def create_user():
-    """일반 사용자 계정 생성"""
+    """슈퍼 관리자용 - 일반 사용자 계정 생성"""
     username = request.form.get('username')
     name = request.form.get('name')
     email = request.form.get('email') if request.form.get('email') else None
@@ -877,16 +942,16 @@ def create_user():
     # 필수 필드 확인
     if not department:
         flash('소속을 선택해주세요.', 'danger')
-        return redirect(url_for('manage_users'))
+        return redirect(url_for('manage_users_unified'))
 
     # 중복 체크
     if User.query.filter_by(username=username).first():
         flash('이미 존재하는 계정 ID입니다.', 'danger')
-        return redirect(url_for('manage_users'))
+        return redirect(url_for('manage_users_unified'))
 
     if email and User.query.filter_by(email=email).first():
         flash('이미 사용 중인 이메일입니다.', 'danger')
-        return redirect(url_for('manage_users'))
+        return redirect(url_for('manage_users_unified'))
 
     # 기본 패스워드 가져오기
     settings = get_system_settings()
@@ -910,18 +975,25 @@ def create_user():
     db.session.commit()
 
     flash(f'사용자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
-    return redirect(url_for('manage_users'))
+    return redirect(url_for('manage_users_unified'))
 
-@app.route('/super-admin/reset-password/<int:user_id>', methods=['POST'])
-@super_admin_required
+@app.route('/reset-password/<int:user_id>', methods=['POST'])
+@admin_required
+def reset_password_unified(user_id):
+    """패스워드 초기화 - 슈퍼 관리자와 일반 관리자 통합"""
+    if current_user.is_super_admin():
+        return reset_password(user_id)
+    else:
+        return admin_reset_password(user_id)
+
 def reset_password(user_id):
-    """사용자 패스워드 초기화"""
+    """슈퍼 관리자용 - 사용자 패스워드 초기화"""
     user = User.query.get_or_404(user_id)
 
     # 슈퍼 관리자 자신은 초기화할 수 없음
     if user.id == current_user.id:
         flash('자신의 패스워드는 초기화할 수 없습니다.', 'danger')
-        return redirect(request.referrer or url_for('super_admin_dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
 
     # 기본 패스워드로 초기화
     settings = get_system_settings()
@@ -931,23 +1003,30 @@ def reset_password(user_id):
     db.session.commit()
 
     flash(f'{user.username}의 패스워드가 기본 패스워드로 초기화되었습니다.', 'success')
-    return redirect(request.referrer or url_for('super_admin_dashboard'))
+    return redirect(request.referrer or url_for('dashboard'))
 
-@app.route('/super-admin/delete-user/<int:user_id>', methods=['POST'])
-@super_admin_required
+@app.route('/delete-user/<int:user_id>', methods=['POST'])
+@admin_required
+def delete_user_unified(user_id):
+    """사용자 삭제 - 슈퍼 관리자와 일반 관리자 통합"""
+    if current_user.is_super_admin():
+        return delete_user(user_id)
+    else:
+        return admin_delete_user(user_id)
+
 def delete_user(user_id):
-    """사용자 삭제"""
+    """슈퍼 관리자용 - 사용자 삭제"""
     user = User.query.get_or_404(user_id)
 
     # 슈퍼 관리자 자신은 삭제할 수 없음
     if user.id == current_user.id:
         flash('자신의 계정은 삭제할 수 없습니다.', 'danger')
-        return redirect(request.referrer or url_for('super_admin_dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
 
     # 슈퍼 관리자는 삭제할 수 없음
     if user.role == ROLE_SUPER_ADMIN:
         flash('슈퍼 관리자 계정은 삭제할 수 없습니다.', 'danger')
-        return redirect(request.referrer or url_for('super_admin_dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
 
     username = user.username
 
@@ -963,27 +1042,34 @@ def delete_user(user_id):
     db.session.commit()
 
     flash(f'계정 "{username}"이 삭제되었습니다.', 'success')
-    return redirect(request.referrer or url_for('super_admin_dashboard'))
+    return redirect(request.referrer or url_for('dashboard'))
 
-@app.route('/super-admin/toggle-active/<int:user_id>', methods=['POST'])
-@super_admin_required
+@app.route('/toggle-active/<int:user_id>', methods=['POST'])
+@admin_required
+def toggle_user_active_unified(user_id):
+    """사용자 활성화/비활성화 - 슈퍼 관리자와 일반 관리자 통합"""
+    if current_user.is_super_admin():
+        return toggle_user_active(user_id)
+    else:
+        return admin_toggle_user_active(user_id)
+
 def toggle_user_active(user_id):
-    """사용자 활성화/비활성화 토글"""
+    """슈퍼 관리자용 - 사용자 활성화/비활성화 토글"""
     user = User.query.get_or_404(user_id)
 
     # 슈퍼 관리자 자신은 비활성화할 수 없음
     if user.id == current_user.id:
         flash('자신의 계정은 비활성화할 수 없습니다.', 'danger')
-        return redirect(request.referrer or url_for('super_admin_dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
 
     user.is_active = not user.is_active
     db.session.commit()
 
     status = '활성화' if user.is_active else '비활성화'
     flash(f'{user.username} 계정이 {status}되었습니다.', 'success')
-    return redirect(request.referrer or url_for('super_admin_dashboard'))
+    return redirect(request.referrer or url_for('dashboard'))
 
-@app.route('/super-admin/settings', methods=['GET', 'POST'])
+@app.route('/settings', methods=['GET', 'POST'])
 @super_admin_required
 def system_settings():
     """시스템 설정 관리"""
@@ -1035,8 +1121,6 @@ def system_settings():
     return render_template('super_admin/settings.html', settings=settings)
 
 # ========== 일반 관리자 전용 페이지 ==========
-@app.route('/admin/dashboard')
-@admin_required
 def admin_dashboard():
     """일반 관리자 대시보드 - 일반 사용자 관리, 패스워드 초기화, 서비스 로그 확인"""
     total_users = User.query.filter_by(role=ROLE_USER).count()
@@ -1066,22 +1150,13 @@ def admin_dashboard():
                          monthly_inspection_targets=monthly_inspection_targets,
                          monthly_inspection_completed=monthly_inspection_completed)
 
-@app.route('/admin/users')
+@app.route('/logs')
 @admin_required
-def admin_manage_users():
-    """일반 사용자 계정 생성 및 관리"""
-    users = User.query.filter_by(role=ROLE_USER).all()
-    return render_template('admin/users.html', users=users)
-
-@app.route('/admin/logs')
-@admin_required
-def admin_service_logs():
+def service_logs():
     """서비스 로그 확인"""
     # TODO: 로그 시스템 구현
     return render_template('admin/logs.html')
 
-@app.route('/admin/create-user', methods=['POST'])
-@admin_required
 def admin_create_user():
     """일반 관리자용 - 일반 사용자 계정 생성"""
     username = request.form.get('username')
@@ -1092,16 +1167,16 @@ def admin_create_user():
     # 필수 필드 확인
     if not department:
         flash('소속을 선택해주세요.', 'danger')
-        return redirect(url_for('admin_manage_users'))
+        return redirect(url_for('manage_users_unified'))
 
     # 중복 체크
     if User.query.filter_by(username=username).first():
         flash('이미 존재하는 계정 ID입니다.', 'danger')
-        return redirect(url_for('admin_manage_users'))
+        return redirect(url_for('manage_users_unified'))
 
     if email and User.query.filter_by(email=email).first():
         flash('이미 사용 중인 이메일입니다.', 'danger')
-        return redirect(url_for('admin_manage_users'))
+        return redirect(url_for('manage_users_unified'))
 
     # 기본 패스워드 가져오기
     settings = get_system_settings()
@@ -1125,10 +1200,8 @@ def admin_create_user():
     db.session.commit()
 
     flash(f'사용자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
-    return redirect(url_for('admin_manage_users'))
+    return redirect(url_for('manage_users_unified'))
 
-@app.route('/admin/reset-password/<int:user_id>', methods=['POST'])
-@admin_required
 def admin_reset_password(user_id):
     """일반 관리자용 - 일반 사용자 패스워드 초기화"""
     user = User.query.get_or_404(user_id)
@@ -1136,7 +1209,7 @@ def admin_reset_password(user_id):
     # 일반 사용자만 초기화 가능
     if user.role != ROLE_USER:
         flash('일반 사용자만 패스워드를 초기화할 수 있습니다.', 'danger')
-        return redirect(request.referrer or url_for('admin_manage_users'))
+        return redirect(request.referrer or url_for('manage_users_unified'))
 
     # 기본 패스워드로 초기화
     settings = get_system_settings()
@@ -1146,10 +1219,8 @@ def admin_reset_password(user_id):
     db.session.commit()
 
     flash(f'{user.username}의 패스워드가 기본 패스워드로 초기화되었습니다.', 'success')
-    return redirect(request.referrer or url_for('admin_manage_users'))
+    return redirect(request.referrer or url_for('manage_users_unified'))
 
-@app.route('/admin/toggle-active/<int:user_id>', methods=['POST'])
-@admin_required
 def admin_toggle_user_active(user_id):
     """일반 관리자용 - 일반 사용자 활성화/비활성화 토글"""
     user = User.query.get_or_404(user_id)
@@ -1157,17 +1228,15 @@ def admin_toggle_user_active(user_id):
     # 일반 사용자만 토글 가능
     if user.role != ROLE_USER:
         flash('일반 사용자만 활성화/비활성화할 수 있습니다.', 'danger')
-        return redirect(request.referrer or url_for('admin_manage_users'))
+        return redirect(request.referrer or url_for('manage_users_unified'))
 
     user.is_active = not user.is_active
     db.session.commit()
 
     status = '활성화' if user.is_active else '비활성화'
     flash(f'{user.username} 계정이 {status}되었습니다.', 'success')
-    return redirect(request.referrer or url_for('admin_manage_users'))
+    return redirect(request.referrer or url_for('manage_users_unified'))
 
-@app.route('/admin/delete-user/<int:user_id>', methods=['POST'])
-@admin_required
 def admin_delete_user(user_id):
     """일반 관리자용 - 일반 사용자 계정 삭제"""
     user = User.query.get_or_404(user_id)
@@ -1175,7 +1244,7 @@ def admin_delete_user(user_id):
     # 일반 사용자만 삭제 가능
     if user.role != ROLE_USER:
         flash('일반 사용자만 삭제할 수 있습니다.', 'danger')
-        return redirect(request.referrer or url_for('admin_manage_users'))
+        return redirect(request.referrer or url_for('manage_users_unified'))
 
     username = user.username
 
@@ -1191,11 +1260,9 @@ def admin_delete_user(user_id):
     db.session.commit()
 
     flash(f'사용자 계정 "{username}"이 삭제되었습니다.', 'success')
-    return redirect(url_for('admin_manage_users'))
+    return redirect(url_for('manage_users_unified'))
 
 # ========== 일반 사용자 전용 페이지 ==========
-@app.route('/user/dashboard')
-@role_required(ROLE_USER)
 def user_dashboard():
     """일반 사용자 대시보드 - 담당 고객사 정보 및 점검 현황"""
     # 담당 고객사 목록 가져오기
@@ -1233,13 +1300,13 @@ def user_dashboard():
                          monthly_inspection_completed=monthly_inspection_completed,
                          recent_documents=recent_documents)
 
-@app.route('/user/customer/edit', methods=['GET', 'POST'])
+@app.route('/customer/edit', methods=['GET', 'POST'])
 @role_required(ROLE_USER)
 def edit_customer_info():
     """본인 고객사 정보 수정"""
     if not current_user.customer_id:
         flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('dashboard'))
 
     customer = Customer.query.get(current_user.customer_id)
 
@@ -1251,22 +1318,22 @@ def edit_customer_info():
         customer.address = request.form.get('address')
         db.session.commit()
         flash('고객사 정보가 수정되었습니다.', 'success')
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('dashboard'))
 
     return render_template('user/edit_customer.html', customer=customer)
 
-@app.route('/user/documents/upload', methods=['GET', 'POST'])
+@app.route('/documents/upload', methods=['GET', 'POST'])
 @role_required(ROLE_USER)
 def upload_document():
     """점검서 업로드"""
     if not current_user.customer_id:
         flash('고객사 정보가 연결되지 않았습니다. 관리자에게 문의하세요.', 'warning')
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
         # TODO: 파일 업로드 로직 구현
         flash('점검서가 업로드되었습니다.', 'success')
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('dashboard'))
 
     return render_template('user/upload_document.html')
 
@@ -1286,40 +1353,39 @@ def get_password_requirements():
 @app.route('/api/change-password', methods=['POST'])
 @login_required
 def api_change_password():
-    """패스워드 변경 API - JSON 응답"""
+    """패스워드 변경 API - JSON 응답 (메뉴에서 접근 시 사용)"""
     current_password = request.form.get('current_password')
     new_password = request.form.get('new_password')
     confirm_password = request.form.get('confirm_password')
 
-    # 1. 현재 비밀번호 확인
+    # 메뉴에서 접근하는 경우 항상 현재 패스워드 확인 필요
+    # 1. 현재 비밀번호 입력 확인
+    if not current_password:
+        return jsonify({
+            'success': False,
+            'message': '현재 패스워드를 입력해주세요.'
+        })
+    
+    # 2. 현재 비밀번호 확인
     if not current_user.check_password(current_password):
         return jsonify({
             'success': False,
             'message': '현재 패스워드가 올바르지 않습니다.'
         })
 
-    # 2. 새 비밀번호 확인
+    # 3. 새 비밀번호 확인
     if new_password != confirm_password:
         return jsonify({
             'success': False,
             'message': '새 패스워드가 일치하지 않습니다.'
         })
 
-    # 3. 현재 비밀번호와 동일한지 확인
+    # 4. 현재 비밀번호와 동일한지 확인
     if current_password == new_password:
         return jsonify({
             'success': False,
             'message': '새 패스워드는 현재 패스워드와 달라야 합니다.'
         })
-
-    # 4. 최초 로그인 시 기본 패스워드 재사용 방지
-    if current_user.is_first_login:
-        settings = get_system_settings()
-        if new_password == settings.default_password:
-            return jsonify({
-                'success': False,
-                'message': '기본 패스워드는 재사용할 수 없습니다. 새로운 패스워드를 설정해주세요.'
-            })
 
     # 5. 패스워드 복잡성 검증
     is_valid, message = validate_password(new_password)

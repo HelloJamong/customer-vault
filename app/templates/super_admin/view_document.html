@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.title }} - 점검서 보기{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('manage_customers') }}">고객사 관리</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('customer_documents', customer_id=document.customer_id) }}">점검서 목록</a></li>
+                <li class="breadcrumb-item active">{{ document.title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="mb-1"><i class="bi bi-file-earmark-pdf text-danger"></i> {{ document.title }}</h5>
+                <small class="text-muted">
+                    {% if document.inspection_date %}
+                    점검일: {{ document.inspection_date.strftime('%Y-%m-%d') }} | 
+                    {% endif %}
+                    업로드: {{ document.uploaded_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% if document.uploader %}
+                    by {{ document.uploader.name }}
+                    {% endif %}
+                </small>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('customer_documents', customer_id=document.customer_id) }}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> 목록으로
+                </a>
+                <a href="{{ url_for('serve_document', document_id=document.id) }}" class="btn btn-success btn-sm" download>
+                    <i class="bi bi-download"></i> 다운로드
+                </a>
+            </div>
+        </div>
+        {% if document.description %}
+        <div class="mt-2">
+            <small class="text-muted">{{ document.description }}</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div id="pdf-viewer-container" style="height: calc(100vh - 250px); min-height: 600px;">
+            <iframe 
+                id="pdf-viewer"
+                src="{{ url_for('serve_document', document_id=document.id) }}" 
+                type="application/pdf"
+                width="100%" 
+                height="100%"
+                style="border: none;">
+                <p>PDF를 표시할 수 없습니다. <a href="{{ url_for('serve_document', document_id=document.id) }}">여기</a>를 클릭하여 다운로드하세요.</p>
+            </iframe>
+        </div>
+    </div>
+</div>
+
+<style>
+.breadcrumb {
+    background-color: transparent;
+    padding: 0;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+#pdf-viewer-container {
+    background-color: #525659;
+}
+
+@media (max-width: 768px) {
+    #pdf-viewer-container {
+        height: 500px !important;
+    }
+}
+</style>
+
+<script>
+// PDF 뷰어 로드 확인
+document.getElementById('pdf-viewer').addEventListener('load', function() {
+    console.log('PDF loaded successfully');
+});
+
+// PDF 뷰어 에러 처리
+document.getElementById('pdf-viewer').addEventListener('error', function() {
+    console.error('Failed to load PDF');
+    const container = document.getElementById('pdf-viewer-container');
+    container.innerHTML = `
+        <div class="alert alert-warning m-3">
+            <i class="bi bi-exclamation-triangle"></i> 
+            PDF를 브라우저에서 직접 표시할 수 없습니다. 
+            <a href="{{ url_for('serve_document', document_id=document.id) }}" class="alert-link">다운로드</a>하여 확인해주세요.
+        </div>
+    `;
+});
+</script>
+{% endblock %}

@@ -236,6 +236,8 @@
                         <option value="분기" {% if customer.inspection_cycle_type == '분기' %}selected{% endif %}>분기</option>
                         <option value="반기" {% if customer.inspection_cycle_type == '반기' %}selected{% endif %}>반기</option>
                         <option value="연1회" {% if customer.inspection_cycle_type == '연1회' %}selected{% endif %}>연1회</option>
+                        <option value="협력사진행" {% if customer.inspection_cycle_type == '협력사진행' %}selected{% endif %}>협력사진행</option>
+                        <option value="무상기간" {% if customer.inspection_cycle_type == '무상기간' %}selected{% endif %}>무상기간</option>
                     </select>
                 </div>
                 <div class="col-md-4 mb-3">
@@ -494,6 +496,9 @@ function updateInspectionCycleOptions() {
     if (cycleType === '매월') {
         cycleMonth.disabled = true;
         helpText.textContent = '매월 점검이 필요합니다.';
+    } else if (cycleType === '협력사진행' || cycleType === '무상기간') {
+        cycleMonth.disabled = true;
+        helpText.textContent = '점검 대상이 아닙니다.';
     } else if (cycleType === '분기') {
         cycleMonth.disabled = false;
         cycleMonth.innerHTML = `
