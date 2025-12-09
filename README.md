@@ -65,19 +65,21 @@ docker compose logs -f
 | 문서 | 설명 | 대상 |
 |------|------|------|
 | **[📖 문서 센터](docs/README.md)** | 모든 문서의 시작점 | 모든 사용자 |
-| **[⚙️ 환경 설정 가이드](docs/SETUP_GUIDE.md)** | 전체 시스템 설정 가이드 | 신규 관리자 |
+| **[🚀 제3자 배포 가이드](docs/DEPLOYMENT_GUIDE.md)** | 본인 서버에 처음부터 배포하기 | 신규 사용자 ⭐ |
+| **[⚙️ 환경 설정 가이드](docs/SETUP_GUIDE.md)** | 환경별 상세 시스템 설정 | 신규 관리자 |
 | **[🔧 환경 변수 참조](docs/ENV_VARIABLES.md)** | .env 파일 설정 빠른 참조 | 모든 사용자 |
 | **[🐳 Docker 설정 가이드](docs/DOCKER_GUIDE.md)** | Docker 파일 수정 방법 | 개발자 |
-| **[📦 Docker 컨테이너 환경 구성](docs/DOCKER_CONTAINER_GUIDE.md)** | Docker로 환경을 구성하는 전체 과정 | 관리자 |
+| **[📦 Docker 컨테이너 환경 구성](docs/DOCKER_CONTAINER_GUIDE.md)** | Docker 명령어 및 운영 | 관리자 |
 
 ### 시나리오별 추천 문서
 
-- **🆕 처음 설치하는 경우**
-  1. [📦 Docker 컨테이너 환경 구성](docs/DOCKER_CONTAINER_GUIDE.md) - Docker 설치부터 시작
-  2. [🔧 환경 변수 참조](docs/ENV_VARIABLES.md) - .env 파일 설정
+- **🆕 완전히 처음 시작하는 경우** ⭐
+  - **[🚀 제3자 배포 가이드](docs/DEPLOYMENT_GUIDE.md)** - 이 가이드 하나면 충분!
+  - 서버 준비부터 완료까지 모든 과정을 단계별로 안내
 
-- **🔄 다른 서버에 배포**
-  - [⚙️ 환경 설정 가이드](docs/SETUP_GUIDE.md) - 환경별 설정 방법
+- **🐳 Docker는 이미 설치된 경우**
+  1. [📦 Docker 컨테이너 환경 구성](docs/DOCKER_CONTAINER_GUIDE.md) - 프로젝트 실행부터
+  2. [🔧 환경 변수 참조](docs/ENV_VARIABLES.md) - .env 설정
 
 - **⚙️ Docker 설정 변경**
   - [🐳 Docker 설정 가이드](docs/DOCKER_GUIDE.md) - 포트, 리소스 등 수정
