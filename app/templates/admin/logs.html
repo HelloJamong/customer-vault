@@ -6,109 +6,122 @@
 <div class="row mb-4">
     <div class="col">
         <h2><i class="bi bi-file-text"></i> 서비스 로그</h2>
-        <p class="text-muted">시스템 활동 로그를 확인할 수 있습니다.</p>
-    </div>
-    <div class="col-auto">
-        <button class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-clockwise"></i> 새로고침
-        </button>
-        <button class="btn btn-outline-primary">
-            <i class="bi bi-download"></i> 다운로드
-        </button>
+        <p class="text-muted">시스템 활동 로그를 확인할 수 있습니다. (최근 500개)</p>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <ul class="nav nav-tabs card-header-tabs" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active" data-bs-toggle="tab" href="#login-logs">
-                    <i class="bi bi-box-arrow-in-right"></i> 로그인 로그
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#upload-logs">
-                    <i class="bi bi-cloud-upload"></i> 업로드 로그
-                </a>
-            </li>
-            {% if current_user.is_super_admin() %}
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#system-logs">
-                    <i class="bi bi-gear"></i> 시스템 로그
-                </a>
-            </li>
-            {% endif %}
-        </ul>
-    </div>
+<!-- 필터 -->
+<div class="card mb-3">
     <div class="card-body">
-        <div class="tab-content">
-            <div class="tab-pane fade show active" id="login-logs">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>시간</th>
-                                <th>사용자</th>
-                                <th>IP 주소</th>
-                                <th>상태</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">
-                                    로그 기능이 곧 추가됩니다.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        <form method="GET" action="{{ url_for('service_logs') }}" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">로그 유형</label>
+                <select class="form-select" name="log_type">
+                    <option value="">전체</option>
+                    <option value="정상" {% if current_log_type == '정상' %}selected{% endif %}>정상</option>
+                    <option value="경고" {% if current_log_type == '경고' %}selected{% endif %}>경고</option>
+                    <option value="오류" {% if current_log_type == '오류' %}selected{% endif %}>오류</option>
+                    <option value="정보" {% if current_log_type == '정보' %}selected{% endif %}>정보</option>
+                </select>
             </div>
-            <div class="tab-pane fade" id="upload-logs">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>시간</th>
-                                <th>사용자</th>
-                                <th>파일명</th>
-                                <th>크기</th>
-                                <th>상태</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">
-                                    로그 기능이 곧 추가됩니다.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="col-md-3">
+                <label class="form-label">액션</label>
+                <select class="form-select" name="action">
+                    <option value="">전체</option>
+                    <option value="로그인" {% if current_action == '로그인' %}selected{% endif %}>로그인</option>
+                    <option value="로그아웃" {% if current_action == '로그아웃' %}selected{% endif %}>로그아웃</option>
+                    <option value="로그인 실패" {% if current_action == '로그인 실패' %}selected{% endif %}>로그인 실패</option>
+                    <option value="계정 잠금" {% if current_action == '계정 잠금' %}selected{% endif %}>계정 잠금</option>
+                    <option value="계정 잠금 해제" {% if current_action == '계정 잠금 해제' %}selected{% endif %}>계정 잠금 해제</option>
+                    <option value="패스워드 변경" {% if current_action == '패스워드 변경' %}selected{% endif %}>패스워드 변경</option>
+                </select>
             </div>
-            {% if current_user.is_super_admin() %}
-            <div class="tab-pane fade" id="system-logs">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>시간</th>
-                                <th>이벤트 유형</th>
-                                <th>설명</th>
-                                <th>상세</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">
-                                    로그 기능이 곧 추가됩니다.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="col-md-4">
+                <label class="form-label">사용자</label>
+                <select class="form-select" name="user_id">
+                    <option value="">전체</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {% if current_user_id == user.id|string %}selected{% endif %}>
+                        {{ user.name }} ({{ user.username }})
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
-            {% endif %}
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> 필터
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 로그 테이블 -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th style="width: 150px;">시간</th>
+                        <th style="width: 80px;">유형</th>
+                        <th style="width: 120px;">액션</th>
+                        <th style="width: 150px;">사용자</th>
+                        <th>설명</th>
+                        <th style="width: 120px;">IP 주소</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if logs %}
+                        {% for log in logs %}
+                        <tr>
+                            <td><small>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                            <td>
+                                {% if log.log_type == '정상' %}
+                                <span class="badge bg-success">정상</span>
+                                {% elif log.log_type == '경고' %}
+                                <span class="badge bg-warning text-dark">경고</span>
+                                {% elif log.log_type == '오류' %}
+                                <span class="badge bg-danger">오류</span>
+                                {% elif log.log_type == '정보' %}
+                                <span class="badge bg-info text-dark">정보</span>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ log.action }}</small></td>
+                            <td>
+                                {% if log.user %}
+                                <small><strong>{{ log.user.name }}</strong><br>{{ log.user.username }}</small>
+                                {% else %}
+                                <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ log.description }}</small></td>
+                            <td><small class="text-muted">{{ log.ip_address or '-' }}</small></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                로그가 없습니다.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+
+{% if current_user.is_super_admin() %}
+<div class="card mt-3">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-gear"></i> 시스템 로그 (슈퍼 관리자 전용)</h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 시스템 로그는 서비스 로그와 함께 표시됩니다. 필터를 사용하여 원하는 로그를 확인하세요.
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

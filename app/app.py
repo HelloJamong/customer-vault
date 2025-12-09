@@ -32,6 +32,19 @@ def before_request():
     """모든 요청 전에 세션 타임아웃 체크"""
     if current_user.is_authenticated:
         if not check_session_timeout():
+            user_id = current_user.id
+            user_name = current_user.name
+            username = current_user.username
+            
+            # 세션 타임아웃 로그 생성
+            create_service_log(
+                user_id=user_id,
+                log_type='정상',
+                action='로그아웃',
+                description=f'{user_name}({username}) 사용자가 세션 타임아웃으로 인해 로그아웃되었습니다.',
+                ip_address=request.remote_addr
+            )
+            
             logout_user()
             session.clear()
             flash('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning')
@@ -319,6 +332,19 @@ class UserSession(db.Model):
     last_activity = db.Column(db.DateTime, default=datetime.utcnow)
     ip_address = db.Column(db.String(45))
 
+class ServiceLog(db.Model):
+    """서비스 로그"""
+    __tablename__ = 'service_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    log_type = db.Column(db.String(20), nullable=False)  # '정상', '경고', '오류', '정보'
+    action = db.Column(db.String(50), nullable=False)  # '로그인', '로그아웃', '패스워드 변경' 등
+    description = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref='service_logs')
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -332,6 +358,25 @@ def get_system_settings():
         db.session.add(settings)
         db.session.commit()
     return settings
+
+def create_service_log(user_id, log_type, action, description, ip_address=None):
+    """서비스 로그 생성"""
+    try:
+        if ip_address is None:
+            ip_address = request.remote_addr if request else None
+        
+        log = ServiceLog(
+            user_id=user_id,
+            log_type=log_type,
+            action=action,
+            description=description,
+            ip_address=ip_address
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Failed to create service log: {str(e)}")
 
 def validate_password(password):
     """패스워드가 시스템 설정의 복잡성 요구사항을 충족하는지 검증"""
@@ -389,6 +434,16 @@ def handle_failed_login(user):
         user.is_locked = True
         user.locked_until = datetime.utcnow() + timedelta(minutes=settings.account_lock_minutes)
         db.session.commit()
+        
+        # 계정 잠금 로그 생성
+        create_service_log(
+            user_id=user.id,
+            log_type='경고',
+            action='계정 잠금',
+            description=f'{user.name}({user.username}) 사용자의 계정이 패스워드 {settings.login_failure_limit}회 입력 오류로 {settings.account_lock_minutes}분간 잠겼습니다.',
+            ip_address=request.remote_addr if request else None
+        )
+        
         return f'로그인 {settings.login_failure_limit}회 실패로 계정이 {settings.account_lock_minutes}분간 잠겼습니다.'
 
     db.session.commit()
@@ -397,10 +452,21 @@ def handle_failed_login(user):
 
 def reset_failed_login_attempts(user):
     """로그인 성공 시 실패 횟수 초기화"""
+    was_locked = user.is_locked
     user.failed_login_attempts = 0
     user.is_locked = False
     user.locked_until = None
     db.session.commit()
+    
+    # 계정 잠금 해제 로그 생성
+    if was_locked:
+        create_service_log(
+            user_id=user.id,
+            log_type='정보',
+            action='계정 잠금 해제',
+            description=f'{user.name}({user.username}) 사용자의 계정 잠금이 해제되었습니다.',
+            ip_address=request.remote_addr if request else None
+        )
 
 def manage_user_session(user_id):
     """사용자 세션 관리 - 중복 로그인 방지"""
@@ -500,6 +566,16 @@ def login():
                 # 로그인 성공
                 reset_failed_login_attempts(user)
                 record_login_attempt(user.id, success=True)
+                
+                # 로그인 성공 로그 생성
+                ip_address = request.remote_addr
+                create_service_log(
+                    user_id=user.id,
+                    log_type='정상',
+                    action='로그인',
+                    description=f'{user.name}({user.username}) 사용자가 로그인했습니다.',
+                    ip_address=ip_address
+                )
 
                 # 마지막 로그인 시간 업데이트
                 user.last_login = datetime.utcnow()
@@ -528,11 +604,29 @@ def login():
 
                 return redirect(url_for('dashboard'))
             else:
-                # 로그인 실패
+                # 로그인 실패 - 패스워드 오류
                 record_login_attempt(user.id, success=False)
                 error_message = handle_failed_login(user)
+                
+                # 패스워드 오류 로그 생성
+                create_service_log(
+                    user_id=user.id,
+                    log_type='경고',
+                    action='로그인 실패',
+                    description=f'{user.name}({user.username}) 사용자의 패스워드 입력 오류가 발생했습니다.',
+                    ip_address=request.remote_addr
+                )
+                
                 flash(error_message, 'danger')
         else:
+            # 존재하지 않는 계정
+            create_service_log(
+                user_id=None,
+                log_type='오류',
+                action='로그인 실패',
+                description=f'존재하지 않는 계정({username})으로 로그인을 시도했습니다.',
+                ip_address=request.remote_addr
+            )
             flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'danger')
 
     return render_template('login.html')
@@ -540,6 +634,19 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    user_id = current_user.id
+    user_name = current_user.name
+    username = current_user.username
+    
+    # 로그아웃 로그 생성
+    create_service_log(
+        user_id=user_id,
+        log_type='정상',
+        action='로그아웃',
+        description=f'{user_name}({username}) 사용자가 로그아웃했습니다.',
+        ip_address=request.remote_addr
+    )
+    
     # 세션 정리
     if 'session_id' in session:
         UserSession.query.filter_by(session_id=session['session_id']).delete()
@@ -635,8 +742,21 @@ def change_password():
                                  settings=settings)
 
         # 5. 패스워드 변경
+        user_id = current_user.id
+        user_name = current_user.name
+        username = current_user.username
+        
         current_user.set_password(new_password)
         db.session.commit()
+        
+        # 패스워드 변경 로그 생성
+        create_service_log(
+            user_id=user_id,
+            log_type='정보',
+            action='패스워드 변경',
+            description=f'{user_name}({username}) 사용자가 패스워드를 변경했습니다.',
+            ip_address=request.remote_addr
+        )
 
         # 로그아웃 처리
         logout_user()
@@ -892,6 +1012,7 @@ def delete_document(document_id):
     customer_id = document.customer_id
     customer = Customer.query.get_or_404(customer_id)
     deleted_inspection_date = document.inspection_date
+    deleted_filename = document.title
     
     try:
         # 파일 삭제
@@ -901,6 +1022,13 @@ def delete_document(document_id):
         # 데이터베이스 레코드 삭제
         db.session.delete(document)
         db.session.commit()
+        
+        # 서비스 로그 생성
+        create_service_log(
+            log_type='경고',
+            action='점검서 삭제',
+            description=f'고객사: {customer.name}, 파일: {deleted_filename}.pdf'
+        )
         
         # 삭제된 점검서가 가장 최근 점검인 경우, last_inspection_date 업데이트
         if customer.last_inspection_date == deleted_inspection_date:
@@ -1197,8 +1325,121 @@ def admin_dashboard():
 @admin_required
 def service_logs():
     """서비스 로그 확인"""
-    # TODO: 로그 시스템 구현
-    return render_template('admin/logs.html')
+    # 필터 파라미터
+    log_type = request.args.get('log_type', '')
+    action = request.args.get('action', '')
+    user_id = request.args.get('user_id', '')
+    
+    # 기본 쿼리
+    query = ServiceLog.query
+    
+    # 필터 적용
+    if log_type:
+        query = query.filter_by(log_type=log_type)
+    if action:
+        query = query.filter_by(action=action)
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    
+    # 최신순으로 정렬하고 최대 500개만 표시
+    logs = query.order_by(ServiceLog.created_at.desc()).limit(500).all()
+    
+    # 사용자 목록 (필터용)
+    users = User.query.order_by(User.name).all()
+    
+    return render_template('admin/logs.html', logs=logs, users=users,
+                         current_log_type=log_type, current_action=action, current_user_id=user_id)
+
+@app.route('/logs/login')
+@admin_required
+def login_logs():
+    """로그인 관련 로그 확인 (슈퍼 관리자 제외)"""
+    # 필터 파라미터
+    log_type = request.args.get('log_type', '')
+    user_id = request.args.get('user_id', '')
+    
+    # 슈퍼 관리자가 아닌 사용자들의 ID 목록
+    non_super_admin_ids = [u.id for u in User.query.filter(User.role != 'super_admin').all()]
+    
+    # 로그인 관련 액션들만 필터링 + 슈퍼 관리자 제외
+    login_actions = ['로그인', '로그아웃', '로그인 실패', '계정 잠금', '계정 잠금 해제', '패스워드 변경']
+    query = ServiceLog.query.filter(ServiceLog.action.in_(login_actions))\
+                            .filter(ServiceLog.user_id.in_(non_super_admin_ids))
+    
+    # 추가 필터 적용
+    if log_type:
+        query = query.filter_by(log_type=log_type)
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    
+    # 최신순으로 정렬하고 최대 500개만 표시
+    logs = query.order_by(ServiceLog.created_at.desc()).limit(500).all()
+    
+    # 사용자 목록 (필터용 - 슈퍼 관리자 제외)
+    users = User.query.filter(User.role != 'super_admin').order_by(User.name).all()
+    
+    return render_template('admin/login_logs.html', logs=logs, users=users,
+                         current_log_type=log_type, current_user_id=user_id)
+
+@app.route('/logs/upload')
+@admin_required
+def upload_logs():
+    """업로드 관련 로그 확인 (슈퍼 관리자 제외)"""
+    # 필터 파라미터
+    user_id = request.args.get('user_id', '')
+    customer_id = request.args.get('customer_id', '')
+    
+    # 슈퍼 관리자가 아닌 사용자들의 ID 목록
+    non_super_admin_ids = [u.id for u in User.query.filter(User.role != 'super_admin').all()]
+    
+    # 문서 업로드 이력 쿼리 (슈퍼 관리자 제외)
+    query = Document.query.filter(Document.uploaded_by.in_(non_super_admin_ids))
+    
+    # 필터 적용
+    if user_id:
+        query = query.filter_by(uploaded_by=user_id)
+    if customer_id:
+        query = query.filter_by(customer_id=customer_id)
+    
+    # 최신순으로 정렬하고 최대 500개만 표시
+    documents = query.order_by(Document.uploaded_at.desc()).limit(500).all()
+    
+    # 사용자 및 고객사 목록 (필터용 - 슈퍼 관리자 제외)
+    users = User.query.filter(User.role != 'super_admin').order_by(User.name).all()
+    customers = Customer.query.order_by(Customer.name).all()
+    
+    return render_template('admin/upload_logs.html', documents=documents, 
+                         users=users, customers=customers,
+                         current_user_id=user_id, current_customer_id=customer_id)
+
+@app.route('/logs/system')
+@super_admin_required
+def system_logs():
+    """시스템 전체 로그 확인 (슈퍼 관리자 전용)"""
+    # 필터 파라미터
+    log_type = request.args.get('log_type', '')
+    action = request.args.get('action', '')
+    user_id = request.args.get('user_id', '')
+    
+    # 기본 쿼리
+    query = ServiceLog.query
+    
+    # 필터 적용
+    if log_type:
+        query = query.filter_by(log_type=log_type)
+    if action:
+        query = query.filter_by(action=action)
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    
+    # 최신순으로 정렬하고 최대 500개만 표시
+    logs = query.order_by(ServiceLog.created_at.desc()).limit(500).all()
+    
+    # 사용자 목록 (필터용)
+    users = User.query.order_by(User.name).all()
+    
+    return render_template('admin/system_logs.html', logs=logs, users=users,
+                         current_log_type=log_type, current_action=action, current_user_id=user_id)
 
 def admin_create_user():
     """일반 관리자용 - 일반 사용자 계정 생성"""
@@ -1446,6 +1687,13 @@ def upload_document():
             
             db.session.add(document)
             db.session.commit()
+            
+            # 서비스 로그 생성
+            create_service_log(
+                log_type='정상',
+                action='점검서 업로드',
+                description=f'고객사: {customer.name}, 파일: {title}.pdf, 점검 유형: {inspection_type}'
+            )
             
             flash('점검서가 성공적으로 업로드되었습니다.', 'success')
             return redirect(url_for('dashboard'))
