@@ -2,6 +2,8 @@ import os
 import re
 import uuid
 import shutil
+import logging
+from logging.handlers import RotatingFileHandler
 from functools import wraps
 from flask import Flask, render_template, redirect, url_for, flash, request, abort, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -18,6 +20,26 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{os.environ.get('DB_US
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = '/app/uploads'
 app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_UPLOAD_SIZE', 16777216))
+
+# 로깅 설정 - 운영 환경에서는 DEBUG 비활성화
+if not app.debug:
+    # 로그 디렉토리 생성
+    if not os.path.exists('/app/logs'):
+        os.makedirs('/app/logs')
+    
+    # 파일 핸들러 설정 (최대 10MB, 백업 10개)
+    file_handler = RotatingFileHandler(
+        '/app/logs/error.log',
+        maxBytes=10485760,  # 10MB
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
+    ))
+    file_handler.setLevel(logging.ERROR)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.ERROR)
+    app.logger.info('Application error logging enabled')
 
 # 데이터베이스 초기화
 db = SQLAlchemy(app)
@@ -2142,6 +2164,50 @@ def init_db():
             print("⚠️  운영 환경에서는 반드시 비밀번호를 변경하세요!")
             print("="*50)
 
+# 에러 핸들러
+@app.errorhandler(400)
+def bad_request(error):
+    """잘못된 요청"""
+    app.logger.error(f'Bad Request: {request.url} - {error}')
+    return render_template('errors/400.html'), 400
+
+@app.errorhandler(403)
+def forbidden(error):
+    """권한 없음"""
+    app.logger.warning(f'Forbidden Access: {request.url} - User: {current_user.username if current_user.is_authenticated else "Anonymous"}')
+    return render_template('errors/403.html'), 403
+
+@app.errorhandler(404)
+def page_not_found(error):
+    """페이지를 찾을 수 없음"""
+    app.logger.warning(f'Page Not Found: {request.url}')
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    """서버 내부 오류"""
+    db.session.rollback()
+    app.logger.error(f'Internal Server Error: {request.url}', exc_info=True)
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(503)
+def service_unavailable(error):
+    """서비스 이용 불가"""
+    app.logger.error(f'Service Unavailable: {request.url} - {error}')
+    return render_template('errors/503.html'), 503
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    """처리되지 않은 모든 예외"""
+    db.session.rollback()
+    app.logger.error(f'Unhandled Exception: {request.url}', exc_info=True)
+    # 개발 환경에서는 실제 에러를 표시하고, 운영 환경에서는 500 페이지 표시
+    if app.debug:
+        raise error
+    return render_template('errors/500.html'), 500
+
 if __name__ == '__main__':
     init_db()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 환경변수로 DEBUG 모드 제어 (기본값: False)
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ['true', '1', 'yes']
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)

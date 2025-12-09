@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}서비스 이용 불가{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6 text-center">
+            <div class="error-template">
+                <h1 class="display-1 text-danger">503</h1>
+                <h2 class="mb-4">서비스 이용 불가</h2>
+                <div class="error-details mb-4">
+                    <p class="text-muted">현재 서비스를 이용할 수 없습니다.</p>
+                    <p class="text-muted">시스템 점검 중이거나 일시적인 장애가 발생했습니다.</p>
+                </div>
+                <div class="error-actions">
+                    <a href="javascript:location.reload()" class="btn btn-primary btn-lg">
+                        <i class="bi bi-arrow-clockwise"></i> 페이지 새로고침
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
