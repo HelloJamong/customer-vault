@@ -807,7 +807,13 @@ def create_user():
     username = request.form.get('username')
     name = request.form.get('name')
     email = request.form.get('email') if request.form.get('email') else None
+    department = request.form.get('department')
     customer_id = request.form.get('customer_id') if request.form.get('customer_id') else None
+
+    # 필수 필드 확인
+    if not department:
+        flash('소속을 선택해주세요.', 'danger')
+        return redirect(url_for('manage_users'))
 
     # 중복 체크
     if User.query.filter_by(username=username).first():
@@ -827,6 +833,7 @@ def create_user():
         name=name,
         email=email,
         role=ROLE_USER,
+        department=department,
         is_active=True,
         customer_id=int(customer_id) if customer_id else None
     )
