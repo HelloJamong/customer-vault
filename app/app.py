@@ -649,10 +649,16 @@ def login():
 
                 login_user(user)
 
-                # 4. 최초 로그인 확인 (기본 패스워드 변경 필요)
+                # 4. 최초 로그인 확인
                 if user.is_first_login:
-                    flash('최초 로그인입니다. 보안을 위해 패스워드를 변경해주세요.', 'warning')
-                    return redirect(url_for('change_password', first_login='true'))
+                    # admin 계정의 최초 로그인인 경우 새 슈퍼관리자 생성 페이지로 이동
+                    if user.username == 'admin' and user.role == ROLE_SUPER_ADMIN:
+                        flash('기본 관리자 계정으로 로그인하셨습니다. 새로운 슈퍼관리자 계정을 생성해주세요.', 'warning')
+                        return redirect(url_for('create_new_super_admin'))
+                    else:
+                        # 일반 사용자/관리자는 패스워드 변경
+                        flash('최초 로그인입니다. 보안을 위해 패스워드를 변경해주세요.', 'warning')
+                        return redirect(url_for('change_password', first_login='true'))
 
                 # 5. 패스워드 만료 확인
                 settings = get_system_settings()
@@ -831,6 +837,94 @@ def change_password():
                          password_expired=password_expired,
                          days_until_expiry=days_until_expiry,
                          settings=settings)
+
+@app.route('/create-new-super-admin', methods=['GET', 'POST'])
+@login_required
+def create_new_super_admin():
+    """기본 admin 계정 최초 로그인 시 새 슈퍼관리자 생성"""
+    # admin 계정이 아니거나 최초 로그인이 아닌 경우 접근 차단
+    if current_user.username != 'admin' or not current_user.is_first_login:
+        flash('잘못된 접근입니다.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        name = request.form.get('name')
+        email = request.form.get('email') if request.form.get('email') else None
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        # 1. 사용자명 검증 - admin 사용 불가
+        if username.lower() == 'admin':
+            flash('슈퍼관리자 계정 ID로 "admin"은 사용할 수 없습니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        # 2. 중복 체크
+        if User.query.filter_by(username=username).first():
+            flash('이미 존재하는 계정 ID입니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        if email and User.query.filter_by(email=email).first():
+            flash('이미 사용 중인 이메일입니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        # 3. 패스워드 확인
+        if password != confirm_password:
+            flash('패스워드가 일치하지 않습니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        # 4. 패스워드 복잡성 검증 (대문자, 숫자, 특수문자, 8자리 이상)
+        if len(password) < 8:
+            flash('패스워드는 최소 8자 이상이어야 합니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        if not re.search(r'[A-Z]', password):
+            flash('패스워드에 대문자가 포함되어야 합니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        if not re.search(r'\d', password):
+            flash('패스워드에 숫자가 포함되어야 합니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+            flash('패스워드에 특수문자가 포함되어야 합니다.', 'danger')
+            return render_template('create_new_super_admin.html')
+
+        # 5. 새 슈퍼관리자 생성
+        new_super_admin = User(
+            username=username,
+            name=name,
+            email=email,
+            role=ROLE_SUPER_ADMIN,
+            is_active=True,
+            is_first_login=False  # 새 슈퍼관리자는 최초 로그인 플래그 해제
+        )
+        new_super_admin.set_password(password)
+        db.session.add(new_super_admin)
+
+        # 6. 기본 admin 계정 비활성화 (삭제하지 않음)
+        admin_account = User.query.filter_by(username='admin').first()
+        if admin_account:
+            admin_account.is_active = False
+            admin_account.is_first_login = False  # 최초 로그인 플래그도 해제
+
+        db.session.commit()
+
+        # 7. 서비스 로그 생성
+        create_service_log(
+            user_id=current_user.id,
+            log_type='정보',
+            action='슈퍼관리자 생성',
+            description=f'새로운 슈퍼관리자 계정 생성: {username} ({name}). 기본 admin 계정 비활성화됨.',
+            ip_address=request.remote_addr
+        )
+
+        # 8. 로그아웃 후 새 계정으로 로그인하도록 안내
+        logout_user()
+        flash(f'새로운 슈퍼관리자 계정 "{username}"이 생성되었습니다. 새 계정으로 로그인해주세요.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('create_new_super_admin.html')
 
 # ========== 통합 대시보드 (역할별 자동 라우팅) ==========
 @app.route('/dashboard')
@@ -2144,24 +2238,25 @@ def init_db():
     with app.app_context():
         db.create_all()
 
-        # 슈퍼 관리자 계정 생성 (존재하지 않을 경우)
-        if not User.query.filter_by(username='vmadm').first():
-            super_admin = User(
-                username='vmadm',
-                name='슈퍼관리자',
-                email='vmadm@example.com',
+        # 기본 admin 계정 생성 (존재하지 않을 경우)
+        # 이 계정은 최초 설정용이며, 새 슈퍼관리자 생성 후 비활성화됨
+        if not User.query.filter_by(username='admin').first():
+            default_admin = User(
+                username='admin',
+                name='기본 관리자',
+                email='admin@system.local',
                 role=ROLE_SUPER_ADMIN,
                 is_active=True,
-                is_first_login=False  # 슈퍼 관리자는 최초 로그인 플래그 해제
+                is_first_login=True  # 최초 로그인 시 새 슈퍼관리자 생성 유도
             )
-            super_admin.set_password('vmadm!2024')  # 운영 환경에서는 반드시 변경 필요!
-            db.session.add(super_admin)
+            default_admin.set_password('password1!')
+            db.session.add(default_admin)
             db.session.commit()
             print("="*50)
-            print("슈퍼 관리자 계정이 생성되었습니다!")
-            print("Username: vmadm")
-            print("Password: vmadm!2024")
-            print("⚠️  운영 환경에서는 반드시 비밀번호를 변경하세요!")
+            print("기본 관리자 계정이 생성되었습니다!")
+            print("Username: admin")
+            print("Password: password1!")
+            print("⚠️  최초 로그인 후 새로운 슈퍼관리자 계정을 생성해주세요!")
             print("="*50)
 
 # 에러 핸들러
