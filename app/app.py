@@ -783,6 +783,85 @@ def admin_service_logs():
     # TODO: 로그 시스템 구현
     return render_template('admin/logs.html')
 
+@app.route('/admin/create-user', methods=['POST'])
+@admin_required
+def admin_create_user():
+    """일반 관리자용 - 일반 사용자 계정 생성"""
+    username = request.form.get('username')
+    name = request.form.get('name')
+    email = request.form.get('email') if request.form.get('email') else None
+
+    # 중복 체크
+    if User.query.filter_by(username=username).first():
+        flash('이미 존재하는 계정 ID입니다.', 'danger')
+        return redirect(url_for('admin_manage_users'))
+
+    if email and User.query.filter_by(email=email).first():
+        flash('이미 사용 중인 이메일입니다.', 'danger')
+        return redirect(url_for('admin_manage_users'))
+
+    # 기본 패스워드 가져오기
+    settings = get_system_settings()
+
+    # 사용자 생성
+    user = User(
+        username=username,
+        name=name,
+        email=email,
+        role=ROLE_USER,
+        is_active=True,
+        customer_id=None
+    )
+    # 기본 패스워드로 설정하되, is_first_login은 True로 유지
+    user.password_hash = generate_password_hash(settings.default_password)
+    user.password_changed_at = datetime.utcnow()
+    user.is_first_login = True
+
+    db.session.add(user)
+    db.session.commit()
+
+    flash(f'사용자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
+    return redirect(url_for('admin_manage_users'))
+
+@app.route('/admin/reset-password/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_reset_password(user_id):
+    """일반 관리자용 - 일반 사용자 패스워드 초기화"""
+    user = User.query.get_or_404(user_id)
+
+    # 일반 사용자만 초기화 가능
+    if user.role != ROLE_USER:
+        flash('일반 사용자만 패스워드를 초기화할 수 있습니다.', 'danger')
+        return redirect(request.referrer or url_for('admin_manage_users'))
+
+    # 기본 패스워드로 초기화
+    settings = get_system_settings()
+    user.password_hash = generate_password_hash(settings.default_password)
+    user.password_changed_at = datetime.utcnow()
+    user.is_first_login = True
+    db.session.commit()
+
+    flash(f'{user.username}의 패스워드가 기본 패스워드로 초기화되었습니다.', 'success')
+    return redirect(request.referrer or url_for('admin_manage_users'))
+
+@app.route('/admin/toggle-active/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_toggle_user_active(user_id):
+    """일반 관리자용 - 일반 사용자 활성화/비활성화 토글"""
+    user = User.query.get_or_404(user_id)
+
+    # 일반 사용자만 토글 가능
+    if user.role != ROLE_USER:
+        flash('일반 사용자만 활성화/비활성화할 수 있습니다.', 'danger')
+        return redirect(request.referrer or url_for('admin_manage_users'))
+
+    user.is_active = not user.is_active
+    db.session.commit()
+
+    status = '활성화' if user.is_active else '비활성화'
+    flash(f'{user.username} 계정이 {status}되었습니다.', 'success')
+    return redirect(request.referrer or url_for('admin_manage_users'))
+
 # ========== 일반 사용자 전용 페이지 ==========
 @app.route('/user/dashboard')
 @role_required(ROLE_USER)
