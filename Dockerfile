@@ -15,11 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 코드 복사
 COPY ./app/*.py /app/
-COPY ./app/static /app/static
 COPY ./app/templates /app/templates
 
 # 업로드 디렉토리 및 로그 디렉토리 생성
-RUN mkdir -p /app/uploads /app/logs
+RUN mkdir -p /app/uploads /app/logs /app/static
 
 # 포트 노출
 EXPOSE 5000
