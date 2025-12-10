@@ -22,7 +22,7 @@ services:
 
   web:
     # Docker Hub에서 이미지를 가져옴
-    image: ${DOCKER_IMAGE:-hellojamong/customer-storage:latest}
+    image: ${DOCKER_IMAGE:-igor0670/customer-storage:latest}
     container_name: customer_web
     restart: always
     environment:

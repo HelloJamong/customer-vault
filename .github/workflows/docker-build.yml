@@ -12,7 +12,7 @@ on:
 
 env:
   # Docker Hub 이미지 이름
-  IMAGE_NAME: hellojamong/customer-storage
+  IMAGE_NAME: igor0670/customer-storage
 
 jobs:
   build-and-push:
