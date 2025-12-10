@@ -71,7 +71,7 @@ jobs:
 
       # 6. 빌드 결과 출력
       - name: Image digest
-        run: echo ${{ steps.meta.outputs.tags }}
+        run: echo "${{ steps.meta.outputs.tags }}"
 
       # 7. 슬랙 알림 (선택사항, SLACK_WEBHOOK_URL 시크릿 설정 필요)
       # - name: Slack Notification
