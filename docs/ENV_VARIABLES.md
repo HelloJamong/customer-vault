@@ -204,13 +204,34 @@ DB_NAME="customer_db"  # 따옴표 불필요 (특수문자 포함 시에만)
 
 ### 비밀번호에 특수문자가 있을 때
 
+**✅ 올바른 방법 (권장):**
 ```bash
-# 특수문자가 포함된 경우 따옴표로 감싸기
-DB_PASSWORD="Pass@2024!#With$pecial"
+# 따옴표 없이 그대로 입력 (대부분의 특수문자)
+DB_PASSWORD=Pass@2024!#Secure
 
-# 또는 이스케이프 처리
-DB_PASSWORD=Pass\@2024\!\#With\$pecial
+# @ 기호 사용 - 완전히 안전!
+DB_PASSWORD=password12!@
+
+# $ 기호는 $$ 로 작성 (특별 주의!)
+DB_PASSWORD=Pass$$2024!
 ```
+
+**❌ 잘못된 방법:**
+```bash
+# 큰따옴표 사용 X
+DB_PASSWORD="Pass@2024!#"     # ❌
+
+# 백슬래시 이스케이프 X
+DB_PASSWORD=Pass\@2024\!      # ❌
+
+# = 양쪽 공백 X
+DB_PASSWORD = Pass@2024!      # ❌
+```
+
+**💡 Tip:**
+- `@`, `!`, `#`, `^`, `&`, `*` 등은 안전하게 사용 가능
+- `$` 기호만 `$$`로 작성 필요
+- **상세한 가이드:** [특수문자 사용 가이드](SPECIAL_CHARACTERS_GUIDE.md)
 
 ## 📚 추가 자료
 

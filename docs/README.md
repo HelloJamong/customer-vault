@@ -11,6 +11,7 @@
 | **[🚀 제3자 배포 가이드](DEPLOYMENT_GUIDE.md)** | 처음 접하는 사람이 본인 서버에 배포하는 전체 과정 | 신규 사용자 ⭐ |
 | **[환경 설정 가이드](SETUP_GUIDE.md)** | 환경별 상세 시스템 설정 가이드 | 신규 관리자 |
 | **[환경 변수 참조](ENV_VARIABLES.md)** | 환경 변수 빠른 참조 및 설정 방법 | 모든 사용자 |
+| **[🔐 특수문자 포함 비밀번호 가이드](SPECIAL_CHARACTERS_GUIDE.md)** | .env 파일에서 @, $, ! 등 특수문자 사용 방법 | 모든 사용자 |
 
 ### 🐳 Docker 관련
 
@@ -57,6 +58,7 @@
 
 - **SECRET_KEY 생성**: [ENV_VARIABLES.md#secret_key-생성](ENV_VARIABLES.md#secret_key-생성)
 - **비밀번호 생성**: [ENV_VARIABLES.md#강력한-비밀번호-생성](ENV_VARIABLES.md#강력한-비밀번호-생성)
+- **특수문자 비밀번호 사용**: [SPECIAL_CHARACTERS_GUIDE.md](SPECIAL_CHARACTERS_GUIDE.md)
 - **환경별 예시**: [ENV_VARIABLES.md#환경별-설정-예시](ENV_VARIABLES.md#환경별-설정-예시)
 
 ### Docker 작업
@@ -171,6 +173,10 @@
 ### Q7: 개발 환경과 운영 환경의 설정이 어떻게 다른가요?
 
 **A:** [환경 설정 가이드](SETUP_GUIDE.md)의 "환경별 구성" 섹션에서 개발/스테이징/운영 환경의 차이를 확인할 수 있습니다.
+
+### Q8: 비밀번호에 @나 $ 같은 특수문자를 사용하면 에러가 발생합니다.
+
+**A:** [특수문자 포함 비밀번호 가이드](SPECIAL_CHARACTERS_GUIDE.md)를 참고하세요. `.env` 파일에서 대부분의 특수문자는 따옴표 없이 그대로 사용할 수 있습니다. `$` 기호만 `$$`로 작성하면 됩니다.
 
 ---
 
