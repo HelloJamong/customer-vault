@@ -309,7 +309,7 @@ class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # 기본 패스워드 설정
-    default_password = db.Column(db.String(50), default='Welcome1!')
+    default_password = db.Column(db.String(50), default='1111')
 
     # 패스워드 복잡성 설정
     password_min_length = db.Column(db.Integer, default=8)
@@ -1729,6 +1729,62 @@ def system_settings():
 
     return render_template('super_admin/settings.html', settings=settings)
 
+@app.route('/change-superadmin-username', methods=['GET', 'POST'])
+@super_admin_required
+def change_superadmin_username():
+    """슈퍼관리자 계정명 변경"""
+    if request.method == 'POST':
+        new_username = request.form.get('new_username')
+        password = request.form.get('password')
+
+        # 1. 패스워드 확인
+        if not current_user.check_password(password):
+            flash('현재 패스워드가 일치하지 않습니다.', 'danger')
+            return redirect(url_for('change_superadmin_username'))
+
+        # 2. 새 사용자명 검증
+        if not new_username or len(new_username.strip()) == 0:
+            flash('새 계정 ID를 입력해주세요.', 'danger')
+            return redirect(url_for('change_superadmin_username'))
+
+        new_username = new_username.strip()
+
+        # 3. admin 사용 불가
+        if new_username.lower() == 'admin':
+            flash('슈퍼관리자 계정 ID로 "admin"은 사용할 수 없습니다.', 'danger')
+            return redirect(url_for('change_superadmin_username'))
+
+        # 4. 현재 계정명과 동일한지 확인
+        if new_username == current_user.username:
+            flash('현재 계정 ID와 동일합니다. 다른 계정 ID를 입력해주세요.', 'warning')
+            return redirect(url_for('change_superadmin_username'))
+
+        # 5. 중복 체크
+        if User.query.filter_by(username=new_username).first():
+            flash('이미 존재하는 계정 ID입니다.', 'danger')
+            return redirect(url_for('change_superadmin_username'))
+
+        # 6. 계정명 변경
+        old_username = current_user.username
+        current_user.username = new_username
+        db.session.commit()
+
+        # 7. 서비스 로그 생성
+        create_service_log(
+            user_id=current_user.id,
+            log_type='정보',
+            action='슈퍼관리자 계정명 변경',
+            description=f'슈퍼관리자 계정명 변경: {old_username} → {new_username}',
+            ip_address=request.remote_addr
+        )
+
+        # 8. 로그아웃 후 새 계정명으로 로그인하도록 안내
+        logout_user()
+        flash(f'슈퍼관리자 계정 ID가 "{new_username}"으로 변경되었습니다. 새 계정 ID로 로그인해주세요.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('super_admin/change_superadmin_username.html')
+
 # ========== 일반 관리자 전용 페이지 ==========
 def admin_dashboard():
     """일반 관리자 대시보드 - 일반 사용자 관리, 패스워드 초기화, 서비스 로그 확인"""
@@ -2249,13 +2305,13 @@ def init_db():
                 is_active=True,
                 is_first_login=True  # 최초 로그인 시 새 슈퍼관리자 생성 유도
             )
-            default_admin.set_password('password1!')
+            default_admin.set_password('1111')
             db.session.add(default_admin)
             db.session.commit()
             print("="*50)
             print("기본 관리자 계정이 생성되었습니다!")
             print("Username: admin")
-            print("Password: password1!")
+            print("Password: 1111")
             print("⚠️  최초 로그인 후 새로운 슈퍼관리자 계정을 생성해주세요!")
             print("="*50)
 

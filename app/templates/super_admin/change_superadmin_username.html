@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}슈퍼관리자 계정 ID 변경{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0"><i class="bi bi-person-badge"></i> 슈퍼관리자 계정 ID 변경</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>주의사항</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>슈퍼관리자 계정 ID를 변경하면 즉시 로그아웃됩니다.</li>
+                        <li>변경 후에는 새로운 계정 ID로 로그인해야 합니다.</li>
+                        <li>보안상 "admin"은 계정 ID로 사용할 수 없습니다.</li>
+                    </ul>
+                </div>
+
+                <form method="POST" action="{{ url_for('change_superadmin_username') }}">
+                    <div class="mb-3">
+                        <label for="current_username" class="form-label">현재 계정 ID</label>
+                        <input type="text" class="form-control" id="current_username" value="{{ current_user.username }}" disabled>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 현재 로그인 중인 계정 ID입니다.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="new_username" class="form-label">새 계정 ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="new_username" name="new_username" required autofocus>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 새로운 슈퍼관리자 계정 ID를 입력하세요. ("admin" 사용 불가)
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">현재 패스워드 확인 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text">
+                            <i class="bi bi-shield-lock"></i> 보안을 위해 현재 패스워드를 입력해주세요.
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg" onclick="return confirm('정말 슈퍼관리자 계정 ID를 변경하시겠습니까? 변경 후 즉시 로그아웃됩니다.')">
+                            <i class="bi bi-check-circle"></i> 계정 ID 변경
+                        </button>
+                        <a href="{{ url_for('system_settings') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> 취소
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center mt-3 text-muted">
+            <small><i class="bi bi-shield-check"></i> 모든 변경 사항은 서비스 로그에 기록됩니다.</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 새 계정 ID 입력 시 admin 체크
+document.getElementById('new_username').addEventListener('input', function() {
+    var newUsername = this.value.toLowerCase();
+    if (newUsername === 'admin') {
+        this.setCustomValidity('슈퍼관리자 계정 ID로 "admin"은 사용할 수 없습니다.');
+    } else {
+        this.setCustomValidity('');
+    }
+});
+</script>
+{% endblock %}

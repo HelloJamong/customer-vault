@@ -1,0 +1,83 @@
+name: Docker Build and Push
+
+# 이 워크플로우는 다음 경우에 실행됩니다:
+# 1. main 브랜치에 push될 때
+# 2. v로 시작하는 태그가 push될 때 (예: v1.0.0)
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:  # 수동 실행 허용
+
+env:
+  # Docker Hub 이미지 이름
+  IMAGE_NAME: hellojamong/customer-storage
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Docker Buildx 설정 (멀티 플랫폼 빌드 지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Docker Hub 로그인
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 4. 메타데이터 추출 (태그 및 레이블)
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # 브랜치 이름 (예: main)
+            type=ref,event=branch
+            # 태그 버전 (예: v1.0.0 -> 1.0.0)
+            type=semver,pattern={{version}}
+            # 메이저.마이너 버전 (예: v1.0.0 -> 1.0)
+            type=semver,pattern={{major}}.{{minor}}
+            # 메이저 버전 (예: v1.0.0 -> 1)
+            type=semver,pattern={{major}}
+            # latest 태그 (main 브랜치 또는 태그 push 시)
+            type=raw,value=latest,enable={{is_default_branch}}
+            # SHA (커밋 해시)
+            type=sha,prefix={{branch}}-
+
+      # 5. Docker 이미지 빌드 및 푸시
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 멀티 플랫폼 지원 (AMD64, ARM64)
+          platforms: linux/amd64,linux/arm64
+          # 빌드 캐시 사용으로 빌드 시간 단축
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      # 6. 빌드 결과 출력
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.tags }}
+
+      # 7. 슬랙 알림 (선택사항, SLACK_WEBHOOK_URL 시크릿 설정 필요)
+      # - name: Slack Notification
+      #   if: always()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: ${{ job.status }}
+      #     text: 'Docker image build ${{ job.status }}'
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

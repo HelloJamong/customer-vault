@@ -1,0 +1,54 @@
+version: '3.8'
+
+# 프로덕션 배포용 docker-compose 파일
+# 사용법: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: customer_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-customer_db}
+      MYSQL_USER: ${DB_USER:-customer_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    networks:
+      - customer_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  web:
+    # Docker Hub에서 이미지를 가져옴
+    image: ${DOCKER_IMAGE:-hellojamong/customer-storage:latest}
+    container_name: customer_web
+    restart: always
+    environment:
+      FLASK_APP: app.py
+      FLASK_ENV: production
+      FLASK_DEBUG: "False"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-customer_db}
+      DB_USER: ${DB_USER:-customer_user}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-16777216}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    ports:
+      - "${HOST_PORT:-5001}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - customer_network
+
+networks:
+  customer_network:
+    driver: bridge
