@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}슈퍼관리자 관리{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-shield-fill-check"></i> 슈퍼관리자 관리</h2>
+        <p class="text-muted">슈퍼관리자 계정을 생성하고 관리합니다. (최대 3개)</p>
+    </div>
+    <div class="col-auto">
+        {% if total_count < 3 %}
+        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#createSuperAdminModal">
+            <i class="bi bi-plus-circle"></i> 슈퍼관리자 생성 ({{ total_count }}/3)
+        </button>
+        {% else %}
+        <button class="btn btn-secondary" disabled>
+            <i class="bi bi-exclamation-circle"></i> 최대 개수 도달 (3/3)
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if total_count >= 3 %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>주의:</strong> 슈퍼관리자는 최대 3개까지만 생성할 수 있습니다. 새로운 슈퍼관리자를 추가하려면 기존 계정을 삭제해야 합니다.
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>계정</th>
+                        <th>이름</th>
+                        <th>이메일</th>
+                        <th>상태</th>
+                        <th>생성일</th>
+                        <th>마지막 로그인</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if superadmins %}
+                        {% for superadmin in superadmins %}
+                        <tr {% if superadmin.id == current_user.id %}class="table-info"{% endif %}>
+                            <td>{{ superadmin.id }}</td>
+                            <td>
+                                <i class="bi bi-shield-fill-check text-danger"></i>
+                                <strong>{{ superadmin.username }}</strong>
+                                {% if superadmin.id == current_user.id %}
+                                <span class="badge bg-info">본인</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ superadmin.name }}</td>
+                            <td>{{ superadmin.email if superadmin.email else '-' }}</td>
+                            <td>
+                                {% if superadmin.is_active %}
+                                <span class="badge bg-success">활성</span>
+                                {% else %}
+                                <span class="badge bg-secondary">비활성</span>
+                                {% endif %}
+                                {% if superadmin.is_first_login %}
+                                <span class="badge bg-warning text-dark">최초 로그인 필요</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ superadmin.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                {% if superadmin.last_login %}
+                                {{ superadmin.last_login.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editSuperAdminModal{{ superadmin.id }}">
+                                    <i class="bi bi-pencil"></i> 수정
+                                </button>
+                                <form method="POST" action="{{ url_for('reset_superadmin_password', user_id=superadmin.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('패스워드를 기본 패스워드로 초기화하시겠습니까?')">
+                                        <i class="bi bi-key"></i> 비밀번호 초기화
+                                    </button>
+                                </form>
+                                {% if superadmin.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('toggle_superadmin', user_id=superadmin.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm {% if superadmin.is_active %}btn-secondary{% else %}btn-success{% endif %}">
+                                        <i class="bi bi-{% if superadmin.is_active %}x-circle{% else %}check-circle{% endif %}"></i>
+                                        {% if superadmin.is_active %}비활성화{% else %}활성화{% endif %}
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('delete_superadmin', user_id=superadmin.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')">
+                                        <i class="bi bi-trash"></i> 삭제
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button type="button" class="btn btn-sm btn-secondary" disabled>
+                                    <i class="bi bi-lock"></i> 본인 계정
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <!-- 슈퍼관리자 수정 모달 -->
+                        <div class="modal fade" id="editSuperAdminModal{{ superadmin.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title"><i class="bi bi-pencil"></i> 슈퍼관리자 정보 수정</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form method="POST" action="{{ url_for('update_superadmin', user_id=superadmin.id) }}">
+                                            <div class="mb-3">
+                                                <label class="form-label">계정 ID</label>
+                                                <input type="text" class="form-control" value="{{ superadmin.username }}" disabled>
+                                                <div class="form-text text-muted">계정 ID는 변경할 수 없습니다.</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">이름 <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" name="name" value="{{ superadmin.name }}" required placeholder="실명 또는 표시명">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">이메일</label>
+                                                <input type="email" class="form-control" name="email" value="{{ superadmin.email or '' }}" placeholder="선택 사항">
+                                            </div>
+                                            <div class="alert alert-info mb-3">
+                                                <i class="bi bi-info-circle"></i>
+                                                계정 ID 변경이 필요한 경우 <a href="{{ url_for('change_superadmin_username') }}" class="alert-link">슈퍼관리자 계정 ID 변경</a> 메뉴를 이용하세요.
+                                            </div>
+                                            <div class="text-end">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                                                <button type="submit" class="btn btn-primary">저장</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                <p class="mt-3">등록된 슈퍼관리자가 없습니다.</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 슈퍼관리자 생성 모달 -->
+<div class="modal fade" id="createSuperAdminModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 슈퍼관리자 생성</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('create_superadmin') }}">
+                    <div class="mb-3">
+                        <label class="form-label">계정 ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="username" required placeholder="로그인에 사용할 ID" autofocus>
+                        <div class="form-text text-muted">
+                            <i class="bi bi-exclamation-circle"></i> 보안상 "admin"은 사용할 수 없습니다.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">이름 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required placeholder="실명 또는 표시명">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">이메일</label>
+                        <input type="email" class="form-control" name="email" placeholder="선택 사항">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">패스워드 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" name="password" required placeholder="안전한 패스워드 입력">
+                        {% if settings %}
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 패스워드 요구사항:
+                            <ul class="mb-0 mt-1">
+                                <li>길이: {{ settings.password_min_length }}-{{ settings.password_max_length }}자</li>
+                                {% if settings.password_require_uppercase %}
+                                <li>대문자 포함 필수</li>
+                                {% endif %}
+                                {% if settings.password_require_special %}
+                                <li>특수문자 포함 필수</li>
+                                {% endif %}
+                                {% if settings.password_require_number %}
+                                <li>숫자 포함 필수</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">패스워드 확인 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" name="confirm_password" required placeholder="패스워드 재입력">
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>주의사항:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>슈퍼관리자는 최대 3개까지만 생성할 수 있습니다.</li>
+                            <li>보안상 "admin" 계정명은 사용할 수 없습니다.</li>
+                            <li>생성 후에는 즉시 사용 가능합니다.</li>
+                        </ul>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                        <button type="submit" class="btn btn-danger">생성</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

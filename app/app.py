@@ -974,6 +974,15 @@ def super_admin_dashboard():
                          monthly_inspection_completed=monthly_inspection_completed,
                          disk_usage=disk_usage)
 
+@app.route('/superadmins')
+@super_admin_required
+def manage_superadmins():
+    """슈퍼관리자 목록 및 관리"""
+    superadmins = User.query.filter_by(role=ROLE_SUPER_ADMIN).all()
+    total_count = len(superadmins)
+    settings = get_system_settings()
+    return render_template('super_admin/superadmins.html', superadmins=superadmins, total_count=total_count, settings=settings)
+
 @app.route('/admins')
 @super_admin_required
 def manage_admins():
@@ -1405,6 +1414,230 @@ def create_admin():
     flash(f'관리자 계정 "{username}"이 생성되었습니다. 기본 패스워드: {settings.default_password}', 'success')
     return redirect(url_for('manage_admins'))
 
+@app.route('/create-superadmin', methods=['POST'])
+@super_admin_required
+def create_superadmin():
+    """슈퍼관리자 계정 생성 - 최대 3개 제한"""
+    # 현재 슈퍼관리자 수 확인
+    current_superadmin_count = User.query.filter_by(role=ROLE_SUPER_ADMIN).count()
+
+    if current_superadmin_count >= 3:
+        flash('슈퍼관리자는 최대 3개까지만 생성할 수 있습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    username = request.form.get('username')
+    name = request.form.get('name')
+    email = request.form.get('email') if request.form.get('email') else None
+    password = request.form.get('password')
+    confirm_password = request.form.get('confirm_password')
+
+    # 1. admin 사용 불가
+    if username.lower() == 'admin':
+        flash('슈퍼관리자 계정 ID로 "admin"은 사용할 수 없습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 2. 중복 체크
+    if User.query.filter_by(username=username).first():
+        flash('이미 존재하는 계정 ID입니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    if email and User.query.filter_by(email=email).first():
+        flash('이미 사용 중인 이메일입니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 3. 패스워드 확인
+    if password != confirm_password:
+        flash('패스워드가 일치하지 않습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 4. 패스워드 복잡성 검증
+    settings = get_system_settings()
+    is_valid, error_message = validate_password(password, settings)
+    if not is_valid:
+        flash(error_message, 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 5. 슈퍼관리자 생성
+    superadmin = User(
+        username=username,
+        name=name,
+        email=email,
+        role=ROLE_SUPER_ADMIN,
+        is_active=True,
+        is_first_login=False
+    )
+    superadmin.set_password(password)
+    db.session.add(superadmin)
+    db.session.commit()
+
+    # 6. 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='슈퍼관리자 생성',
+        description=f'새로운 슈퍼관리자 계정 생성: {username} ({name})',
+        ip_address=request.remote_addr
+    )
+
+    flash(f'슈퍼관리자 계정 "{username}"이 생성되었습니다.', 'success')
+    return redirect(url_for('manage_superadmins'))
+
+@app.route('/update-superadmin/<int:user_id>', methods=['POST'])
+@super_admin_required
+def update_superadmin(user_id):
+    """슈퍼관리자 정보 수정 (이름, 이메일만)"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼관리자가 아니면 오류
+    if user.role != ROLE_SUPER_ADMIN:
+        flash('슈퍼관리자만 수정할 수 있습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    name = request.form.get('name')
+    email = request.form.get('email') if request.form.get('email') else None
+
+    # 이메일 중복 체크 (본인 제외)
+    if email:
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user and existing_user.id != user_id:
+            flash('이미 사용 중인 이메일입니다.', 'danger')
+            return redirect(url_for('manage_superadmins'))
+
+    old_name = user.name
+    old_email = user.email
+
+    user.name = name
+    user.email = email
+    db.session.commit()
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='슈퍼관리자 정보 수정',
+        description=f'계정: {user.username}, 이름: {old_name} → {name}, 이메일: {old_email or "없음"} → {email or "없음"}',
+        ip_address=request.remote_addr
+    )
+
+    flash(f'슈퍼관리자 "{user.username}"의 정보가 수정되었습니다.', 'success')
+    return redirect(url_for('manage_superadmins'))
+
+@app.route('/reset-superadmin-password/<int:user_id>', methods=['POST'])
+@super_admin_required
+def reset_superadmin_password(user_id):
+    """슈퍼관리자 패스워드 초기화"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼관리자가 아니면 오류
+    if user.role != ROLE_SUPER_ADMIN:
+        flash('슈퍼관리자만 초기화할 수 있습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 기본 패스워드 가져오기
+    settings = get_system_settings()
+
+    user.password_hash = generate_password_hash(settings.default_password)
+    user.password_changed_at = datetime.utcnow()
+    user.is_first_login = True
+    db.session.commit()
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='슈퍼관리자 패스워드 초기화',
+        description=f'계정: {user.username} ({user.name})',
+        ip_address=request.remote_addr
+    )
+
+    flash(f'슈퍼관리자 "{user.username}"의 패스워드가 "{settings.default_password}"(으)로 초기화되었습니다.', 'success')
+    return redirect(url_for('manage_superadmins'))
+
+@app.route('/toggle-superadmin/<int:user_id>', methods=['POST'])
+@super_admin_required
+def toggle_superadmin(user_id):
+    """슈퍼관리자 활성화/비활성화"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼관리자가 아니면 오류
+    if user.role != ROLE_SUPER_ADMIN:
+        flash('슈퍼관리자만 활성화/비활성화할 수 있습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 본인 계정은 비활성화 불가
+    if user.id == current_user.id:
+        flash('본인 계정은 비활성화할 수 없습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    user.is_active = not user.is_active
+    db.session.commit()
+
+    status = '활성화' if user.is_active else '비활성화'
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action=f'슈퍼관리자 {status}',
+        description=f'계정: {user.username} ({user.name})',
+        ip_address=request.remote_addr
+    )
+
+    flash(f'슈퍼관리자 "{user.username}"이(가) {status}되었습니다.', 'success')
+    return redirect(url_for('manage_superadmins'))
+
+@app.route('/delete-superadmin/<int:user_id>', methods=['POST'])
+@super_admin_required
+def delete_superadmin(user_id):
+    """슈퍼관리자 삭제"""
+    user = User.query.get_or_404(user_id)
+
+    # 슈퍼관리자가 아니면 오류
+    if user.role != ROLE_SUPER_ADMIN:
+        flash('슈퍼관리자만 삭제할 수 있습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    # 본인 계정은 삭제 불가
+    if user.id == current_user.id:
+        flash('본인 계정은 삭제할 수 없습니다.', 'danger')
+        return redirect(url_for('manage_superadmins'))
+
+    username = user.username
+    name = user.name
+
+    try:
+        # 관련된 모든 레코드를 먼저 삭제
+        # 1. 로그인 시도 기록 삭제
+        LoginAttempt.query.filter_by(user_id=user_id).delete()
+
+        # 2. 사용자 세션 삭제
+        UserSession.query.filter_by(user_id=user_id).delete()
+
+        # 3. 서비스 로그는 user_id가 nullable이므로 NULL로 설정
+        ServiceLog.query.filter_by(user_id=user_id).update({'user_id': None})
+
+        # 4. 사용자 삭제
+        db.session.delete(user)
+        db.session.commit()
+
+        # 서비스 로그 생성
+        create_service_log(
+            user_id=current_user.id,
+            log_type='경고',
+            action='슈퍼관리자 삭제',
+            description=f'삭제된 슈퍼관리자: {username} ({name})',
+            ip_address=request.remote_addr
+        )
+
+        flash(f'슈퍼관리자 "{username}"이(가) 삭제되었습니다.', 'danger')
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'슈퍼관리자 삭제 중 오류 발생: {str(e)}')
+        flash(f'슈퍼관리자 삭제 중 오류가 발생했습니다: {str(e)}', 'danger')
+
+    return redirect(url_for('manage_superadmins'))
+
 @app.route('/create-user', methods=['POST'])
 @admin_required
 def create_user_unified():
@@ -1728,62 +1961,6 @@ def system_settings():
         return redirect(url_for('system_settings'))
 
     return render_template('super_admin/settings.html', settings=settings)
-
-@app.route('/change-superadmin-username', methods=['GET', 'POST'])
-@super_admin_required
-def change_superadmin_username():
-    """슈퍼관리자 계정명 변경"""
-    if request.method == 'POST':
-        new_username = request.form.get('new_username')
-        password = request.form.get('password')
-
-        # 1. 패스워드 확인
-        if not current_user.check_password(password):
-            flash('현재 패스워드가 일치하지 않습니다.', 'danger')
-            return redirect(url_for('change_superadmin_username'))
-
-        # 2. 새 사용자명 검증
-        if not new_username or len(new_username.strip()) == 0:
-            flash('새 계정 ID를 입력해주세요.', 'danger')
-            return redirect(url_for('change_superadmin_username'))
-
-        new_username = new_username.strip()
-
-        # 3. admin 사용 불가
-        if new_username.lower() == 'admin':
-            flash('슈퍼관리자 계정 ID로 "admin"은 사용할 수 없습니다.', 'danger')
-            return redirect(url_for('change_superadmin_username'))
-
-        # 4. 현재 계정명과 동일한지 확인
-        if new_username == current_user.username:
-            flash('현재 계정 ID와 동일합니다. 다른 계정 ID를 입력해주세요.', 'warning')
-            return redirect(url_for('change_superadmin_username'))
-
-        # 5. 중복 체크
-        if User.query.filter_by(username=new_username).first():
-            flash('이미 존재하는 계정 ID입니다.', 'danger')
-            return redirect(url_for('change_superadmin_username'))
-
-        # 6. 계정명 변경
-        old_username = current_user.username
-        current_user.username = new_username
-        db.session.commit()
-
-        # 7. 서비스 로그 생성
-        create_service_log(
-            user_id=current_user.id,
-            log_type='정보',
-            action='슈퍼관리자 계정명 변경',
-            description=f'슈퍼관리자 계정명 변경: {old_username} → {new_username}',
-            ip_address=request.remote_addr
-        )
-
-        # 8. 로그아웃 후 새 계정명으로 로그인하도록 안내
-        logout_user()
-        flash(f'슈퍼관리자 계정 ID가 "{new_username}"으로 변경되었습니다. 새 계정 ID로 로그인해주세요.', 'success')
-        return redirect(url_for('login'))
-
-    return render_template('super_admin/change_superadmin_username.html')
 
 # ========== 일반 관리자 전용 페이지 ==========
 def admin_dashboard():
