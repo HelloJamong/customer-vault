@@ -66,8 +66,6 @@ echo -e "${GREEN}✓ 디렉토리 생성 완료${NC}"
 echo ""
 echo "5. 설정 파일 다운로드 중..."
 cat > docker-compose.yml <<'EOF'
-version: '3.8'
-
 services:
   db:
     image: mariadb:10.11
