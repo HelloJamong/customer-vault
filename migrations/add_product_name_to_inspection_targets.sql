@@ -1,0 +1,1 @@
+ALTER TABLE inspection_targets ADD COLUMN product_name VARCHAR(100) DEFAULT NULL AFTER custom_name;

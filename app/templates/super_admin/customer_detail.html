@@ -15,7 +15,7 @@
     </div>
 </div>
 
-<form method="POST" action="{{ url_for('update_customer', customer_id=customer.id) }}">
+<form id="customerForm" method="POST" action="{{ url_for('update_customer', customer_id=customer.id) }}">
     <!-- 고객사 정보 -->
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
@@ -303,13 +303,185 @@
             </div>
         </div>
     </div>
+</form>
 
-    <!-- 저장 버튼 -->
-    <div class="d-grid gap-2 mb-3">
-        <button type="submit" class="btn btn-primary btn-lg">
-            <i class="bi bi-check-circle"></i> 저장
-        </button>
+<!-- 점검 대상 관리 -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> 점검 대상 관리</h5>
+            <span class="badge bg-dark">{{ customer.inspection_targets|length }}/5</span>
+        </div>
     </div>
+    <div class="card-body">
+        <!-- 점검 대상 목록 -->
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 8%">번호</th>
+                        <th style="width: 25%">점검 대상 구분</th>
+                        <th style="width: 25%">항목명</th>
+                        <th style="width: 25%">제품명</th>
+                        <th style="width: 17%" class="text-center">관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for target in customer.inspection_targets %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ target.target_type }}</td>
+                        <td>
+                            {% if target.target_type == '기타' and target.custom_name %}
+                                <span class="text-primary">{{ target.custom_name }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if target.product_name %}
+                                {{ target.product_name }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#editTargetModal{{ target.id }}">
+                                <i class="bi bi-pencil"></i> 수정
+                            </button>
+                            {% if customer.inspection_targets|length > 1 %}
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="deleteInspectionTarget({{ target.id }}, '{{ target.get_display_name() }}')">
+                                <i class="bi bi-trash"></i> 삭제
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-secondary" disabled>
+                                <i class="bi bi-lock"></i> 최소 1개 필요
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% for target in customer.inspection_targets %}
+        <div class="modal fade" id="editTargetModal{{ target.id }}" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-pencil"></i> 점검 대상 수정</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('update_inspection_target', target_id=target.id) }}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">점검 대상 구분 <span class="text-danger">*</span></label>
+                                <select class="form-select" name="target_type" required
+                                        onchange="toggleCustomName(this, 'edit{{ target.id }}')">
+                                    <option value="망분리 솔루션" {% if target.target_type == '망분리 솔루션' %}selected{% endif %}>망분리 솔루션</option>
+                                    <option value="망연계 솔루션" {% if target.target_type == '망연계 솔루션' %}selected{% endif %}>망연계 솔루션</option>
+                                    <option value="L4스위치" {% if target.target_type == 'L4스위치' %}selected{% endif %}>L4스위치</option>
+                                    <option value="기타" {% if target.target_type == '기타' %}selected{% endif %}>기타</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="customNameEdit{{ target.id }}" style="display: {% if target.target_type == '기타' %}block{% else %}none{% endif %}">
+                                <label class="form-label">항목명 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="custom_name"
+                                    value="{{ target.custom_name or '' }}"
+                                    placeholder="점검 대상 항목명을 입력하세요">
+                            </div>
+                            <div class="mb-3" id="productNameEdit{{ target.id }}">
+                                <label class="form-label">제품명 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="product_name"
+                                    value="{{ target.product_name or '' }}"
+                                    placeholder="제품명을 입력하세요">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle"></i> 취소
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 저장
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- 점검 대상 추가 버튼 -->
+        {% if customer.inspection_targets|length < 5 %}
+        <div class="text-center mt-3">
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTargetModal">
+                <i class="bi bi-plus-circle"></i> 점검 대상 추가
+            </button>
+        </div>
+        {% else %}
+        <div class="alert alert-warning mb-0 mt-3">
+            <i class="bi bi-exclamation-triangle"></i> 점검 대상은 최대 5개까지만 추가할 수 있습니다.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 저장 버튼 (점검 대상 관리 카드 아래, 고객사 삭제 버튼 위) -->
+<div class="d-grid gap-2 mb-4">
+    <button type="submit" class="btn btn-primary btn-lg" form="customerForm">
+        <i class="bi bi-check-circle"></i> 저장
+    </button>
+</div>
+
+<!-- 점검 대상 추가 모달 -->
+<div class="modal fade" id="addTargetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 점검 대상 추가</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_inspection_target', customer_id=customer.id) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">점검 대상 구분 <span class="text-danger">*</span></label>
+                        <select class="form-select" name="target_type" required onchange="toggleCustomName(this, 'add')">
+                            <option value="">선택하세요</option>
+                            <option value="망분리 솔루션">망분리 솔루션</option>
+                            <option value="망연계 솔루션">망연계 솔루션</option>
+                            <option value="L4스위치">L4스위치</option>
+                            <option value="기타">기타</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="customNameAdd" style="display: none">
+                        <label class="form-label">항목명 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="custom_name" placeholder="점검 대상 항목명을 입력하세요">
+                        <div class="form-text">기타 선택 시 점검 대상 항목명을 입력해주세요.</div>
+                    </div>
+                    <div class="mb-3" id="productNameAdd">
+                        <label class="form-label">제품명 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="product_name" placeholder="제품명을 입력하세요">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> 취소
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> 추가
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 점검 대상 삭제용 폼 (숨김) -->
+<form id="deleteTargetForm" method="POST" style="display: none">
 </form>
 
 {% if current_user.is_super_admin() or current_user.is_admin() %}
@@ -482,6 +654,24 @@ document.getElementById('contractType').addEventListener('change', function() {
         }
     });
 });
+
+// 점검 대상 관리 함수
+function toggleCustomName(selectElement, prefix) {
+    const customNameDiv = document.getElementById('customName' + prefix.charAt(0).toUpperCase() + prefix.slice(1));
+    if (selectElement.value === '기타') {
+        customNameDiv.style.display = 'block';
+    } else {
+        customNameDiv.style.display = 'none';
+    }
+}
+
+function deleteInspectionTarget(targetId, displayName) {
+    if (confirm(`정말로 점검 대상 "${displayName}"을(를) 삭제하시겠습니까?`)) {
+        const form = document.getElementById('deleteTargetForm');
+        form.action = '/inspection-targets/' + targetId + '/delete';
+        form.submit();
+    }
+}
 
 // 점검 주기 유형에 따라 선택 옵션 업데이트
 document.getElementById('inspectionCycleType').addEventListener('change', updateInspectionCycleOptions);

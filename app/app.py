@@ -11,6 +11,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
 app = Flask(__name__)
 
@@ -233,6 +235,7 @@ class Customer(db.Model):
 
     # Relationships
     documents = db.relationship('Document', backref='customer', lazy=True, cascade='all, delete-orphan')
+    inspection_targets = db.relationship('InspectionTarget', backref='customer', lazy=True, cascade='all, delete-orphan', order_by='InspectionTarget.display_order')
     engineer = db.relationship('User', foreign_keys=[engineer_id], backref='customers_as_engineer')
     engineer_sub = db.relationship('User', foreign_keys=[engineer_sub_id], backref='customers_as_engineer_sub')
     sales = db.relationship('User', foreign_keys=[sales_id], backref='customers_as_sales')
@@ -275,23 +278,56 @@ class Customer(db.Model):
         return False
 
     def is_inspection_completed_this_month(self):
-        """이번 달 점검 완료 여부 확인"""
-        if not self.last_inspection_date:
+        """이번 달 점검 완료 여부 확인 - 모든 점검 대상별 점검서 업로드 여부 기준"""
+        # 이번 달 점검 대상이 아닌 경우 미완료로 간주
+        if not self.is_inspection_needed_this_month():
             return False
 
+        # 점검 대상이 없으면 완료 처리할 수 없음
+        target_ids = [target.id for target in self.inspection_targets]
+        if not target_ids:
+            return False
+
+        from dateutil.relativedelta import relativedelta
         today = datetime.today().date()
-        current_month = today.month
-        current_year = today.year
+        start_of_month = today.replace(day=1)
+        start_of_next_month = start_of_month + relativedelta(months=1)
 
-        inspection_month = self.last_inspection_date.month
-        inspection_year = self.last_inspection_date.year
+        # 이번 달에 업로드된 점검서 중 각 점검 대상별 업로드 여부 확인
+        completed_target_ids = {
+            doc.inspection_target_id
+            for doc in Document.query
+                .filter(Document.customer_id == self.id)
+                .filter(Document.inspection_target_id.in_(target_ids))
+                .filter(Document.inspection_date >= start_of_month)
+                .filter(Document.inspection_date < start_of_next_month)
+                .all()
+        }
 
-        return inspection_month == current_month and inspection_year == current_year
+        return len(completed_target_ids) == len(target_ids)
+
+class InspectionTarget(db.Model):
+    """고객사 점검 대상 항목"""
+    __tablename__ = 'inspection_targets'
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    target_type = db.Column(db.String(50), nullable=False)  # 망분리 솔루션, 망연계 솔루션, L4스위치, 기타
+    custom_name = db.Column(db.String(100))  # 기타 선택 시 항목명
+    product_name = db.Column(db.String(100))  # 제품명
+    display_order = db.Column(db.Integer, default=0)  # 표시 순서
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_display_name(self):
+        """표시할 이름 반환"""
+        if self.target_type == '기타' and self.custom_name:
+            return self.custom_name
+        return self.target_type
 
 class Document(db.Model):
     __tablename__ = 'documents'
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    inspection_target_id = db.Column(db.Integer, db.ForeignKey('inspection_targets.id'), nullable=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     filename = db.Column(db.String(255), nullable=False)
@@ -303,6 +339,7 @@ class Document(db.Model):
     inspection_type = db.Column(db.String(20))  # '방문' 또는 '원격'
 
     uploader = db.relationship('User', backref='documents')
+    inspection_target = db.relationship('InspectionTarget', backref='documents')
 
 class SystemSettings(db.Model):
     __tablename__ = 'system_settings'
@@ -1039,6 +1076,15 @@ def create_customer():
     # 고객사 생성 (회사명만으로)
     customer = Customer(name=name)
     db.session.add(customer)
+    db.session.flush()  # customer.id를 얻기 위해 flush
+
+    # 기본 점검 대상 추가 (망분리 솔루션)
+    default_target = InspectionTarget(
+        customer_id=customer.id,
+        target_type='망분리 솔루션',
+        display_order=1
+    )
+    db.session.add(default_target)
     db.session.commit()
 
     # 서비스 로그 생성
@@ -1294,13 +1340,196 @@ def delete_customer(customer_id):
     flash(f'고객사 "{customer_name}"이(가) 삭제되었습니다.', 'success')
     return redirect(url_for('manage_customers'))
 
+@app.route('/customers/<int:customer_id>/inspection-targets/add', methods=['POST'])
+@login_required
+def add_inspection_target(customer_id):
+    """점검 대상 추가"""
+    customer = Customer.query.get_or_404(customer_id)
+
+    # 현재 점검 대상 개수 확인 (최대 5개)
+    current_count = InspectionTarget.query.filter_by(customer_id=customer_id).count()
+    if current_count >= 5:
+        flash('점검 대상은 최대 5개까지만 추가할 수 있습니다.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer_id))
+
+    target_type = request.form.get('target_type')
+    custom_name = request.form.get('custom_name')
+    product_name = request.form.get('product_name')
+
+    if not target_type:
+        flash('점검 대상 구분을 선택해주세요.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer_id))
+
+    # 기타 선택 시 항목명 필수
+    if target_type == '기타' and not custom_name:
+        flash('기타 선택 시 항목명을 입력해주세요.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer_id))
+
+    # 다음 display_order 계산
+    max_order = db.session.query(db.func.max(InspectionTarget.display_order)).filter_by(customer_id=customer_id).scalar() or 0
+
+    new_target = InspectionTarget(
+        customer_id=customer_id,
+        target_type=target_type,
+        custom_name=custom_name if target_type == '기타' else None,
+        product_name=product_name,
+        display_order=max_order + 1
+    )
+    db.session.add(new_target)
+    db.session.commit()
+
+    # 서비스 로그 생성
+    display_name = new_target.get_display_name()
+    log_description = f'고객사: {customer.name}, 점검 대상: {display_name}'
+    if product_name:
+        log_description += f', 제품명: {product_name}'
+
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='점검 대상 추가',
+        description=log_description,
+        ip_address=request.remote_addr
+    )
+
+    flash(f'점검 대상 "{display_name}"이(가) 추가되었습니다.', 'success')
+    return redirect(url_for('customer_detail', customer_id=customer_id))
+
+@app.route('/inspection-targets/<int:target_id>/update', methods=['POST'])
+@login_required
+def update_inspection_target(target_id):
+    """점검 대상 수정"""
+    target = InspectionTarget.query.get_or_404(target_id)
+    customer_id = target.customer_id
+
+    target_type = request.form.get('target_type')
+    custom_name = request.form.get('custom_name')
+    product_name = request.form.get('product_name')
+
+    if not target_type:
+        flash('점검 대상 구분을 선택해주세요.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer_id))
+
+    # 기타 선택 시 항목명 필수
+    if target_type == '기타' and not custom_name:
+        flash('기타 선택 시 항목명을 입력해주세요.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer_id))
+
+    old_display_name = target.get_display_name()
+    old_product_name = target.product_name
+
+    target.target_type = target_type
+    target.custom_name = custom_name if target_type == '기타' else None
+    target.product_name = product_name
+    db.session.commit()
+
+    # 서비스 로그 생성
+    new_display_name = target.get_display_name()
+    log_description = f'고객사: {target.customer.name}, {old_display_name} → {new_display_name}'
+    if old_product_name != product_name:
+        log_description += f', 제품명: {old_product_name or "없음"} → {product_name or "없음"}'
+
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='점검 대상 수정',
+        description=log_description,
+        ip_address=request.remote_addr
+    )
+
+    flash(f'점검 대상이 "{new_display_name}"(으)로 수정되었습니다.', 'success')
+    return redirect(url_for('customer_detail', customer_id=customer_id))
+
+@app.route('/inspection-targets/<int:target_id>/delete', methods=['POST'])
+@login_required
+def delete_inspection_target(target_id):
+    """점검 대상 삭제"""
+    target = InspectionTarget.query.get_or_404(target_id)
+    customer_id = target.customer_id
+    customer_name = target.customer.name
+    display_name = target.get_display_name()
+
+    # 최소 1개는 남겨야 함
+    current_count = InspectionTarget.query.filter_by(customer_id=customer_id).count()
+    if current_count <= 1:
+        flash('점검 대상은 최소 1개 이상 유지되어야 합니다.', 'danger')
+        return redirect(url_for('customer_detail', customer_id=customer_id))
+
+    db.session.delete(target)
+    db.session.commit()
+
+    # 서비스 로그 생성
+    create_service_log(
+        user_id=current_user.id,
+        log_type='정보',
+        action='점검 대상 삭제',
+        description=f'고객사: {customer_name}, 점검 대상: {display_name}',
+        ip_address=request.remote_addr
+    )
+
+    flash(f'점검 대상 "{display_name}"이(가) 삭제되었습니다.', 'success')
+    return redirect(url_for('customer_detail', customer_id=customer_id))
+
 @app.route('/customers/<int:customer_id>/documents')
 @login_required
 def customer_documents(customer_id):
     """고객사 점검서 목록 조회"""
     customer = Customer.query.get_or_404(customer_id)
-    documents = Document.query.filter_by(customer_id=customer_id).order_by(Document.uploaded_at.desc()).all()
-    return render_template('super_admin/customer_documents.html', customer=customer, documents=documents)
+    query = Document.query.filter_by(customer_id=customer_id)
+
+    # 필터 처리
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    target_id = request.args.get('target_id')
+    uploader_id = request.args.get('uploader_id')
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(Document.inspection_date >= start_date)
+        except ValueError:
+            flash('시작일 형식이 올바르지 않습니다.', 'danger')
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(Document.inspection_date <= end_date)
+        except ValueError:
+            flash('종료일 형식이 올바르지 않습니다.', 'danger')
+
+    if target_id:
+        try:
+            target_id_int = int(target_id)
+            query = query.filter(Document.inspection_target_id == target_id_int)
+        except ValueError:
+            flash('점검 항목 선택이 올바르지 않습니다.', 'danger')
+
+    if uploader_id:
+        try:
+            uploader_id_int = int(uploader_id)
+            query = query.filter(Document.uploaded_by == uploader_id_int)
+        except ValueError:
+            flash('점검자 선택이 올바르지 않습니다.', 'danger')
+
+    documents = query.order_by(Document.uploaded_at.desc()).all()
+
+    # 필터 옵션 데이터
+    uploaders = User.query.join(Document, User.id == Document.uploaded_by)\
+                          .filter(Document.customer_id == customer_id)\
+                          .distinct()\
+                          .all()
+
+    return render_template(
+        'super_admin/customer_documents.html',
+        customer=customer,
+        documents=documents,
+        uploaders=uploaders,
+        filter_values={
+            'start_date': start_date_str or '',
+            'end_date': end_date_str or '',
+            'target_id': target_id or '',
+            'uploader_id': uploader_id or ''
+        }
+    )
 
 @app.route('/documents/<int:document_id>/view')
 @login_required
@@ -2304,6 +2533,15 @@ def upload_document():
     
     # 담당 고객사 목록 가져오기
     customers = current_user.assigned_customers.all()
+    target_map = {
+        customer.id: [
+            {
+                'id': target.id,
+                'name': target.get_display_name(),
+                'product': target.product_name or ''
+            } for target in customer.inspection_targets
+        ] for customer in customers
+    }
     
     if not customers:
         flash('담당 고객사가 없습니다. 관리자에게 문의하세요.', 'warning')
@@ -2312,11 +2550,12 @@ def upload_document():
     if request.method == 'POST':
         customer_id = request.form.get('customer_id')
         inspection_type = request.form.get('inspection_type')
+        inspection_target_id = request.form.get('inspection_target_id')
         file = request.files.get('file')
         
-        if not customer_id or not inspection_type or not file:
+        if not customer_id or not inspection_type or not inspection_target_id or not file:
             flash('모든 필드를 입력해주세요.', 'danger')
-            return render_template('user/upload_document.html', customers=customers)
+            return render_template('user/upload_document.html', customers=customers, target_map=target_map)
         
         # 고객사 확인
         customer = Customer.query.get_or_404(customer_id)
@@ -2325,28 +2564,40 @@ def upload_document():
         if customer not in current_user.assigned_customers:
             flash('담당 고객사가 아닙니다.', 'danger')
             return redirect(url_for('dashboard'))
+
+        # 점검 대상 존재 여부 확인
+        if not customer.inspection_targets:
+            flash('선택한 고객사에 등록된 점검 대상이 없습니다. 먼저 점검 대상을 추가해주세요.', 'danger')
+            return render_template('user/upload_document.html', customers=customers, target_map=target_map)
+
+        # 점검 대상 확인
+        target = InspectionTarget.query.get(inspection_target_id)
+        if not target or target.customer_id != customer.id:
+            flash('선택한 점검 대상이 유효하지 않습니다.', 'danger')
+            return render_template('user/upload_document.html', customers=customers, target_map=target_map)
         
         # PDF 파일인지 확인
         if not file.filename.endswith('.pdf'):
             flash('PDF 파일만 업로드 가능합니다.', 'danger')
-            return render_template('user/upload_document.html', customers=customers)
+            return render_template('user/upload_document.html', customers=customers, target_map=target_map)
         
-        # 파일명 생성: 점검 주기에 따른 형식
+        # 파일명 생성: 점검 주기에 따른 형식 + 점검 대상 제품명
         current_date = datetime.now()
         cycle_type = customer.inspection_cycle_type
+        target_label = target.product_name or target.get_display_name()
         
         if cycle_type == '매월':
-            title = f"{current_date.month}월_{customer.name}_점검내역서"
+            title = f"{current_date.month}월_{customer.name}_{target_label}_점검내역서"
         elif cycle_type == '분기':
             quarter = (current_date.month - 1) // 3 + 1
-            title = f"{quarter}분기({current_date.month}월)_{customer.name}_점검내역서"
+            title = f"{quarter}분기({current_date.month}월)_{customer.name}_{target_label}_점검내역서"
         elif cycle_type == '반기':
             half = 1 if current_date.month <= 6 else 2
-            title = f"{half}분기({current_date.month}월)_{customer.name}_점검내역서"
+            title = f"{half}분기({current_date.month}월)_{customer.name}_{target_label}_점검내역서"
         elif cycle_type == '연1회':
-            title = f"{current_date.year}년_{customer.name}_점검내역서"
+            title = f"{current_date.year}년_{customer.name}_{target_label}_점검내역서"
         else:
-            title = f"{current_date.strftime('%Y%m%d')}_{customer.name}_점검내역서"
+            title = f"{current_date.strftime('%Y%m%d')}_{customer.name}_{target_label}_점검내역서"
         
         # 파일 저장
         filename = f"{uuid.uuid4().hex}_{file.filename}"
@@ -2365,6 +2616,7 @@ def upload_document():
                 filepath=filepath,
                 file_size=file_size,
                 uploaded_by=current_user.id,
+                inspection_target_id=target.id,
                 inspection_date=current_date.date(),
                 inspection_type=inspection_type
             )
@@ -2380,7 +2632,7 @@ def upload_document():
                 user_id=current_user.id,
                 log_type='정상',
                 action='점검서 업로드',
-                description=f'고객사: {customer.name}, 파일: {title}.pdf, 점검 유형: {inspection_type}'
+                description=f'고객사: {customer.name}, 점검 대상: {target.get_display_name()}, 파일: {title}.pdf, 점검 유형: {inspection_type}'
             )
             
             flash('점검서가 성공적으로 업로드되었습니다.', 'success')
@@ -2391,9 +2643,9 @@ def upload_document():
             if os.path.exists(filepath):
                 os.remove(filepath)
             flash(f'파일 업로드 중 오류가 발생했습니다: {str(e)}', 'danger')
-            return render_template('user/upload_document.html', customers=customers)
+            return render_template('user/upload_document.html', customers=customers, target_map=target_map)
 
-    return render_template('user/upload_document.html', customers=customers)
+    return render_template('user/upload_document.html', customers=customers, target_map=target_map)
 
 @app.route('/api/password-requirements')
 @login_required
@@ -2470,10 +2722,12 @@ def health():
 def init_db():
     with app.app_context():
         db.create_all()
+        ensure_documents_inspection_target_column()
 
-        # 기본 admin 계정 생성 (존재하지 않을 경우)
-        # 이 계정은 최초 설정용이며, 새 슈퍼관리자 생성 후 비활성화됨
-        if not User.query.filter_by(username='admin').first():
+        # 기본 admin 계정 생성 (슈퍼관리자가 하나도 없을 때만)
+        # 이미 다른 슈퍼관리자가 존재하면 의도적으로 삭제된 admin 계정을 다시 만들지 않는다.
+        super_admin_count = User.query.filter_by(role=ROLE_SUPER_ADMIN).count()
+        if super_admin_count == 0 and not User.query.filter_by(username='admin').first():
             default_admin = User(
                 username='admin',
                 name='기본 관리자',
@@ -2491,6 +2745,31 @@ def init_db():
             print("Password: 1111")
             print("⚠️  최초 로그인 후 새로운 슈퍼관리자 계정을 생성해주세요!")
             print("="*50)
+
+def ensure_documents_inspection_target_column():
+    """점검 대상 컬럼이 없을 경우 자동 추가 (마이그레이션 미적용 대비)"""
+    try:
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('documents')]
+        if 'inspection_target_id' in columns:
+            return
+
+        with db.engine.begin() as conn:
+            conn.execute(text(
+                "ALTER TABLE documents "
+                "ADD COLUMN inspection_target_id INT NULL COMMENT '연결된 점검 대상 ID' AFTER customer_id"
+            ))
+            conn.execute(text(
+                "ALTER TABLE documents "
+                "ADD CONSTRAINT fk_documents_inspection_target "
+                "FOREIGN KEY (inspection_target_id) REFERENCES inspection_targets(id) "
+                "ON DELETE SET NULL"
+            ))
+        app.logger.info("Added inspection_target_id column to documents table")
+    except OperationalError as e:
+        app.logger.error(f"Failed to add inspection_target_id column (OperationalError): {e}")
+    except Exception as e:
+        app.logger.error(f"Failed to add inspection_target_id column: {e}")
 
 # 에러 핸들러
 @app.errorhandler(400)

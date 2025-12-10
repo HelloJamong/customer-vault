@@ -119,6 +119,7 @@
                     <tr>
                         <th>고객사</th>
                         <th>제목</th>
+                        <th>점검 대상</th>
                         <th>파일명</th>
                         <th>점검일</th>
                         <th>업로드일</th>
@@ -129,6 +130,16 @@
                     <tr>
                         <td>{{ doc.customer.name }}</td>
                         <td>{{ doc.title }}</td>
+                        <td>
+                            {% if doc.inspection_target %}
+                            {{ doc.inspection_target.get_display_name() }}
+                            {% if doc.inspection_target.product_name %}
+                            <small class="text-muted d-block">{{ doc.inspection_target.product_name }}</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <i class="bi bi-file-earmark-pdf text-danger"></i> {{ doc.filename }}
                         </td>

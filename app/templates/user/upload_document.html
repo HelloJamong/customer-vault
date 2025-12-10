@@ -20,7 +20,7 @@
                         <select class="form-select" id="customer_id" name="customer_id" required>
                             <option value="">고객사를 선택하세요</option>
                             {% for customer in customers %}
-                            <option value="{{ customer.id }}">
+                            <option value="{{ customer.id }}" {% if request.form.get('customer_id') == customer.id|string %}selected{% endif %}>
                                 {{ customer.name }} 
                                 {% if customer.inspection_cycle_type %}
                                 ({{ customer.inspection_cycle_type }})
@@ -31,6 +31,17 @@
                         <div class="form-text">
                             <i class="bi bi-info-circle"></i>
                             담당 고객사만 표시됩니다.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="inspection_target_id" class="form-label">점검 대상 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="inspection_target_id" name="inspection_target_id" required disabled>
+                            <option value="">고객사를 먼저 선택하세요</option>
+                        </select>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            선택한 고객사의 점검 대상만 표시됩니다.
                         </div>
                     </div>
 
@@ -64,7 +75,7 @@
                         <strong>안내:</strong> 
                         <ul class="mb-0 mt-2">
                             <li>점검서 파일명은 자동으로 생성됩니다 (예: 12월_고객사명_점검내역서)</li>
-                            <li>업로드 시 해당 고객사의 점검 완료 상태가 자동으로 업데이트됩니다</li>
+                            <li>점검 대상별로 업로드해야 완료로 집계됩니다</li>
                             <li>업로드한 점검서는 "고객사 관리 > 점검서보기"에서 확인할 수 있습니다</li>
                         </ul>
                     </div>
@@ -82,4 +93,46 @@
         </div>
     </div>
 </div>
+<script>
+const targetMap = {{ target_map|tojson }};
+const customerSelect = document.getElementById('customer_id');
+const targetSelect = document.getElementById('inspection_target_id');
+const initialCustomerId = "{{ request.form.get('customer_id', '') }}";
+const initialTargetId = "{{ request.form.get('inspection_target_id', '') }}";
+
+function populateTargets(customerId, preselectId = '') {
+    targetSelect.innerHTML = '';
+
+    const targets = targetMap[customerId] || [];
+    if (!customerId || targets.length === 0) {
+        targetSelect.disabled = true;
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = targets.length === 0 && customerId ? '등록된 점검 대상이 없습니다' : '고객사를 먼저 선택하세요';
+        targetSelect.appendChild(option);
+        return;
+    }
+
+    targetSelect.disabled = false;
+    targetSelect.appendChild(new Option('점검 대상을 선택하세요', ''));
+    targets.forEach(target => {
+        const label = target.product ? `${target.name} (${target.product})` : target.name;
+        const option = new Option(label, target.id);
+        if (preselectId && String(preselectId) === String(target.id)) {
+            option.selected = true;
+        }
+        targetSelect.appendChild(option);
+    });
+}
+
+customerSelect.addEventListener('change', () => {
+    populateTargets(customerSelect.value);
+});
+
+// 초기 값 복원
+if (initialCustomerId) {
+    customerSelect.value = initialCustomerId;
+    populateTargets(initialCustomerId, initialTargetId);
+}
+</script>
 {% endblock %}

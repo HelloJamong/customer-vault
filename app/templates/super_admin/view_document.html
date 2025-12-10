@@ -24,6 +24,9 @@
                     {% if document.inspection_date %}
                     점검일: {{ document.inspection_date.strftime('%Y-%m-%d') }} | 
                     {% endif %}
+                    {% if document.inspection_target %}
+                    점검 대상: {{ document.inspection_target.get_display_name() }}{% if document.inspection_target.product_name %} ({{ document.inspection_target.product_name }}){% endif %} | 
+                    {% endif %}
                     업로드: {{ document.uploaded_at.strftime('%Y-%m-%d %H:%M') }}
                     {% if document.uploader %}
                     by {{ document.uploader.name }}

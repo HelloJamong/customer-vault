@@ -26,6 +26,46 @@
         <h5 class="mb-0">점검서 목록 (총 {{ documents|length }}건)</h5>
     </div>
     <div class="card-body">
+        <form class="row g-3 mb-3" method="GET">
+            <div class="col-md-3">
+                <label class="form-label">시작일</label>
+                <input type="date" class="form-control" name="start_date" value="{{ filter_values.start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">종료일</label>
+                <input type="date" class="form-control" name="end_date" value="{{ filter_values.end_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">점검 항목</label>
+                <select class="form-select" name="target_id">
+                    <option value="">전체</option>
+                    {% for target in customer.inspection_targets %}
+                    <option value="{{ target.id }}" {% if filter_values.target_id == target.id|string %}selected{% endif %}>
+                        {{ target.get_display_name() }}{% if target.product_name %} ({{ target.product_name }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">점검자</label>
+                <select class="form-select" name="uploader_id">
+                    <option value="">전체</option>
+                    {% for uploader in uploaders %}
+                    <option value="{{ uploader.id }}" {% if filter_values.uploader_id == uploader.id|string %}selected{% endif %}>
+                        {{ uploader.name }} ({{ uploader.username }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> 필터 적용
+                </button>
+                <a href="{{ url_for('customer_documents', customer_id=customer.id) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i> 초기화
+                </a>
+            </div>
+        </form>
         {% if documents %}
         <div class="table-responsive">
             <table class="table table-hover">
@@ -33,6 +73,7 @@
                     <tr>
                         <th>ID</th>
                         <th>제목</th>
+                        <th>점검서 구분</th>
                         <th>점검방식</th>
                         <th>점검일</th>
                         <th>업로드일시</th>
@@ -48,6 +89,16 @@
                         <td>
                             <i class="bi bi-file-earmark-pdf text-danger"></i>
                             <strong>{{ doc.title }}</strong>
+                        </td>
+                        <td>
+                            {% if doc.inspection_target %}
+                            <div>{{ doc.inspection_target.get_display_name() }}</div>
+                            {% if doc.inspection_target.product_name %}
+                            <small class="text-muted">{{ doc.inspection_target.product_name }}</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">미지정</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if doc.inspection_type == '방문' %}
