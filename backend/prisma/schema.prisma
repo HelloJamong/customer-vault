@@ -1,0 +1,250 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 사용자 모델
+model User {
+  id                    Int       @id @default(autoincrement())
+  username              String    @unique @db.VarChar(80)
+  name                  String    @db.VarChar(100)
+  passwordHash          String    @map("password_hash") @db.VarChar(255)
+  email                 String?   @unique @db.VarChar(120)
+  role                  String    @default("user") @db.VarChar(20) // super_admin, admin, user
+  department            String?   @db.VarChar(20)
+  isActive              Boolean   @default(true) @map("is_active")
+  customerId            Int?      @map("customer_id")
+
+  // 계정 잠금
+  isLocked              Boolean   @default(false) @map("is_locked")
+  lockedUntil           DateTime? @map("locked_until")
+  failedLoginAttempts   Int       @default(0) @map("failed_login_attempts")
+
+  // 최초 로그인
+  isFirstLogin          Boolean   @default(true) @map("is_first_login")
+
+  // 타임스탬프
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  passwordChangedAt     DateTime  @default(now()) @map("password_changed_at")
+  lastLogin             DateTime? @map("last_login")
+
+  // Relations
+  assignedCustomers     UserCustomer[]
+  uploadedDocuments     Document[]
+  serviceLogs           ServiceLog[]
+  loginAttempts         LoginAttempt[]
+  userSessions          UserSession[]
+  customersAsEngineer   Customer[] @relation("Engineer")
+  customersAsEngineerSub Customer[] @relation("EngineerSub")
+  customersAsSales      Customer[] @relation("Sales")
+  updatedSettings       SystemSettings[]
+
+  @@map("users")
+}
+
+// 고객사 모델
+model Customer {
+  id                      Int       @id @default(autoincrement())
+  name                    String    @db.VarChar(200)
+  location                String?   @db.VarChar(200)
+
+  // 정 담당자
+  contactName             String?   @map("contact_name") @db.VarChar(100)
+  contactPosition         String?   @map("contact_position") @db.VarChar(100)
+  contactDepartment       String?   @map("contact_department") @db.VarChar(100)
+  contactMobile           String?   @map("contact_mobile") @db.VarChar(50)
+  contactPhone            String?   @map("contact_phone") @db.VarChar(50)
+  contactEmail            String?   @map("contact_email") @db.VarChar(120)
+
+  // 부담당자 1
+  contactNameSub1         String?   @map("contact_name_sub1") @db.VarChar(100)
+  contactPositionSub1     String?   @map("contact_position_sub1") @db.VarChar(100)
+  contactDepartmentSub1   String?   @map("contact_department_sub1") @db.VarChar(100)
+  contactMobileSub1       String?   @map("contact_mobile_sub1") @db.VarChar(50)
+  contactPhoneSub1        String?   @map("contact_phone_sub1") @db.VarChar(50)
+  contactEmailSub1        String?   @map("contact_email_sub1") @db.VarChar(120)
+
+  // 부담당자 2
+  contactNameSub2         String?   @map("contact_name_sub2") @db.VarChar(100)
+  contactPositionSub2     String?   @map("contact_position_sub2") @db.VarChar(100)
+  contactDepartmentSub2   String?   @map("contact_department_sub2") @db.VarChar(100)
+  contactMobileSub2       String?   @map("contact_mobile_sub2") @db.VarChar(50)
+  contactPhoneSub2        String?   @map("contact_phone_sub2") @db.VarChar(50)
+  contactEmailSub2        String?   @map("contact_email_sub2") @db.VarChar(120)
+
+  // 부담당자 3
+  contactNameSub3         String?   @map("contact_name_sub3") @db.VarChar(100)
+  contactPositionSub3     String?   @map("contact_position_sub3") @db.VarChar(100)
+  contactDepartmentSub3   String?   @map("contact_department_sub3") @db.VarChar(100)
+  contactMobileSub3       String?   @map("contact_mobile_sub3") @db.VarChar(50)
+  contactPhoneSub3        String?   @map("contact_phone_sub3") @db.VarChar(50)
+  contactEmailSub3        String?   @map("contact_email_sub3") @db.VarChar(120)
+
+  // 계약 정보
+  contractType            String    @default("미계약") @map("contract_type") @db.VarChar(20)
+  contractStartDate       DateTime? @map("contract_start_date") @db.Date
+  contractEndDate         DateTime? @map("contract_end_date") @db.Date
+
+  // 점검 정보
+  inspectionCycleType     String    @default("매월") @map("inspection_cycle_type") @db.VarChar(20)
+  inspectionCycleMonth    Int?      @map("inspection_cycle_month")
+  lastInspectionDate      DateTime? @map("last_inspection_date") @db.Date
+
+  // 비고
+  notes                   String?   @db.Text
+
+  // 사내 담당자
+  engineerId              Int?      @map("engineer_id")
+  engineerSubId           Int?      @map("engineer_sub_id")
+  salesId                 Int?      @map("sales_id")
+
+  // 타임스탬프
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  engineer                User?     @relation("Engineer", fields: [engineerId], references: [id])
+  engineerSub             User?     @relation("EngineerSub", fields: [engineerSubId], references: [id])
+  sales                   User?     @relation("Sales", fields: [salesId], references: [id])
+  assignedUsers           UserCustomer[]
+  documents               Document[]
+  inspectionTargets       InspectionTarget[]
+
+  @@map("customers")
+}
+
+// 사용자-고객사 중간 테이블
+model UserCustomer {
+  userId       Int      @map("user_id")
+  customerId   Int      @map("customer_id")
+  assignedAt   DateTime @default(now()) @map("assigned_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, customerId])
+  @@map("user_customers")
+}
+
+// 점검 대상 항목
+model InspectionTarget {
+  id           Int       @id @default(autoincrement())
+  customerId   Int       @map("customer_id")
+  targetType   String    @map("target_type") @db.VarChar(50)
+  customName   String?   @map("custom_name") @db.VarChar(100)
+  productName  String?   @map("product_name") @db.VarChar(100)
+  displayOrder Int       @default(0) @map("display_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  documents    Document[]
+
+  @@map("inspection_targets")
+}
+
+// 점검 문서
+model Document {
+  id                  Int       @id @default(autoincrement())
+  customerId          Int       @map("customer_id")
+  inspectionTargetId  Int?      @map("inspection_target_id")
+  title               String    @db.VarChar(200)
+  description         String?   @db.Text
+  filename            String    @db.VarChar(255)
+  filepath            String    @db.VarChar(500)
+  fileSize            Int?      @map("file_size")
+  uploadedBy          Int       @map("uploaded_by")
+  uploadedAt          DateTime  @default(now()) @map("uploaded_at")
+  inspectionDate      DateTime? @map("inspection_date") @db.Date
+  inspectionType      String?   @map("inspection_type") @db.VarChar(20)
+
+  customer            Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  inspectionTarget    InspectionTarget? @relation(fields: [inspectionTargetId], references: [id], onDelete: SetNull)
+  uploader            User      @relation(fields: [uploadedBy], references: [id])
+
+  @@map("documents")
+}
+
+// 시스템 설정
+model SystemSettings {
+  id                          Int       @id @default(autoincrement())
+
+  // 기본 비밀번호
+  defaultPassword             String    @default("1111") @map("default_password") @db.VarChar(50)
+
+  // 비밀번호 복잡성
+  passwordMinLength           Int       @default(8) @map("password_min_length")
+  passwordMaxLength           Int       @default(20) @map("password_max_length")
+  passwordRequireUppercase    Boolean   @default(true) @map("password_require_uppercase")
+  passwordRequireSpecial      Boolean   @default(true) @map("password_require_special")
+  passwordRequireNumber       Boolean   @default(true) @map("password_require_number")
+
+  // 세션 관리
+  preventDuplicateLogin       Boolean   @default(false) @map("prevent_duplicate_login")
+  sessionTimeoutEnabled       Boolean   @default(false) @map("session_timeout_enabled")
+  sessionTimeoutMinutes       Int       @default(30) @map("session_timeout_minutes")
+
+  // 로그인 실패
+  loginFailureLimit           Int       @default(5) @map("login_failure_limit")
+  accountLockMinutes          Int       @default(10) @map("account_lock_minutes")
+
+  // 비밀번호 만료
+  passwordExpiryEnabled       Boolean   @default(false) @map("password_expiry_enabled")
+  passwordExpiryDays          Int       @default(90) @map("password_expiry_days")
+
+  updatedAt                   DateTime  @updatedAt @map("updated_at")
+  updatedBy                   Int?      @map("updated_by")
+
+  updater                     User?     @relation(fields: [updatedBy], references: [id])
+
+  @@map("system_settings")
+}
+
+// 로그인 시도 기록
+model LoginAttempt {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  attemptTime DateTime  @default(now()) @map("attempt_time")
+  success     Boolean   @default(false)
+  ipAddress   String?   @map("ip_address") @db.VarChar(45)
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_attempts")
+}
+
+// 사용자 세션
+model UserSession {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  sessionId    String    @unique @map("session_id") @db.VarChar(255)
+  loginTime    DateTime  @default(now()) @map("login_time")
+  lastActivity DateTime  @default(now()) @map("last_activity")
+  ipAddress    String?   @map("ip_address") @db.VarChar(45)
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// 서비스 로그
+model ServiceLog {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      @map("user_id")
+  logType     String    @map("log_type") @db.VarChar(20) // 정상, 경고, 오류, 정보
+  action      String    @db.VarChar(50)
+  description String?   @db.Text
+  ipAddress   String?   @map("ip_address") @db.VarChar(45)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("service_logs")
+}
