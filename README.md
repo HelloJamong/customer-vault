@@ -21,42 +21,113 @@
 - ✅ 점검 문서 업로드 및 관리
 - ✅ 점검 이력 조회 및 통계
 - ✅ 시스템 로그 및 보안 설정
-- ✅ 슈퍼관리자 계정 ID 변경 기능 (보안 강화)
 
 ---
 
-## 🚀 빠른 시작
+## 🚀 빠른 시작 (Docker Hub 이미지 사용)
 
-### 1️⃣ 환경 변수 설정
+서버에 Docker만 설치되어 있다면, 사전 빌드된 이미지로 바로 시작할 수 있습니다.
+
+### 1️⃣ 필요한 파일 다운로드
 
 ```bash
-# env.example을 복사하여 .env 생성
-cp docs/env.example .env
+# 프로젝트 디렉토리 생성
+mkdir -p ~/customer-storage && cd ~/customer-storage
 
-# SECRET_KEY 생성 후 .env 파일에 설정
-python -c "import secrets; print(secrets.token_hex(32))"
+# docker-compose.prod.yml 다운로드
+wget https://raw.githubusercontent.com/HelloJamong/customer-storage/main/docker-compose.prod.yml
 
-# .env 파일 편집 (필수!)
+# 또는 curl 사용
+curl -O https://raw.githubusercontent.com/HelloJamong/customer-storage/main/docker-compose.prod.yml
+
+# .env.example 다운로드 (설정 참고용)
+wget https://raw.githubusercontent.com/HelloJamong/customer-storage/main/.env.example
+
+# 또는 curl 사용
+curl -O https://raw.githubusercontent.com/HelloJamong/customer-storage/main/.env.example
+```
+
+### 2️⃣ 환경 변수 설정
+
+```bash
+# .env.example을 .env로 복사
+cp .env.example .env
+
+# .env 파일 수정
 nano .env
 ```
 
-### 2️⃣ Docker 실행
+**.env 파일 설정 예시:**
+```bash
+# Flask 설정
+FLASK_ENV=production
+# SECRET_KEY 생성: python3 -c "import secrets; print(secrets.token_hex(32))"
+SECRET_KEY=여기에_생성된_랜덤_키_입력
+
+# 데이터베이스 설정 (강력한 비밀번호로 변경!)
+DB_ROOT_PASSWORD=강력한_루트_비밀번호
+DB_NAME=customer_db
+DB_USER=customer_user
+DB_PASSWORD=강력한_사용자_비밀번호
+
+# 애플리케이션 설정
+HOST_PORT=5001
+MAX_UPLOAD_SIZE=16777216
+
+# Docker 이미지
+DOCKER_IMAGE=igor0670/customer-storage:latest
+```
+
+**SECRET_KEY 생성 방법:**
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+# 출력된 값을 .env의 SECRET_KEY에 붙여넣기
+```
+
+### 3️⃣ 필요한 디렉토리 생성
 
 ```bash
-# 컨테이너 빌드 및 실행
-docker compose up -d
+mkdir -p data/mariadb uploads logs
+```
+
+### 4️⃣ 서비스 실행
+
+```bash
+# Docker 이미지 다운로드
+docker compose -f docker-compose.prod.yml pull
+
+# 서비스 시작 (백그라운드)
+docker compose -f docker-compose.prod.yml up -d
 
 # 로그 확인
-docker compose logs -f
+docker compose -f docker-compose.prod.yml logs -f
 ```
+
+### 5️⃣ 서비스 관리 명령어
+
+```bash
+# 중지
+docker compose -f docker-compose.prod.yml down
+
+# 재시작
+docker compose -f docker-compose.prod.yml restart
+
+# 상태 확인
+docker compose -f docker-compose.prod.yml ps
+
+# 업데이트 (새 버전 배포 시)
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
 
 ### 3️⃣ 접속 및 초기 설정
 
 1. 브라우저에서 http://localhost:5001 접속
 2. 기본 계정으로 로그인: `admin` / `1111`
-3. 자동으로 표시되는 페이지에서 새 슈퍼관리자 계정 생성
-4. 새 계정으로 다시 로그인
-5. (선택) 시스템 설정에서 슈퍼관리자 계정 ID 변경 가능
+3. 보안을 위해 별도 슈퍼 관리자 생성 후 로그인 진행
+4. 이후 admin 계정 비활성화 또는 삭제(권장)
 
 ---
 
@@ -134,40 +205,8 @@ customer-storage/
 
 ---
 
-## 💡 주요 명령어
-
-```bash
-# 시작
-docker compose up -d
-
-# 중지
-docker compose down
-
-# 로그 확인
-docker compose logs -f web
-
-# 재시작
-docker compose restart
-
-# 데이터베이스 백업
-docker compose exec db mysqldump -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} > backup.sql
-```
-
 > 📖 **전체 명령어 및 운영 가이드는 [docs/DOCKER_CONTAINER_GUIDE.md](docs/DOCKER_CONTAINER_GUIDE.md)를 참고하세요.**
 
----
-
-## ⚠️ 보안 주의사항
-
-운영 환경 배포 전 **필수 확인**:
-
-- [ ] `.env` 파일의 모든 비밀번호 변경
-- [ ] `SECRET_KEY` 무작위 문자열로 설정
-- [ ] `FLASK_DEBUG=False` 설정
-- [ ] `.env` 파일 권한: `chmod 600 .env`
-- [ ] 기본 admin 계정 비활성화 (최초 로그인 시 자동)
-
-> 📖 **전체 보안 체크리스트는 [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md#보안-체크리스트)를 참고하세요.**
 
 ---
 
