@@ -11,7 +11,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=mysql://${DB_USER:-customer_user}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-customer_db}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_EXPIRATION=${JWT_ACCESS_EXPIRATION:-1h}
       - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION:-7d}
@@ -25,7 +25,10 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
+    networks:
+      - customer-storage-network
 
   mariadb:
     image: mariadb:10.11
@@ -38,5 +41,20 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./data/mariadb:/var/lib/mysql
+      - mariadb-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+    networks:
+      - customer-storage-network
+
+volumes:
+  mariadb-data:
+
+networks:
+  customer-storage-network:
+    driver: bridge

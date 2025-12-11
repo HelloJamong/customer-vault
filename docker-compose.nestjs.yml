@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # MariaDB 데이터베이스
+  db:
+    image: mariadb:10.11
+    container_name: customer_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-customer_db}
+      MYSQL_USER: ${DB_USER:-customer_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-customerpass}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - customer_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # NestJS 백엔드
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: customer_backend
+    restart: always
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:-customerpass}@db:3306/${DB_NAME:-customer_db}
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret-key-in-production}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-1h}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-16777216}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_DIR: /app/logs
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - customer_network
+
+networks:
+  customer_network:
+    driver: bridge
+
+volumes:
+  mariadb_data:
