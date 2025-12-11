@@ -1049,8 +1049,17 @@ def manage_customers():
     if current_user.is_super_admin() or current_user.is_admin():
         customers_list = Customer.query.all()
     else:
-        # 일반 사용자는 담당 고객사만 조회
-        customers_list = current_user.assigned_customers.all()
+        # 일반 사용자: 담당 고객사 + 담당자가 미지정된 고객사
+        assigned_customers = current_user.assigned_customers.all()
+        unassigned_customers = Customer.query.filter(
+            Customer.engineer_id.is_(None),
+            Customer.engineer_sub_id.is_(None),
+            Customer.sales_id.is_(None)
+        ).all()
+
+        # 중복 제거를 위해 ID 기준으로 병합
+        customer_ids = set([c.id for c in assigned_customers] + [c.id for c in unassigned_customers])
+        customers_list = Customer.query.filter(Customer.id.in_(customer_ids)).all()
     
     # 점검 대상 여부와 완료 여부 계산
     for customer in customers_list:
@@ -1277,23 +1286,29 @@ def update_customer(customer_id):
     customer.engineer_sub_id = new_engineer_sub_id
     customer.sales_id = new_sales_id
 
-    # user_customers 테이블 동기화 - 담당 엔지니어만 assigned_customers에 포함
+    # user_customers 테이블 동기화 - 담당 엔지니어와 영업 모두 포함
     # 기존 할당 관계 모두 제거 (리스트로 변환 후 제거)
     current_assigned = list(customer.assigned_users.all())
     for user in current_assigned:
         customer.assigned_users.remove(user)
-    
+
     # 담당 엔지니어가 지정된 경우 추가
     if new_engineer_id:
         engineer_user = User.query.get(new_engineer_id)
         if engineer_user:
             customer.assigned_users.append(engineer_user)
-    
+
     # 부담당 엔지니어가 지정된 경우 추가
     if new_engineer_sub_id:
         engineer_sub_user = User.query.get(new_engineer_sub_id)
         if engineer_sub_user:
             customer.assigned_users.append(engineer_sub_user)
+
+    # 담당 영업이 지정된 경우 추가
+    if new_sales_id:
+        sales_user = User.query.get(new_sales_id)
+        if sales_user:
+            customer.assigned_users.append(sales_user)
 
     customer.updated_at = datetime.utcnow()
 
