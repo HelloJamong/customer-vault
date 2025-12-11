@@ -1680,8 +1680,7 @@ def create_superadmin():
         return redirect(url_for('manage_superadmins'))
 
     # 4. 패스워드 복잡성 검증
-    settings = get_system_settings()
-    is_valid, error_message = validate_password(password, settings)
+    is_valid, error_message = validate_password(password)
     if not is_valid:
         flash(error_message, 'danger')
         return redirect(url_for('manage_superadmins'))
