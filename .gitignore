@@ -45,3 +45,6 @@ backup_*/
 
 # Private documentation
 DEPLOYMENT_GUIDE.md
+
+# Backend migration documentation
+BACKEND_SPEC.md
