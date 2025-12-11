@@ -42,3 +42,6 @@ logs/
 
 # Backup
 backup_*/
+
+# Private documentation
+DEPLOYMENT_GUIDE.md
