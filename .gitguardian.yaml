@@ -1,0 +1,13 @@
+version: 2
+
+paths-ignore:
+  - "**/*.example"
+  - "**/.env.example"
+  - "**/.env.*.example"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/.vite/**"
+  - "**/build/**"
+
+# 실제 .env 파일들은 .gitignore에 있어서 무시됨을 명시
+# GitGuardian이 로컬 파일을 스캔할 때 경고하지 않도록 설정
