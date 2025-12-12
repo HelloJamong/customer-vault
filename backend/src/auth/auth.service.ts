@@ -190,7 +190,7 @@ export class AuthService {
 
     return {
       minLength: settings.passwordMinLength,
-      maxLength: settings.passwordMaxLength,
+      maxLength: 20, // 고정값 20자
       requireUppercase: settings.passwordRequireUppercase,
       requireSpecial: settings.passwordRequireSpecial,
       requireNumber: settings.passwordRequireNumber,

@@ -177,28 +177,26 @@ model Document {
 model SystemSettings {
   id                          Int       @id @default(autoincrement())
 
-  // 기본 비밀번호
+  // 초기 패스워드
   defaultPassword             String    @default("1111") @map("default_password") @db.VarChar(50)
 
   // 비밀번호 복잡성
   passwordMinLength           Int       @default(8) @map("password_min_length")
-  passwordMaxLength           Int       @default(20) @map("password_max_length")
   passwordRequireUppercase    Boolean   @default(true) @map("password_require_uppercase")
   passwordRequireSpecial      Boolean   @default(true) @map("password_require_special")
   passwordRequireNumber       Boolean   @default(true) @map("password_require_number")
 
-  // 세션 관리
-  preventDuplicateLogin       Boolean   @default(false) @map("prevent_duplicate_login")
-  sessionTimeoutEnabled       Boolean   @default(false) @map("session_timeout_enabled")
-  sessionTimeoutMinutes       Int       @default(30) @map("session_timeout_minutes")
-
-  // 로그인 실패
-  loginFailureLimit           Int       @default(5) @map("login_failure_limit")
-  accountLockMinutes          Int       @default(10) @map("account_lock_minutes")
-
-  // 비밀번호 만료
+  // 비밀번호 변경 주기
   passwordExpiryEnabled       Boolean   @default(false) @map("password_expiry_enabled")
   passwordExpiryDays          Int       @default(90) @map("password_expiry_days")
+
+  // 중복 로그인 방지
+  preventDuplicateLogin       Boolean   @default(false) @map("prevent_duplicate_login")
+
+  // 로그인 실패 횟수
+  loginFailureLimitEnabled    Boolean   @default(false) @map("login_failure_limit_enabled")
+  loginFailureLimit           Int       @default(5) @map("login_failure_limit")
+  accountLockMinutes          Int       @default(10) @map("account_lock_minutes")
 
   updatedAt                   DateTime  @updatedAt @map("updated_at")
   updatedBy                   Int?      @map("updated_by")
