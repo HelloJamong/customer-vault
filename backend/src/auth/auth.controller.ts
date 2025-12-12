@@ -56,6 +56,15 @@ export class AuthController {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);
   }
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '현재 로그인한 사용자 정보 조회' })
+  @ApiResponse({ status: 200, description: '조회 성공' })
+  async getCurrentUser(@Request() req) {
+    return this.authService.getUserById(req.user.id);
+  }
+
   @Get('password-requirements')
   @ApiOperation({ summary: '비밀번호 요구사항 조회' })
   @ApiResponse({ status: 200, description: '조회 성공' })
