@@ -162,6 +162,29 @@ export class AuthService {
     }
   }
 
+  async getUserById(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        role: true,
+        email: true,
+        isActive: true,
+        isFirstLogin: true,
+        lastLogin: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    }
+
+    return user;
+  }
+
   async getPasswordRequirements() {
     const settings = await this.getSystemSettings();
 

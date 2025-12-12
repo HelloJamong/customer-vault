@@ -36,3 +36,11 @@ DEPLOYMENT_GUIDE.md
 
 # Backend migration documentation
 BACKEND_SPEC.md
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+frontend/.vite/
