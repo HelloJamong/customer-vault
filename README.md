@@ -8,11 +8,12 @@
 
 ### 기술 스택
 
-- **Backend**: Python Flask
+- **Backend**: NestJS (TypeScript)
 - **Database**: MariaDB 10.11
-- **Frontend**: Bootstrap 5, Jinja2 템플릿
+- **ORM**: Prisma
+- **Authentication**: JWT (Access Token + Refresh Token)
+- **API Documentation**: Swagger/OpenAPI
 - **Container**: Docker & Docker Compose
-- **OS**: Rocky Linux 9 (운영 환경)
 
 ### 주요 기능
 
@@ -21,192 +22,391 @@
 - ✅ 점검 문서 업로드 및 관리
 - ✅ 점검 이력 조회 및 통계
 - ✅ 시스템 로그 및 보안 설정
+- ✅ RESTful API 제공
+- ✅ Health Check 엔드포인트
 
 ---
 
-## 🚀 빠른 시작 (Docker Hub 이미지 사용)
+## 🚀 빠른 시작
 
-서버에 Docker만 설치되어 있다면, 사전 빌드된 이미지로 바로 시작할 수 있습니다.
+### 필수 요구사항
 
-### 1️⃣ 필요한 파일 다운로드
+- Docker 20.10 이상
+- Docker Compose 2.0 이상
+
+### 1️⃣ 프로젝트 클론
 
 ```bash
-# 프로젝트 디렉토리 생성
-mkdir -p ~/customer-storage && cd ~/customer-storage
-
-# docker-compose.prod.yml 다운로드
-wget https://raw.githubusercontent.com/HelloJamong/customer-storage/main/docker-compose.prod.yml
-
-# 또는 curl 사용
-curl -O https://raw.githubusercontent.com/HelloJamong/customer-storage/main/docker-compose.prod.yml
-
-# .env.example 다운로드 (설정 참고용)
-wget https://raw.githubusercontent.com/HelloJamong/customer-storage/main/.env.example
-
-# 또는 curl 사용
-curl -O https://raw.githubusercontent.com/HelloJamong/customer-storage/main/.env.example
+git clone https://github.com/HelloJamong/customer-storage.git
+cd customer-storage
 ```
 
 ### 2️⃣ 환경 변수 설정
 
+**개발 환경:**
 ```bash
-# .env.example을 .env로 복사
-cp .env.example .env
+# NestJS 환경 변수 복사
+cp .env.nestjs.example .env.nestjs
 
-# .env 파일 수정
-nano .env
+# 필요시 .env.nestjs 파일 수정
+nano .env.nestjs
 ```
 
-**.env 파일 설정 예시:**
+**프로덕션 환경:**
 ```bash
-# Flask 설정
-FLASK_ENV=production
-# SECRET_KEY 생성: python3 -c "import secrets; print(secrets.token_hex(32))"
-SECRET_KEY=여기에_생성된_랜덤_키_입력
+# 프로덕션 환경 변수 복사
+cp .env.production.example .env.production
 
-# 데이터베이스 설정 (강력한 비밀번호로 변경!)
-DB_ROOT_PASSWORD=강력한_루트_비밀번호
-DB_NAME=customer_db
-DB_USER=customer_user
-DB_PASSWORD=강력한_사용자_비밀번호
-
-# 애플리케이션 설정
-HOST_PORT=5001
-MAX_UPLOAD_SIZE=16777216
-
-# Docker 이미지
-DOCKER_IMAGE=igor0670/customer-storage:latest
+# ⚠️ 프로덕션 환경 변수 필수 변경 항목
+nano .env.production
 ```
 
-**SECRET_KEY 생성 방법:**
+**프로덕션 환경에서 반드시 변경해야 할 항목:**
+
+1. **JWT_SECRET** (128자 랜덤 문자열)
 ```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-# 출력된 값을 .env의 SECRET_KEY에 붙여넣기
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-### 3️⃣ 필요한 디렉토리 생성
-
+2. **DB_PASSWORD** (강력한 비밀번호)
 ```bash
-mkdir -p data/mariadb uploads logs
+node -e "
+const crypto = require('crypto');
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+let password = '';
+for (let i = 0; i < 32; i++) {
+  password += chars[crypto.randomInt(0, chars.length)];
+}
+console.log(password);
+"
 ```
 
-### 4️⃣ 서비스 실행
+3. **CORS_ORIGIN** (실제 프론트엔드 도메인)
+```env
+CORS_ORIGIN=https://yourdomain.com,https://app.yourdomain.com
+```
+
+### 3️⃣ 서비스 실행
+
+**개발 환경:**
+```bash
+docker compose --env-file .env.nestjs -f docker-compose.nestjs.yml up -d
+```
+
+**프로덕션 환경:**
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+```
+
+### 4️⃣ 서비스 확인
 
 ```bash
-# Docker 이미지 다운로드
-docker compose -f docker-compose.prod.yml pull
-
-# 서비스 시작 (백그라운드)
-docker compose -f docker-compose.prod.yml up -d
+# 컨테이너 상태 확인
+docker compose -f docker-compose.nestjs.yml ps
 
 # 로그 확인
-docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.nestjs.yml logs -f backend
+
+# Health Check
+curl http://localhost:5001/api/health
 ```
 
-### 5️⃣ 서비스 관리 명령어
-
-```bash
-# 중지
-docker compose -f docker-compose.prod.yml down
-
-# 재시작
-docker compose -f docker-compose.prod.yml restart
-
-# 상태 확인
-docker compose -f docker-compose.prod.yml ps
-
-# 업데이트 (새 버전 배포 시)
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+**예상 응답:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-12-12T13:25:00.000Z",
+  "database": "connected",
+  "uptime": 123.456
+}
 ```
+
+### 5️⃣ 접속 정보
+
+**API 서버:**
+- Base URL: http://localhost:5001/api
+- Swagger 문서: http://localhost:5001/api/docs
+- Health Check: http://localhost:5001/api/health
+
+**기본 로그인 계정:**
+- ID: `vmadm`
+- PW: `1111`
+
+⚠️ **보안**: 프로덕션 환경에서는 반드시 비밀번호를 변경하세요!
 
 ---
 
-### 3️⃣ 접속 및 초기 설정
-
-1. 브라우저에서 http://localhost:5001 접속
-2. 기본 계정으로 로그인: `admin` / `1111`
-3. 보안을 위해 별도 슈퍼 관리자 생성 후 로그인 진행
-4. 이후 admin 계정 비활성화 또는 삭제(권장)
-
----
-
-## 📚 문서
-
-상세한 설치 및 설정 가이드는 **[docs 폴더](docs/)**를 참고하세요.
-
-| 문서 | 설명 | 대상 |
-|------|------|------|
-| **[📖 문서 센터](docs/README.md)** | 모든 문서의 시작점 | 모든 사용자 |
-| **[🚀 제3자 배포 가이드](docs/DEPLOYMENT_GUIDE.md)** | 본인 서버에 처음부터 배포하기 | 신규 사용자 ⭐ |
-| **[⚙️ 환경 설정 가이드](docs/SETUP_GUIDE.md)** | 환경별 상세 시스템 설정 | 신규 관리자 |
-| **[🔧 환경 변수 참조](docs/ENV_VARIABLES.md)** | .env 파일 설정 빠른 참조 | 모든 사용자 |
-| **[🐳 Docker 설정 가이드](docs/DOCKER_GUIDE.md)** | Docker 파일 수정 방법 | 개발자 |
-| **[📦 Docker 컨테이너 환경 구성](docs/DOCKER_CONTAINER_GUIDE.md)** | Docker 명령어 및 운영 | 관리자 |
-| **[🚀 Docker 배포 빠른 시작](docs/DOCKER_QUICKSTART.md)** | Docker Hub 배포 빠른 가이드 | 개발자 ⭐ |
-| **[🐋 Docker 이미지 배포 가이드](docs/DOCKER_DEPLOYMENT.md)** | Docker Hub 배포 상세 가이드 | 개발자 |
-
-### 시나리오별 추천 문서
-
-- **🆕 완전히 처음 시작하는 경우** ⭐
-  - **[🚀 제3자 배포 가이드](docs/DEPLOYMENT_GUIDE.md)** - 이 가이드 하나면 충분!
-  - 서버 준비부터 완료까지 모든 과정을 단계별로 안내
-
-- **🐳 Docker는 이미 설치된 경우**
-  1. [📦 Docker 컨테이너 환경 구성](docs/DOCKER_CONTAINER_GUIDE.md) - 프로젝트 실행부터
-  2. [🔧 환경 변수 참조](docs/ENV_VARIABLES.md) - .env 설정
-
-- **⚙️ Docker 설정 변경**
-  - [🐳 Docker 설정 가이드](docs/DOCKER_GUIDE.md) - 포트, 리소스 등 수정
-
-- **🚀 Docker Hub로 배포하기** (개발자용)
-  - **[🚀 Docker 배포 빠른 시작](docs/DOCKER_QUICKSTART.md)** - 빠른 시작 가이드 ⭐
-  - [🐋 Docker 이미지 배포 가이드](docs/DOCKER_DEPLOYMENT.md) - 상세 가이드
-
----
-
-## 🏗️ 아키텍처
-
-```
-┌─────────────────────────────────────┐
-│      Docker Environment             │
-│                                     │
-│  ┌──────────────┐  ┌─────────────┐ │
-│  │  Web App     │  │  Database   │ │
-│  │  (Flask)     │◄─┤  (MariaDB)  │ │
-│  │  Port: 5000  │  │  Port: 3306 │ │
-│  └──────────────┘  └─────────────┘ │
-│         │                           │
-└─────────┼───────────────────────────┘
-          │
-    Host: 5001
-```
-
-### 디렉토리 구조
+## 🏗️ 프로젝트 구조
 
 ```
 customer-storage/
-├── 📚 docs/                   # 문서 디렉토리 (설정 가이드, 환경변수 등)
-├── 🐍 app/                    # Flask 애플리케이션 소스코드
-├── 🗄️ migrations/             # 데이터베이스 스키마 변경 SQL
-├── 📁 uploads/                # 사용자 업로드 파일 (gitignore)
-├── 💾 data/mariadb/           # MariaDB 데이터 볼륨 (gitignore)
-├── 📝 logs/                   # 애플리케이션 로그 (gitignore)
+├── backend/                      # NestJS 백엔드
+│   ├── src/
+│   │   ├── auth/                # 인증 모듈 (JWT)
+│   │   ├── users/               # 사용자 관리
+│   │   ├── customers/           # 고객사 관리
+│   │   ├── inspection-targets/  # 점검 대상 관리
+│   │   ├── documents/           # 문서 관리
+│   │   ├── logs/                # 로그 관리
+│   │   ├── settings/            # 설정 관리
+│   │   ├── dashboard/           # 대시보드
+│   │   ├── health/              # Health Check
+│   │   └── common/              # 공통 모듈 (Prisma, Guards 등)
+│   ├── prisma/
+│   │   └── schema.prisma        # 데이터베이스 스키마
+│   ├── Dockerfile
+│   └── package.json
 │
-├── 🐳 docker-compose.yml      # Docker Compose 오케스트레이션
-├── 🐳 Dockerfile              # Flask 이미지 빌드 파일
-├── 📦 requirements.txt        # Python 의존성 패키지
-├── 🔒 .env                    # 환경 변수 (gitignore, 직접 생성)
-└── 📖 README.md               # 프로젝트 개요 (현재 파일)
+├── data/                         # MariaDB 데이터 볼륨
+├── uploads/                      # 업로드 파일 저장소
+├── logs/                         # 애플리케이션 로그
+│
+├── docker-compose.nestjs.yml     # 개발용 Docker Compose
+├── docker-compose.prod.yml       # 프로덕션용 Docker Compose
+├── .env.nestjs                   # 개발 환경 변수 (gitignore)
+├── .env.nestjs.example           # 개발 환경 변수 템플릿
+├── .env.production               # 프로덕션 환경 변수 (gitignore)
+├── .env.production.example       # 프로덕션 환경 변수 템플릿
+└── README.md
 ```
-
-> 💡 **Tip:** Docker 관련 파일(`docker-compose.yml`, `Dockerfile`)은 루트에 위치해야 합니다.
-> 이는 Docker의 표준 관행이며, 다른 위치에 두면 명령어 실행이 복잡해집니다.
 
 ---
 
-> 📖 **전체 명령어 및 운영 가이드는 [docs/DOCKER_CONTAINER_GUIDE.md](docs/DOCKER_CONTAINER_GUIDE.md)를 참고하세요.**
+## 🐳 Docker 명령어
 
+### 서비스 관리
+
+```bash
+# 시작
+docker compose -f docker-compose.nestjs.yml up -d
+
+# 중지
+docker compose -f docker-compose.nestjs.yml down
+
+# 재시작
+docker compose -f docker-compose.nestjs.yml restart
+
+# 로그 확인
+docker compose -f docker-compose.nestjs.yml logs -f backend
+
+# 컨테이너 접속
+docker exec -it customer_backend sh
+```
+
+### 데이터베이스 관리
+
+```bash
+# MariaDB 접속
+docker exec -it customer_db mysql -u customer_user -p customer_db
+
+# 데이터베이스 백업
+docker exec customer_db mysqldump -u customer_user -p customer_db > backup.sql
+
+# 데이터베이스 복원
+docker exec -i customer_db mysql -u customer_user -p customer_db < backup.sql
+```
+
+### Prisma 관리
+
+```bash
+# Prisma Client 재생성
+docker exec customer_backend npx prisma generate
+
+# 데이터베이스 스키마 확인
+docker exec customer_backend npx prisma db pull
+```
+
+---
+
+## 📡 API 문서
+
+API 문서는 Swagger UI를 통해 제공됩니다.
+
+**접속 방법:**
+```
+http://localhost:5001/api/docs
+```
+
+### 주요 엔드포인트
+
+| 카테고리 | 엔드포인트 | 설명 |
+|---------|-----------|------|
+| **인증** | POST /api/auth/login | 로그인 |
+| | POST /api/auth/refresh | 토큰 갱신 |
+| | POST /api/auth/logout | 로그아웃 |
+| **사용자** | GET /api/users | 사용자 목록 |
+| | GET /api/users/:id | 사용자 조회 |
+| | POST /api/users | 사용자 생성 |
+| | PATCH /api/users/:id | 사용자 수정 |
+| | DELETE /api/users/:id | 사용자 삭제 |
+| **고객사** | GET /api/customers | 고객사 목록 |
+| | GET /api/customers/:id | 고객사 상세 |
+| | POST /api/customers | 고객사 생성 |
+| **문서** | POST /api/documents/upload/:customerId | 문서 업로드 |
+| | GET /api/documents/customer/:customerId | 고객사 문서 목록 |
+| **Health** | GET /api/health | 서버 상태 확인 |
+
+### 인증 방식
+
+API는 JWT Bearer 토큰 인증을 사용합니다.
+
+**로그인:**
+```bash
+curl -X POST http://localhost:5001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"vmadm","password":"1111"}'
+```
+
+**응답:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "vmadm",
+    "role": "SUPER_ADMIN"
+  }
+}
+```
+
+**인증이 필요한 API 호출:**
+```bash
+curl -X GET http://localhost:5001/api/users \
+  -H "Authorization: Bearer {access_token}"
+```
+
+---
+
+## 🔒 보안 설정
+
+### 프로덕션 체크리스트
+
+배포 전 반드시 확인하세요:
+
+- [ ] `.env.production` 파일 생성 및 값 설정
+- [ ] JWT_SECRET 새로 생성 (128자)
+- [ ] DB 비밀번호 변경 (32자 이상)
+- [ ] CORS_ORIGIN에 실제 도메인 설정
+- [ ] LOG_LEVEL=warn 확인
+- [ ] Health Check 엔드포인트 확인
+- [ ] SSL/TLS 인증서 설정 (Nginx/Apache)
+- [ ] 방화벽 규칙 설정
+- [ ] 백업 전략 수립
+
+### 토큰 만료 시간
+
+**개발 환경:**
+- Access Token: 1시간
+- Refresh Token: 7일
+
+**프로덕션 환경:**
+- Access Token: 15분 (보안 강화)
+- Refresh Token: 7일
+
+---
+
+## 🔧 개발 가이드
+
+### 로컬 개발 환경 설정
+
+```bash
+# 백엔드 디렉토리로 이동
+cd backend
+
+# 의존성 설치
+npm install
+
+# Prisma Client 생성
+npx prisma generate
+
+# 개발 서버 실행 (hot reload)
+npm run start:dev
+```
+
+### 데이터베이스 마이그레이션
+
+```bash
+# Prisma 스키마 변경 후
+npx prisma db push
+
+# 또는 마이그레이션 파일 생성
+npx prisma migrate dev --name migration_name
+```
+
+### 코드 스타일
+
+프로젝트는 ESLint와 Prettier를 사용합니다.
+
+```bash
+# Lint 검사
+npm run lint
+
+# 자동 수정
+npm run lint:fix
+
+# 포맷팅
+npm run format
+```
+
+---
+
+## 📊 시스템 아키텍처
+
+```
+┌─────────────────────────────────────────┐
+│         Docker Environment              │
+│                                         │
+│  ┌──────────────────┐  ┌─────────────┐ │
+│  │  NestJS Backend  │  │   MariaDB   │ │
+│  │   (TypeScript)   │◄─┤   10.11     │ │
+│  │                  │  │             │ │
+│  │  - REST API      │  │ - Prisma    │ │
+│  │  - JWT Auth      │  │ - customer_ │ │
+│  │  - Swagger       │  │   db        │ │
+│  │  Port: 5000      │  │ Port: 3306  │ │
+│  └──────────────────┘  └─────────────┘ │
+│         │                               │
+└─────────┼───────────────────────────────┘
+          │
+    Host: 5001
+          │
+          ▼
+    React Frontend
+    (To be developed)
+```
+
+---
+
+## 🚧 다음 단계
+
+현재 백엔드 마이그레이션이 완료된 상태입니다.
+
+### 계획된 작업
+
+**Phase 2-2: 로깅 및 모니터링**
+- [ ] Winston 로거 통합
+- [ ] 파일 로그 로테이션
+- [ ] 에러 추적 (Sentry 등)
+- [ ] API 응답 시간 로깅
+
+**Phase 2-3: 성능 최적화**
+- [ ] 데이터베이스 인덱스 최적화
+- [ ] Redis 캐싱 구현
+- [ ] 쿼리 성능 모니터링
+- [ ] API Rate Limiting
+
+**Phase 2-4: 추가 보안**
+- [ ] Helmet.js 미들웨어
+- [ ] CSRF 보호
+- [ ] Request Validation 강화
+- [ ] IP 화이트리스트
+
+**Phase 3: 프론트엔드 개발**
+- [ ] React 18+ 프로젝트 생성
+- [ ] TypeScript 설정
+- [ ] API 클라이언트 구현
+- [ ] 페이지 개발 (로그인, 대시보드, 고객사 관리 등)
 
 ---
 
@@ -214,7 +414,7 @@ customer-storage/
 
 - **문제 보고**: GitHub Issues에 등록해주세요
 - **기능 제안**: Pull Request 환영합니다
-- **문서 개선**: [docs](docs/) 폴더의 문서 개선 제안
+- **문서 개선**: README 및 코드 주석 개선 제안
 
 ---
 
@@ -224,4 +424,4 @@ customer-storage/
 
 ---
 
-**📚 상세한 문서는 [docs 폴더](docs/)를 참고하세요.**
+**🚀 NestJS 백엔드 마이그레이션 완료!**

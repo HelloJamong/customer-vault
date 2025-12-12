@@ -1,20 +1,8 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.env
-venv/
-env/
-ENV/
-
-# Flask
-instance/
-.webassets-cache
-
 # Environment variables
 .env
+.env.*
+!.env.example
+!.env.*.example
 
 # Database
 *.db

@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@nestjs/platform-express": "^11.1.9",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/multer": "^2.0.0"
+  }
+}
