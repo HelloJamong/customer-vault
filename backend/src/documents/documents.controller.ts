@@ -97,7 +97,7 @@ export class DocumentsController {
   )
   async upload(
     @Param('customerId', ParseIntPipe) customerId: number,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body() body: any,
     @Request() req,
   ) {
