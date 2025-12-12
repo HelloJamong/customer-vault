@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/api/auth.api';
 import { useAuthStore } from '@/store/authStore';
@@ -12,7 +12,7 @@ export const useAuth = () => {
   const loginMutation = useMutation({
     mutationFn: (credentials: LoginRequest) => authAPI.login(credentials),
     onSuccess: (data) => {
-      setAuth(data.access_token, data.refresh_token, data.user);
+      setAuth(data.accessToken, data.refreshToken, data.user);
       navigate('/dashboard');
     },
     onError: (error: any) => {
@@ -36,18 +36,8 @@ export const useAuth = () => {
     },
   });
 
-  // 현재 사용자 정보 쿼리
-  const { data: currentUser, isLoading } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: () => authAPI.getCurrentUser(),
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5분
-  });
-
   return {
     user,
-    currentUser,
-    isLoading,
     isAuthenticated: !!user,
     login: loginMutation.mutate,
     logout: logoutMutation.mutate,

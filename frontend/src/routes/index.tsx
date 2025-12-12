@@ -12,7 +12,6 @@ import DashboardPage from '@/pages/DashboardPage';
 import CustomersPage from '@/pages/CustomersPage';
 import UsersPage from '@/pages/UsersPage';
 import DocumentsPage from '@/pages/DocumentsPage';
-import ProfilePage from '@/pages/ProfilePage';
 import SettingsPage from '@/pages/SettingsPage';
 import UnauthorizedPage from '@/pages/UnauthorizedPage';
 
@@ -58,10 +57,6 @@ export const router = createBrowserRouter([
         element: <DocumentsPage />,
       },
       {
-        path: 'profile',
-        element: <ProfilePage />,
-      },
-      {
         path: 'settings',
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
@@ -77,6 +72,6 @@ export const router = createBrowserRouter([
   },
   {
     path: '*',
-    element: <Navigate to="/dashboard" replace />,
+    element: <Navigate to="/login" replace />,
   },
 ]);

@@ -40,14 +40,14 @@ apiClient.interceptors.response.use(
 
         // Refresh Token으로 새 Access Token 발급
         const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refresh_token: refreshToken,
+          refreshToken: refreshToken,
         });
 
         // 새 토큰 저장
-        localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
 
         // 원래 요청 재시도
-        originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
+        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh Token도 만료된 경우 로그아웃

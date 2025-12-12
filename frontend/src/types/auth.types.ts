@@ -7,11 +7,13 @@ export enum UserRole {
 export interface User {
   id: number;
   username: string;
-  email: string | null;
-  role: UserRole;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  name: string;
+  email?: string | null;
+  role: string;
+  isActive?: boolean;
+  isFirstLogin?: boolean;
+  lastLogin?: string;
+  createdAt?: string;
 }
 
 export interface LoginRequest {
@@ -20,12 +22,12 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
+  accessToken: string;
+  refreshToken: string;
   user: User;
 }
 
 export interface ChangePasswordRequest {
-  old_password: string;
-  new_password: string;
+  currentPassword: string;
+  newPassword: string;
 }

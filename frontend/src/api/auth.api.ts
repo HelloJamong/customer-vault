@@ -20,9 +20,9 @@ export const authAPI = {
   },
 
   // 토큰 갱신
-  refreshToken: async (refreshToken: string): Promise<{ access_token: string }> => {
+  refreshToken: async (refreshToken: string): Promise<{ accessToken: string }> => {
     const { data } = await apiClient.post('/auth/refresh', {
-      refresh_token: refreshToken,
+      refreshToken: refreshToken,
     });
     return data;
   },

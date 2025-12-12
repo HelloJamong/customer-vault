@@ -16,14 +16,24 @@ const queryClient = new QueryClient({
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
+      main: '#2563eb', // blue-600
     },
     secondary: {
-      main: '#dc004e',
+      main: '#6366f1', // indigo-500
+    },
+    error: {
+      main: '#dc2626', // red-600
+    },
+    warning: {
+      main: '#f59e0b', // amber-500
+    },
+    success: {
+      main: '#14b8a6', // teal-500
     },
   },
   typography: {
     fontFamily: [
+      'Pretendard',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
@@ -32,6 +42,15 @@ const theme = createTheme({
       'Arial',
       'sans-serif',
     ].join(','),
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        },
+      },
+    },
   },
 });
 
