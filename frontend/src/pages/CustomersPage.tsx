@@ -1,25 +1,47 @@
-import { Box, Typography, Button, Chip } from '@mui/material';
+import { useState } from 'react';
+import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { Add, Edit, Delete } from '@mui/icons-material';
+import { Add, Visibility, Info } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
-import dayjs from 'dayjs';
 
 const CustomersPage = () => {
-  const { customers, isLoading, deleteCustomer } = useCustomers();
+  const navigate = useNavigate();
+  const { customers, isLoading, createCustomer } = useCustomers();
+  const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
 
-  const handleDelete = (id: number, name: string) => {
-    if (confirm(`"${name}" 고객사를 삭제하시겠습니까?`)) {
-      deleteCustomer(id);
+  const handleAddCustomer = async () => {
+    if (!newCustomerName.trim()) {
+      alert('고객사명을 입력해주세요.');
+      return;
+    }
+
+    try {
+      await createCustomer({ name: newCustomerName.trim() });
+      setOpenAddDialog(false);
+      setNewCustomerName('');
+    } catch (error) {
+      console.error('고객사 추가 실패:', error);
     }
   };
 
+  const getInspectionCycleText = (customer: Customer) => {
+    if (customer.inspectionCycleType === '매월') return '매월';
+    if (customer.inspectionCycleType === '분기') return `분기(${customer.inspectionCycleMonth}월)`;
+    if (customer.inspectionCycleType === '반기') return `반기(${customer.inspectionCycleMonth}월)`;
+    if (customer.inspectionCycleType === '연1회') return `연1회(${customer.inspectionCycleMonth}월)`;
+    return customer.inspectionCycleType || '-';
+  };
+
+  const getStatusColor = (status: string | undefined) => {
+    if (status === '점검 완료') return 'success';
+    if (status === '미완료') return 'error';
+    return 'default';
+  };
+
   const columns: GridColDef<Customer>[] = [
-    {
-      field: 'id',
-      headerName: 'ID',
-      width: 70,
-    },
     {
       field: 'name',
       headerName: '고객사명',
@@ -27,75 +49,59 @@ const CustomersPage = () => {
       flex: 1,
     },
     {
-      field: 'contact_person',
-      headerName: '담당자',
-      width: 130,
-    },
-    {
-      field: 'contact_phone',
-      headerName: '연락처',
-      width: 150,
-    },
-    {
-      field: 'contact_email',
-      headerName: '이메일',
-      width: 200,
-    },
-    {
-      field: 'inspection_cycle_months',
+      field: 'inspectionCycleType',
       headerName: '점검주기',
-      width: 100,
-      renderCell: (params) => `${params.value}개월`,
+      width: 150,
+      renderCell: (params) => getInspectionCycleText(params.row),
     },
     {
-      field: 'last_inspection_date',
-      headerName: '최근점검일',
-      width: 130,
-      renderCell: (params) =>
-        params.value ? dayjs(params.value).format('YYYY-MM-DD') : '-',
-    },
-    {
-      field: 'next_inspection_date',
-      headerName: '다음점검일',
-      width: 130,
-      renderCell: (params) =>
-        params.value ? dayjs(params.value).format('YYYY-MM-DD') : '-',
-    },
-    {
-      field: 'is_active',
+      field: 'inspectionStatus',
       headerName: '상태',
-      width: 100,
+      width: 120,
       renderCell: (params) => (
         <Chip
-          label={params.value ? '활성' : '비활성'}
-          color={params.value ? 'success' : 'default'}
+          label={params.value || '대상아님'}
+          color={getStatusColor(params.value)}
           size="small"
         />
       ),
     },
     {
-      field: 'actions',
-      headerName: '작업',
-      width: 150,
+      field: 'contractType',
+      headerName: '계약 상태',
+      width: 120,
+      renderCell: (params) => params.value || '미계약',
+    },
+    {
+      field: 'viewDocuments',
+      headerName: '점검서보기',
+      width: 120,
       sortable: false,
       renderCell: (params) => (
-        <Box display="flex" gap={1}>
-          <Button
-            size="small"
-            startIcon={<Edit />}
-            onClick={() => alert(`편집 기능은 곧 구현됩니다: ${params.row.name}`)}
-          >
-            편집
-          </Button>
-          <Button
-            size="small"
-            color="error"
-            startIcon={<Delete />}
-            onClick={() => handleDelete(params.row.id, params.row.name)}
-          >
-            삭제
-          </Button>
-        </Box>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<Visibility />}
+          onClick={() => navigate(`/customers/${params.row.id}/documents`)}
+        >
+          보기
+        </Button>
+      ),
+    },
+    {
+      field: 'viewDetails',
+      headerName: '세부사항보기',
+      width: 130,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<Info />}
+          onClick={() => navigate(`/customers/${params.row.id}`)}
+        >
+          세부사항
+        </Button>
       ),
     },
   ];
@@ -114,7 +120,7 @@ const CustomersPage = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => alert('고객사 추가 기능은 곧 구현됩니다')}
+          onClick={() => setOpenAddDialog(true)}
         >
           고객사 추가
         </Button>
@@ -138,6 +144,33 @@ const CustomersPage = () => {
           }}
         />
       </Box>
+
+      {/* 고객사 추가 다이얼로그 */}
+      <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>고객사 추가</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="고객사명"
+            fullWidth
+            required
+            value={newCustomerName}
+            onChange={(e) => setNewCustomerName(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleAddCustomer();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAddDialog(false)}>취소</Button>
+          <Button onClick={handleAddCustomer} variant="contained">
+            추가
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

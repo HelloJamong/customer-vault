@@ -1,36 +1,74 @@
 export interface Customer {
   id: number;
   name: string;
-  contract_start: string | null;
-  contract_end: string | null;
-  inspection_cycle_months: number;
-  last_inspection_date: string | null;
-  next_inspection_date: string | null;
-  contact_person: string | null;
-  contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
+  location: string | null;
+
+  // 주 담당자
+  contactName: string | null;
+  contactPosition: string | null;
+  contactDepartment: string | null;
+  contactMobile: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+
+  // 계약 정보
+  contractType: string;
+  contractStartDate: string | null;
+  contractEndDate: string | null;
+
+  // 점검 정보
+  inspectionCycleType: string;
+  inspectionCycleMonth: number | null;
+  lastInspectionDate: string | null;
+  inspectionStatus?: string; // '점검 완료' | '미완료' | '대상아님'
+
+  // 비고
   notes: string | null;
-  is_active: boolean;
-  assigned_user_id: number | null;
-  created_at: string;
-  updated_at: string;
+
+  // 사내 담당자
+  engineerId: number | null;
+  engineerSubId: number | null;
+  salesId: number | null;
+
+  // 관계
+  engineer?: { id: number; name: string } | null;
+  engineerSub?: { id: number; name: string } | null;
+  sales?: { id: number; name: string } | null;
+
+  // 타임스탬프
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateCustomerDto {
   name: string;
-  contract_start?: string;
-  contract_end?: string;
-  inspection_cycle_months: number;
-  last_inspection_date?: string;
-  contact_person?: string;
-  contact_phone?: string;
-  contact_email?: string;
-  address?: string;
+  location?: string;
+
+  // 주 담당자
+  contactName?: string;
+  contactPosition?: string;
+  contactDepartment?: string;
+  contactMobile?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+
+  // 계약 정보
+  contractType?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+
+  // 점검 정보
+  inspectionCycleType?: string;
+  inspectionCycleMonth?: number;
+  lastInspectionDate?: string;
+
+  // 비고
   notes?: string;
-  assigned_user_id?: number;
+
+  // 사내 담당자
+  engineerId?: number;
+  engineerSubId?: number;
+  salesId?: number;
 }
 
-export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {
-  is_active?: boolean;
-}
+export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}

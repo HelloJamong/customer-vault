@@ -31,14 +31,33 @@ export class CustomersService {
       where.name = { contains: filters.search };
     }
 
-    return this.prisma.customer.findMany({
+    const customers = await this.prisma.customer.findMany({
       where,
       include: {
         engineer: { select: { id: true, name: true } },
         engineerSub: { select: { id: true, name: true } },
         sales: { select: { id: true, name: true } },
+        inspectionTargets: { select: { id: true } },
+        documents: {
+          select: {
+            id: true,
+            inspectionDate: true,
+            inspectionTargetId: true,
+          },
+        },
       },
       orderBy: { name: 'asc' },
+    });
+
+    // 각 고객사의 점검 상태 계산
+    return customers.map((customer) => {
+      const inspectionStatus = this.getInspectionStatus(customer);
+      const { inspectionTargets, documents, ...customerData } = customer;
+
+      return {
+        ...customerData,
+        inspectionStatus,
+      };
     });
   }
 
@@ -101,6 +120,52 @@ export class CustomersService {
   async remove(id: number) {
     await this.prisma.customer.delete({ where: { id } });
     return { message: '고객사가 삭제되었습니다.' };
+  }
+
+  // 점검 상태 계산 (점검 완료 / 미완료 / 대상아님)
+  getInspectionStatus(customer: any): string {
+    // 계약 상태가 만료 또는 미계약인 경우
+    if (['만료', '미계약'].includes(customer.contractType)) {
+      return '대상아님';
+    }
+
+    // 점검 주기가 협력사진행 또는 무상기간인 경우
+    if (['협력사진행', '무상기간'].includes(customer.inspectionCycleType)) {
+      return '대상아님';
+    }
+
+    // 이번 달 점검 대상인지 확인
+    if (!this.isInspectionNeededThisMonth(customer)) {
+      return '대상아님';
+    }
+
+    // 점검 대상 항목이 없으면 미완료
+    const targetIds = customer.inspectionTargets?.map((t: any) => t.id) || [];
+    if (targetIds.length === 0) {
+      return '미완료';
+    }
+
+    // 이번 달 점검 완료된 대상 확인
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const completedTargetIds = new Set(
+      customer.documents
+        ?.filter((doc: any) => {
+          const inspectionDate = new Date(doc.inspectionDate);
+          return (
+            doc.inspectionTargetId &&
+            inspectionDate >= startOfMonth &&
+            inspectionDate <= endOfMonth
+          );
+        })
+        .map((doc: any) => doc.inspectionTargetId) || []
+    );
+
+    // 모든 점검 대상이 완료되었는지 확인
+    const allCompleted = targetIds.every((id: number) => completedTargetIds.has(id));
+    return allCompleted ? '점검 완료' : '미완료';
   }
 
   // 이번 달 점검 대상 여부 확인

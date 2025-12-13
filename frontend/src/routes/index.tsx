@@ -10,6 +10,8 @@ import MainLayout from '@/components/layout/MainLayout';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import CustomersPage from '@/pages/CustomersPage';
+import CustomerDetailPage from '@/pages/CustomerDetailPage';
+import CustomerDocumentsPage from '@/pages/CustomerDocumentsPage';
 import UsersPage from '@/pages/UsersPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import SettingsPage from '@/pages/SettingsPage';
@@ -41,6 +43,22 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
             <CustomersPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <CustomerDetailPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId/documents',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <CustomerDocumentsPage />
           </RoleRoute>
         ),
       },
