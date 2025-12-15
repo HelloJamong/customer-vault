@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/utils/constants';
+import { useAuthStore } from '@/store/authStore';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -8,6 +9,9 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// 리다이렉트 중인지 확인하는 플래그
+let isRedirecting = false;
 
 // 요청 인터셉터: Access Token 자동 추가
 apiClient.interceptors.request.use(
@@ -51,9 +55,14 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh Token도 만료된 경우 로그아웃
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        window.location.href = '/login';
+        // zustand store의 logout 호출
+        useAuthStore.getState().logout();
+
+        // 이미 로그인 페이지에 있지 않고, 리다이렉트 중이 아닌 경우에만 리다이렉트
+        if (!isRedirecting && window.location.pathname !== '/login') {
+          isRedirecting = true;
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }

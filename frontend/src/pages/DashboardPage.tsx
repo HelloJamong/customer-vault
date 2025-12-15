@@ -33,7 +33,20 @@ const DashboardPage = () => {
 
 // 슈퍼관리자용 대시보드
 const SuperAdminDashboard = () => {
-  const { stats, isLoading } = useDashboard();
+  const { stats, isLoading, error } = useDashboard();
+
+  if (error) {
+    return (
+      <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" minHeight="400px" gap={2}>
+        <Typography variant="h6" color="error">
+          대시보드 데이터를 불러오는데 실패했습니다.
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'}
+        </Typography>
+      </Box>
+    );
+  }
 
   if (isLoading || !stats) {
     return (
@@ -616,7 +629,20 @@ const SuperAdminDashboard = () => {
 
 // 관리자용 대시보드
 const AdminDashboard = () => {
-  const { stats, isLoading } = useDashboard();
+  const { stats, isLoading, error } = useDashboard();
+
+  if (error) {
+    return (
+      <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" minHeight="400px" gap={2}>
+        <Typography variant="h6" color="error">
+          대시보드 데이터를 불러오는데 실패했습니다.
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'}
+        </Typography>
+      </Box>
+    );
+  }
 
   if (isLoading || !stats) {
     return (

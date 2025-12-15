@@ -11,6 +11,30 @@ export interface Customer {
   contactPhone: string | null;
   contactEmail: string | null;
 
+  // 부담당자 1
+  contactNameSub1: string | null;
+  contactPositionSub1: string | null;
+  contactDepartmentSub1: string | null;
+  contactMobileSub1: string | null;
+  contactPhoneSub1: string | null;
+  contactEmailSub1: string | null;
+
+  // 부담당자 2
+  contactNameSub2: string | null;
+  contactPositionSub2: string | null;
+  contactDepartmentSub2: string | null;
+  contactMobileSub2: string | null;
+  contactPhoneSub2: string | null;
+  contactEmailSub2: string | null;
+
+  // 부담당자 3
+  contactNameSub3: string | null;
+  contactPositionSub3: string | null;
+  contactDepartmentSub3: string | null;
+  contactMobileSub3: string | null;
+  contactPhoneSub3: string | null;
+  contactEmailSub3: string | null;
+
   // 계약 정보
   contractType: string;
   contractStartDate: string | null;
@@ -34,10 +58,21 @@ export interface Customer {
   engineer?: { id: number; name: string } | null;
   engineerSub?: { id: number; name: string } | null;
   sales?: { id: number; name: string } | null;
+  inspectionTargets?: InspectionTarget[];
 
   // 타임스탬프
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InspectionTarget {
+  id: number;
+  customerId: number;
+  targetType: string;
+  customName: string | null;
+  productName: string | null;
+  displayOrder: number;
+  createdAt: string;
 }
 
 export interface CreateCustomerDto {
@@ -51,6 +86,28 @@ export interface CreateCustomerDto {
   contactMobile?: string;
   contactPhone?: string;
   contactEmail?: string;
+
+  // 부담당자 1-3
+  contactNameSub1?: string;
+  contactPositionSub1?: string;
+  contactDepartmentSub1?: string;
+  contactMobileSub1?: string;
+  contactPhoneSub1?: string;
+  contactEmailSub1?: string;
+
+  contactNameSub2?: string;
+  contactPositionSub2?: string;
+  contactDepartmentSub2?: string;
+  contactMobileSub2?: string;
+  contactPhoneSub2?: string;
+  contactEmailSub2?: string;
+
+  contactNameSub3?: string;
+  contactPositionSub3?: string;
+  contactDepartmentSub3?: string;
+  contactMobileSub3?: string;
+  contactPhoneSub3?: string;
+  contactEmailSub3?: string;
 
   // 계약 정보
   contractType?: string;
@@ -72,3 +129,15 @@ export interface CreateCustomerDto {
 }
 
 export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}
+
+export interface CreateInspectionTargetDto {
+  customerId: number;
+  targetType: string;
+  productName?: string;
+}
+
+export interface UpdateInspectionTargetDto {
+  targetType?: string;
+  productName?: string;
+  displayOrder?: number;
+}

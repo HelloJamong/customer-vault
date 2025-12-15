@@ -7,7 +7,6 @@ interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
-  isAuthenticated: boolean;
 
   // Actions
   login: (accessToken: string, refreshToken: string, user: User) => void;
@@ -22,7 +21,6 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      isAuthenticated: false,
 
       login: (accessToken, refreshToken, user) => {
         localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
@@ -31,7 +29,6 @@ export const useAuthStore = create<AuthState>()(
           user,
           accessToken,
           refreshToken,
-          isAuthenticated: true,
         });
       },
 
@@ -42,7 +39,6 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           accessToken: null,
           refreshToken: null,
-          isAuthenticated: false,
         });
       },
 
@@ -57,8 +53,14 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
-        isAuthenticated: state.isAuthenticated,
       }),
     }
   )
 );
+
+// Helper function to check authentication
+export const isAuthenticated = (): boolean => {
+  const state = useAuthStore.getState();
+  const hasToken = !!localStorage.getItem(ACCESS_TOKEN_KEY);
+  return !!state.user && hasToken;
+};

@@ -107,6 +107,7 @@ export class UpdateCustomerDto {
   @IsOptional()
   location?: string;
 
+  // 주 담당자
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
@@ -115,8 +116,138 @@ export class UpdateCustomerDto {
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
+  contactPosition?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactDepartment?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactMobile?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPhone?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactEmail?: string;
+
+  // 부담당자 1
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactNameSub1?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPositionSub1?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactDepartmentSub1?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactMobileSub1?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPhoneSub1?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactEmailSub1?: string;
+
+  // 부담당자 2
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactNameSub2?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPositionSub2?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactDepartmentSub2?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactMobileSub2?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPhoneSub2?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactEmailSub2?: string;
+
+  // 부담당자 3
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactNameSub3?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPositionSub3?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactDepartmentSub3?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactMobileSub3?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactPhoneSub3?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  contactEmailSub3?: string;
+
+  // 계약 정보
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
   contractType?: string;
 
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  contractStartDate?: string;
+
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  contractEndDate?: string;
+
+  // 점검 정보
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
@@ -125,8 +256,30 @@ export class UpdateCustomerDto {
   @ApiProperty({ required: false })
   @IsInt()
   @IsOptional()
+  inspectionCycleMonth?: number;
+
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  lastInspectionDate?: string;
+
+  // 사내 담당자
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
   engineerId?: number;
 
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
+  engineerSubId?: number;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
+  salesId?: number;
+
+  // 비고
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()

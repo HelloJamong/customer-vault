@@ -107,7 +107,18 @@ export class CustomersService {
   async update(id: number, updateCustomerDto: UpdateCustomerDto) {
     const customer = await this.prisma.customer.update({
       where: { id },
-      data: updateCustomerDto,
+      data: {
+        ...updateCustomerDto,
+        contractStartDate: updateCustomerDto.contractStartDate
+          ? new Date(updateCustomerDto.contractStartDate)
+          : undefined,
+        contractEndDate: updateCustomerDto.contractEndDate
+          ? new Date(updateCustomerDto.contractEndDate)
+          : undefined,
+        lastInspectionDate: updateCustomerDto.lastInspectionDate
+          ? new Date(updateCustomerDto.lastInspectionDate)
+          : undefined,
+      },
     });
 
     return {
@@ -170,11 +181,22 @@ export class CustomersService {
 
   // 이번 달 점검 대상 여부 확인
   isInspectionNeededThisMonth(customer: any): boolean {
+    // 계약 상태가 만료 또는 미계약인 경우
     if (['만료', '미계약'].includes(customer.contractType)) {
       return false;
     }
 
+    // 점검 주기가 협력사진행 또는 무상기간인 경우
     if (['협력사진행', '무상기간'].includes(customer.inspectionCycleType)) {
+      return false;
+    }
+
+    // 계약 상태가 유상이거나, 무상이지만 점검 주기가 설정된 경우
+    const isValidContract = customer.contractType === '유상' ||
+      (customer.contractType === '무상' && customer.inspectionCycleType &&
+       !['협력사진행', '무상기간'].includes(customer.inspectionCycleType));
+
+    if (!isValidContract) {
       return false;
     }
 

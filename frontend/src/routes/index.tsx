@@ -11,6 +11,7 @@ import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
+import CustomerEditPage from '@/pages/CustomerEditPage';
 import CustomerDocumentsPage from '@/pages/CustomerDocumentsPage';
 import UsersPage from '@/pages/UsersPage';
 import DocumentsPage from '@/pages/DocumentsPage';
@@ -51,6 +52,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
             <CustomerDetailPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId/edit',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <CustomerEditPage />
           </RoleRoute>
         ),
       },

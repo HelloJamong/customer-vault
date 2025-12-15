@@ -62,12 +62,28 @@ export class DocumentsService {
     inspectionDate: string;
     inspectionType: string;
   }) {
+    const inspectionDate = new Date(data.inspectionDate);
+
     const document = await this.prisma.document.create({
       data: {
         ...data,
-        inspectionDate: new Date(data.inspectionDate),
+        inspectionDate,
       },
     });
+
+    // 고객사의 최근 점검일 자동 업데이트
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: data.customerId },
+      select: { lastInspectionDate: true },
+    });
+
+    // 현재 저장된 최근 점검일이 없거나, 새로 업로드된 점검일이 더 최근인 경우 업데이트
+    if (!customer?.lastInspectionDate || inspectionDate > customer.lastInspectionDate) {
+      await this.prisma.customer.update({
+        where: { id: data.customerId },
+        data: { lastInspectionDate: inspectionDate },
+      });
+    }
 
     return {
       id: document.id,

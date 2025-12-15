@@ -98,7 +98,7 @@ const CustomerDetailPage = () => {
         <Button
           variant="contained"
           startIcon={<Edit />}
-          onClick={() => alert('편집 기능은 곧 구현됩니다')}
+          onClick={() => navigate(`/customers/${customerId}/edit`)}
         >
           수정
         </Button>

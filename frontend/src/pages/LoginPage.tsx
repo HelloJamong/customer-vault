@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
-import { useAuthStore } from '@/store/authStore';
+import { isAuthenticated } from '@/store/authStore';
 import { Navigate } from 'react-router-dom';
 import {
   Box,
@@ -21,7 +21,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authenticated = isAuthenticated();
   const { login, isLoginLoading } = useAuth();
   const {
     register,
@@ -32,7 +32,7 @@ const LoginPage = () => {
   });
 
   // 이미 로그인되어 있으면 대시보드로 리다이렉트
-  if (isAuthenticated) {
+  if (authenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 

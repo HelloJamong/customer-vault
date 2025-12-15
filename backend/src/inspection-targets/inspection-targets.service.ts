@@ -1,18 +1,44 @@
 import { Injectable } from '@nestjs/common';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 export class CreateInspectionTargetDto {
+  @IsNumber()
+  @IsNotEmpty()
   customerId: number;
+
+  @IsString()
+  @IsNotEmpty()
   targetType: string;
+
+  @IsString()
+  @IsOptional()
   customName?: string;
+
+  @IsString()
+  @IsOptional()
   productName?: string;
+
+  @IsNumber()
+  @IsOptional()
   displayOrder?: number;
 }
 
 export class UpdateInspectionTargetDto {
+  @IsString()
+  @IsOptional()
   targetType?: string;
+
+  @IsString()
+  @IsOptional()
   customName?: string;
+
+  @IsString()
+  @IsOptional()
   productName?: string;
+
+  @IsNumber()
+  @IsOptional()
   displayOrder?: number;
 }
 
