@@ -20,6 +20,7 @@ model User {
   email                 String?   @unique @db.VarChar(120)
   role                  String    @default("user") @db.VarChar(20) // super_admin, admin, user
   department            String?   @db.VarChar(20)
+  description           String?   @db.VarChar(200)
   isActive              Boolean   @default(true) @map("is_active")
   customerId            Int?      @map("customer_id")
 

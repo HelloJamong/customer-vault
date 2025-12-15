@@ -3,13 +3,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { isAuthenticated } from '@/store/authStore';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import {
   Box,
   TextField,
   Button,
   Typography,
   Paper,
+  Alert,
 } from '@mui/material';
 import { Lock } from '@mui/icons-material';
 
@@ -23,6 +24,8 @@ type LoginForm = z.infer<typeof loginSchema>;
 const LoginPage = () => {
   const authenticated = isAuthenticated();
   const { login, isLoginLoading } = useAuth();
+  const location = useLocation();
+  const passwordChanged = (location.state as { passwordChanged?: boolean } | null)?.passwordChanged;
   const {
     register,
     handleSubmit,
@@ -119,6 +122,11 @@ const LoginPage = () => {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit(onSubmit)}>
+            {passwordChanged && (
+              <Alert severity="success" sx={{ mb: 3 }}>
+                비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해주세요.
+              </Alert>
+            )}
             <Box sx={{ mb: 3 }}>
               <Typography
                 component="label"

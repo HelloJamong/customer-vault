@@ -4,6 +4,11 @@ import { authAPI } from '@/api/auth.api';
 import { useAuthStore } from '@/store/authStore';
 import type { LoginRequest } from '@/types/auth.types';
 
+interface LogoutOptions {
+  redirectState?: Record<string, unknown>;
+  skipRequest?: boolean;
+}
+
 export const useAuth = () => {
   const navigate = useNavigate();
   const { login: setAuth, logout: clearAuth, user } = useAuthStore();
@@ -24,15 +29,20 @@ export const useAuth = () => {
 
   // 로그아웃 뮤테이션
   const logoutMutation = useMutation({
-    mutationFn: () => authAPI.logout(),
-    onSuccess: () => {
-      clearAuth();
-      navigate('/login');
+    mutationFn: async (options?: LogoutOptions) => {
+      if (options?.skipRequest) {
+        return;
+      }
+      await authAPI.logout();
     },
-    onError: () => {
+    onSuccess: (_data, variables) => {
+      clearAuth();
+      navigate('/login', { state: variables?.redirectState });
+    },
+    onError: (_error, variables) => {
       // 에러가 발생해도 로컬 스토리지는 클리어
       clearAuth();
-      navigate('/login');
+      navigate('/login', { state: variables?.redirectState });
     },
   });
 

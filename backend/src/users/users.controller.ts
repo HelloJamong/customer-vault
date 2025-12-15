@@ -9,6 +9,7 @@ import {
   UseGuards,
   Query,
   ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -71,8 +72,8 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @ApiOperation({ summary: '사용자 활성화/비활성화 토글' })
   @ApiResponse({ status: 200, description: '변경 성공' })
-  toggleActive(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.toggleActive(id);
+  toggleActive(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.usersService.toggleActive(id, req.user.userId);
   }
 
   @Post(':id/reset-password')
@@ -87,7 +88,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: '사용자 삭제' })
   @ApiResponse({ status: 200, description: '삭제 성공' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.usersService.remove(id, req.user.userId);
   }
 }

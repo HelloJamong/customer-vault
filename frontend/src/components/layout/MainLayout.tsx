@@ -1,35 +1,10 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Box,
-  Typography,
-  Button,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-} from '@mui/material';
+import { Box, Typography, Button, Menu, MenuItem } from '@mui/material';
 import { KeyboardArrowDown } from '@mui/icons-material';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { authAPI } from '@/api/auth.api';
-
-const passwordChangeSchema = z.object({
-  currentPassword: z.string().min(1, '현재 패스워드를 입력해주세요'),
-  newPassword: z.string().min(4, '새 패스워드는 최소 4자 이상이어야 합니다'),
-  confirmPassword: z.string().min(1, '패스워드 확인을 입력해주세요'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: '패스워드가 일치하지 않습니다',
-  path: ['confirmPassword'],
-});
-
-type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
+import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
 
 const MainLayout = () => {
   const user = useAuthStore((state) => state.user);
@@ -41,16 +16,14 @@ const MainLayout = () => {
   const [logAnchor, setLogAnchor] = useState<null | HTMLElement>(null);
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<PasswordChangeForm>({
-    resolver: zodResolver(passwordChangeSchema),
-  });
+  useEffect(() => {
+    if (user?.isFirstLogin) {
+      setIsForcedPasswordChange(true);
+      setPasswordDialogOpen(true);
+    }
+  }, [user?.isFirstLogin]);
 
   const handleLogout = () => {
     setUserAnchor(null);
@@ -59,30 +32,21 @@ const MainLayout = () => {
 
   const handlePasswordDialogOpen = () => {
     setUserAnchor(null);
+    setIsForcedPasswordChange(false);
     setPasswordDialogOpen(true);
-    reset();
   };
 
   const handlePasswordDialogClose = () => {
+    if (isForcedPasswordChange) {
+      return;
+    }
     setPasswordDialogOpen(false);
-    reset();
   };
 
-  const onPasswordChangeSubmit = async (data: PasswordChangeForm) => {
-    setIsSubmitting(true);
-    try {
-      await authAPI.changePassword({
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      });
-      alert('패스워드가 성공적으로 변경되었습니다.');
-      handlePasswordDialogClose();
-    } catch (error: any) {
-      const message = error.response?.data?.message || '패스워드 변경에 실패했습니다.';
-      alert(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handlePasswordChangeSuccess = () => {
+    alert('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
+    setPasswordDialogOpen(false);
+    logout({ redirectState: { passwordChanged: true } });
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -403,190 +367,12 @@ const MainLayout = () => {
         <Outlet />
       </Box>
 
-      {/* 패스워드 변경 다이얼로그 */}
-      <Dialog
+      <ChangePasswordDialog
         open={passwordDialogOpen}
+        isForced={isForcedPasswordChange}
         onClose={handlePasswordDialogClose}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontSize: '1.25rem',
-            fontWeight: 700,
-            color: '#1e293b',
-            pb: 2,
-          }}
-        >
-          패스워드 변경
-        </DialogTitle>
-        <form onSubmit={handleSubmit(onPasswordChangeSubmit)}>
-          <DialogContent sx={{ pt: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <Box>
-                <Typography
-                  component="label"
-                  sx={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#334155',
-                    mb: 0.5,
-                  }}
-                >
-                  현재 패스워드
-                </Typography>
-                <TextField
-                  {...register('currentPassword')}
-                  type="password"
-                  fullWidth
-                  placeholder="현재 패스워드를 입력해주세요"
-                  error={!!errors.currentPassword}
-                  helperText={errors.currentPassword?.message}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: '#f8fafc',
-                      borderRadius: 2,
-                      '& fieldset': {
-                        borderColor: '#e2e8f0',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#cbd5e1',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#6366f1',
-                        borderWidth: 2,
-                      },
-                    },
-                  }}
-                />
-              </Box>
-
-              <Box>
-                <Typography
-                  component="label"
-                  sx={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#334155',
-                    mb: 0.5,
-                  }}
-                >
-                  새 패스워드
-                </Typography>
-                <TextField
-                  {...register('newPassword')}
-                  type="password"
-                  fullWidth
-                  placeholder="새 패스워드를 입력해주세요"
-                  error={!!errors.newPassword}
-                  helperText={errors.newPassword?.message}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: '#f8fafc',
-                      borderRadius: 2,
-                      '& fieldset': {
-                        borderColor: '#e2e8f0',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#cbd5e1',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#6366f1',
-                        borderWidth: 2,
-                      },
-                    },
-                  }}
-                />
-              </Box>
-
-              <Box>
-                <Typography
-                  component="label"
-                  sx={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#334155',
-                    mb: 0.5,
-                  }}
-                >
-                  패스워드 재확인
-                </Typography>
-                <TextField
-                  {...register('confirmPassword')}
-                  type="password"
-                  fullWidth
-                  placeholder="패스워드를 다시 입력해주세요"
-                  error={!!errors.confirmPassword}
-                  helperText={errors.confirmPassword?.message}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: '#f8fafc',
-                      borderRadius: 2,
-                      '& fieldset': {
-                        borderColor: '#e2e8f0',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#cbd5e1',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#6366f1',
-                        borderWidth: 2,
-                      },
-                    },
-                  }}
-                />
-              </Box>
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3, pt: 2 }}>
-            <Button
-              onClick={handlePasswordDialogClose}
-              disabled={isSubmitting}
-              sx={{
-                color: '#64748b',
-                textTransform: 'none',
-                fontWeight: 500,
-                px: 3,
-                py: 1,
-                '&:hover': {
-                  bgcolor: '#f8fafc',
-                },
-              }}
-            >
-              취소
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={isSubmitting}
-              sx={{
-                bgcolor: '#6366f1',
-                color: 'white',
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 3,
-                py: 1,
-                boxShadow: 'none',
-                '&:hover': {
-                  bgcolor: '#4f46e5',
-                  boxShadow: 'none',
-                },
-              }}
-            >
-              {isSubmitting ? '변경 중...' : '저장'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+        onSuccess={handlePasswordChangeSuccess}
+      />
     </Box>
   );
 };

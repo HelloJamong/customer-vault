@@ -24,6 +24,11 @@ export class CreateUserDto {
   @IsOptional()
   department?: string;
 
+  @ApiProperty({ example: '시스템 관리자', description: '설명', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @ApiProperty({ example: [1, 2], description: '담당 고객사 ID 목록', required: false })
   @IsArray()
   @IsInt({ each: true })
@@ -46,6 +51,11 @@ export class UpdateUserDto {
   @IsString()
   @IsOptional()
   department?: string;
+
+  @ApiProperty({ example: '시스템 관리자', description: '설명', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @ApiProperty({ example: [1, 3, 5], description: '담당 고객사 ID 목록', required: false })
   @IsArray()
