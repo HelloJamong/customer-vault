@@ -44,7 +44,7 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: (
-          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomersPage />
           </RoleRoute>
         ),

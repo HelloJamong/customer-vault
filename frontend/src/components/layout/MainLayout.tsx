@@ -55,6 +55,7 @@ const MainLayout = () => {
   const userRole = user?.role?.toLowerCase();
   const isSuperAdmin = userRole === 'super_admin';
   const isAdmin = userRole === 'admin' || isSuperAdmin;
+  const canManageCustomers = isAdmin || userRole === 'user';
 
   return (
     <Box sx={{ minHeight: '100vh', width: '100vw', bgcolor: '#f8fafc' }}>
@@ -186,7 +187,7 @@ const MainLayout = () => {
             )}
 
             {/* 고객사 관리 */}
-            {isAdmin && (
+            {canManageCustomers && (
               <Button
                 onClick={() => navigate('/customers')}
                 sx={{
