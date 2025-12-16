@@ -4,7 +4,6 @@ import {
   Typography,
   Button,
   Paper,
-  Grid,
   TextField,
   CircularProgress,
   Divider,
@@ -27,6 +26,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import {
   ArrowBack,
   Save,
@@ -43,6 +43,12 @@ import 'dayjs/locale/ko';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import type { Customer, InspectionTarget, UpdateCustomerDto } from '@/types/customer.types';
+
+type UserOption = {
+  id: number;
+  name: string;
+  department?: string;
+};
 
 // dayjs 한국어 설정
 dayjs.locale('ko');
@@ -71,8 +77,13 @@ const CustomerEditPage = () => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
+  // 사내 담당자 옵션
+  const [engineerOptions, setEngineerOptions] = useState<UserOption[]>([]);
+  const [salesOptions, setSalesOptions] = useState<UserOption[]>([]);
+
   useEffect(() => {
     fetchCustomer();
+    fetchTeamMembers();
   }, [customerId]);
 
   const fetchCustomer = async () => {
@@ -135,6 +146,17 @@ const CustomerEditPage = () => {
     }
   };
 
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await apiClient.get('/users');
+      const users: UserOption[] = response.data;
+      setEngineerOptions(users.filter((user) => user.department === '기술팀'));
+      setSalesOptions(users.filter((user) => user.department === '영업팀'));
+    } catch (error) {
+      console.error('사내 담당자 목록 조회 실패:', error);
+    }
+  };
+
   const handleChange = (field: keyof UpdateCustomerDto, value: any) => {
     // 전화번호 필드 검증 (숫자, 하이픈만 허용)
     if (field.includes('Mobile') || field.includes('Phone')) {
@@ -184,9 +206,15 @@ const CustomerEditPage = () => {
 
     setIsSaving(true);
     try {
+      const normalizeId = (value: any) =>
+        value === '' || value === undefined || value === null ? undefined : value;
+
       // 빈 문자열을 null로 변환 (날짜 필드)
-      const cleanedData = {
+      const cleanedData: UpdateCustomerDto = {
         ...formData,
+        engineerId: normalizeId(formData.engineerId),
+        engineerSubId: normalizeId(formData.engineerSubId),
+        salesId: normalizeId(formData.salesId),
         contractStartDate: formData.contractStartDate || undefined,
         contractEndDate: formData.contractEndDate || undefined,
         lastInspectionDate: formData.lastInspectionDate || undefined,
@@ -318,7 +346,7 @@ const CustomerEditPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
+          <Grid xs={12} md={6}>
             <TextField
               label="고객사명"
               fullWidth
@@ -327,7 +355,7 @@ const CustomerEditPage = () => {
               onChange={(e) => handleChange('name', e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid xs={12} md={6}>
             <TextField
               label="위치"
               fullWidth
@@ -345,7 +373,7 @@ const CustomerEditPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <TextField
               label="담당자명"
               fullWidth
@@ -353,7 +381,7 @@ const CustomerEditPage = () => {
               onChange={(e) => handleChange('contactName', e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <TextField
               label="직책"
               fullWidth
@@ -361,7 +389,7 @@ const CustomerEditPage = () => {
               onChange={(e) => handleChange('contactPosition', e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <TextField
               label="부서"
               fullWidth
@@ -369,7 +397,7 @@ const CustomerEditPage = () => {
               onChange={(e) => handleChange('contactDepartment', e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <TextField
               label="휴대전화"
               fullWidth
@@ -377,7 +405,7 @@ const CustomerEditPage = () => {
               onChange={(e) => handleChange('contactMobile', e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <TextField
               label="유선전화"
               fullWidth
@@ -385,7 +413,7 @@ const CustomerEditPage = () => {
               onChange={(e) => handleChange('contactPhone', e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <TextField
               label="이메일"
               fullWidth
@@ -447,7 +475,7 @@ const CustomerEditPage = () => {
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="담당자명"
                     fullWidth
@@ -455,7 +483,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactNameSub1', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="직책"
                     fullWidth
@@ -463,7 +491,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactPositionSub1', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="부서"
                     fullWidth
@@ -471,7 +499,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactDepartmentSub1', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="휴대전화"
                     fullWidth
@@ -479,7 +507,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactMobileSub1', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="유선전화"
                     fullWidth
@@ -487,7 +515,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactPhoneSub1', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="이메일"
                     fullWidth
@@ -541,7 +569,7 @@ const CustomerEditPage = () => {
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="담당자명"
                     fullWidth
@@ -549,7 +577,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactNameSub2', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="직책"
                     fullWidth
@@ -557,7 +585,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactPositionSub2', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="부서"
                     fullWidth
@@ -565,7 +593,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactDepartmentSub2', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="휴대전화"
                     fullWidth
@@ -573,7 +601,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactMobileSub2', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="유선전화"
                     fullWidth
@@ -581,7 +609,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactPhoneSub2', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="이메일"
                     fullWidth
@@ -635,7 +663,7 @@ const CustomerEditPage = () => {
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="담당자명"
                     fullWidth
@@ -643,7 +671,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactNameSub3', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="직책"
                     fullWidth
@@ -651,7 +679,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactPositionSub3', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="부서"
                     fullWidth
@@ -659,7 +687,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactDepartmentSub3', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="휴대전화"
                     fullWidth
@@ -667,7 +695,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactMobileSub3', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="유선전화"
                     fullWidth
@@ -675,7 +703,7 @@ const CustomerEditPage = () => {
                     onChange={(e) => handleChange('contactPhoneSub3', e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <TextField
                     label="이메일"
                     fullWidth
@@ -752,7 +780,7 @@ const CustomerEditPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <FormControl fullWidth>
               <InputLabel>계약 상태</InputLabel>
               <Select
@@ -767,7 +795,7 @@ const CustomerEditPage = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
               <DatePicker
                 label="계약 시작일"
@@ -784,7 +812,7 @@ const CustomerEditPage = () => {
               />
             </LocalizationProvider>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid xs={12} md={4}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
               <DatePicker
                 label="계약 종료일"
@@ -816,7 +844,7 @@ const CustomerEditPage = () => {
           </Typography>
         ) : (
           <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <FormControl fullWidth>
                 <InputLabel>점검 주기</InputLabel>
                 <Select
@@ -834,7 +862,7 @@ const CustomerEditPage = () => {
               </FormControl>
             </Grid>
             {formData.inspectionCycleType === '분기' && (
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth>
                   <InputLabel>점검 시작 월</InputLabel>
                   <Select
@@ -850,7 +878,7 @@ const CustomerEditPage = () => {
               </Grid>
             )}
             {formData.inspectionCycleType === '반기' && (
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth>
                   <InputLabel>점검 시작 월</InputLabel>
                   <Select
@@ -869,7 +897,7 @@ const CustomerEditPage = () => {
               </Grid>
             )}
             {formData.inspectionCycleType === '연1회' && (
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth>
                   <InputLabel>점검 월</InputLabel>
                   <Select
@@ -886,7 +914,7 @@ const CustomerEditPage = () => {
                 </FormControl>
               </Grid>
             )}
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
                 <DatePicker
                   label="최근 점검일 (자동 반영)"
@@ -904,6 +932,82 @@ const CustomerEditPage = () => {
             </Grid>
           </Grid>
         )}
+      </Paper>
+
+      {/* 사내 담당자 */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>
+          사내 담당자
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={2}>
+          <Grid xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel id="engineerId-label">담당 엔지니어</InputLabel>
+              <Select
+                labelId="engineerId-label"
+                label="담당 엔지니어"
+                value={formData.engineerId ?? ''}
+                onChange={(e) =>
+                  handleChange('engineerId', e.target.value === '' ? null : Number(e.target.value))
+                }
+              >
+                <MenuItem value="">
+                  <em>선택 안 함</em>
+                </MenuItem>
+                {engineerOptions.map((engineer) => (
+                  <MenuItem key={engineer.id} value={engineer.id}>
+                    {engineer.name} {engineer.department ? `(${engineer.department})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel id="engineerSubId-label">부 엔지니어</InputLabel>
+              <Select
+                labelId="engineerSubId-label"
+                label="부 엔지니어"
+                value={formData.engineerSubId ?? ''}
+                onChange={(e) =>
+                  handleChange('engineerSubId', e.target.value === '' ? null : Number(e.target.value))
+                }
+              >
+                <MenuItem value="">
+                  <em>선택 안 함</em>
+                </MenuItem>
+                {engineerOptions.map((engineer) => (
+                  <MenuItem key={engineer.id} value={engineer.id}>
+                    {engineer.name} {engineer.department ? `(${engineer.department})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel id="salesId-label">담당 영업</InputLabel>
+              <Select
+                labelId="salesId-label"
+                label="담당 영업"
+                value={formData.salesId ?? ''}
+                onChange={(e) =>
+                  handleChange('salesId', e.target.value === '' ? null : Number(e.target.value))
+                }
+              >
+                <MenuItem value="">
+                  <em>선택 안 함</em>
+                </MenuItem>
+                {salesOptions.map((sales) => (
+                  <MenuItem key={sales.id} value={sales.id}>
+                    {sales.name} {sales.department ? `(${sales.department})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
       </Paper>
 
       {/* 비고 */}
@@ -946,7 +1050,7 @@ const CustomerEditPage = () => {
         <DialogTitle>점검 대상 제품 추가</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <TextField
                 label="유형"
                 fullWidth
@@ -956,7 +1060,7 @@ const CustomerEditPage = () => {
                 placeholder="예: 망분리 솔루션"
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <TextField
                 label="제품명"
                 fullWidth

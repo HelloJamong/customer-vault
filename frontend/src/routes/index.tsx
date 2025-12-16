@@ -52,7 +52,7 @@ export const router = createBrowserRouter([
       {
         path: 'customers/:customerId',
         element: (
-          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomerDetailPage />
           </RoleRoute>
         ),
@@ -68,7 +68,7 @@ export const router = createBrowserRouter([
       {
         path: 'customers/:customerId/documents',
         element: (
-          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomerDocumentsPage />
           </RoleRoute>
         ),

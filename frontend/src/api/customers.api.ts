@@ -1,3 +1,4 @@
+import axios, { AxiosError } from 'axios';
 import apiClient from './axios';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types/customer.types';
 
@@ -33,7 +34,18 @@ export const customersAPI = {
 
   // 담당 고객사 목록 (일반 사용자용)
   getMyCustomers: async (): Promise<Customer[]> => {
-    const { data } = await apiClient.get('/customers/my');
-    return data;
+    try {
+      const { data } = await apiClient.get('/customers/my');
+      return data;
+    } catch (error) {
+      // 백엔드가 400을 반환하더라도 담당 고객사가 없는 것으로 간주
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        if (axiosError.response?.status === 400) {
+          return [];
+        }
+      }
+      throw error;
+    }
   },
 };
