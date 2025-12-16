@@ -1,0 +1,99 @@
+# 고객창고 (Customer-Storage) - 통합 Docker Compose 설정
+#
+# 사용법:
+#   개발 환경: docker compose up -d
+#   프로덕션 환경: docker compose --profile production up -d
+#   전체 스택 (Frontend 포함): docker compose --profile frontend up -d
+
+services:
+  # ==========================================
+  # MariaDB 데이터베이스
+  # ==========================================
+  db:
+    image: mariadb:10.11
+    container_name: customer_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-customer_db}
+      MYSQL_USER: ${DB_USER:-customer_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-customerpass}
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      - customer_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ==========================================
+  # NestJS 백엔드 API
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: customer_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5000
+      DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:-customerpass}@db:3306/${DB_NAME:-customer_db}
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret-key-in-production-environment}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-1h}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-16777216}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_DIR: /app/logs
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    ports:
+      - "${BACKEND_PORT:-5001}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - customer_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # React 프론트엔드 (선택적)
+  # 사용: docker compose --profile frontend up -d
+  # ==========================================
+  frontend:
+    profiles: ["frontend", "fullstack"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:5001/api}
+    container_name: customer_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - customer_network
+
+networks:
+  customer_network:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+    driver: local

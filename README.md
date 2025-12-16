@@ -43,32 +43,28 @@ cd customer-storage
 
 ### 2️⃣ 환경 변수 설정
 
-**개발 환경:**
 ```bash
-# NestJS 환경 변수 복사
-cp .env.nestjs.example .env.nestjs
+# 환경 변수 파일 생성
+cp .env.example .env
 
-# 필요시 .env.nestjs 파일 수정
-nano .env.nestjs
-```
-
-**프로덕션 환경:**
-```bash
-# 프로덕션 환경 변수 복사
-cp .env.production.example .env.production
-
-# ⚠️ 프로덕션 환경 변수 필수 변경 항목
-nano .env.production
+# 필요시 .env 파일 수정 (개발 환경은 기본값 사용 가능)
+nano .env
 ```
 
 **프로덕션 환경에서 반드시 변경해야 할 항목:**
 
-1. **JWT_SECRET** (128자 랜덤 문자열)
+1. **NODE_ENV**를 production으로 변경
+```env
+NODE_ENV=production
+LOG_LEVEL=warn
+```
+
+2. **JWT_SECRET** (128자 랜덤 문자열)
 ```bash
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-2. **DB_PASSWORD** (강력한 비밀번호)
+3. **DB_PASSWORD** (강력한 비밀번호)
 ```bash
 node -e "
 const crypto = require('crypto');
@@ -81,31 +77,43 @@ console.log(password);
 "
 ```
 
-3. **CORS_ORIGIN** (실제 프론트엔드 도메인)
+4. **CORS_ORIGIN** (실제 프론트엔드 도메인)
 ```env
 CORS_ORIGIN=https://yourdomain.com,https://app.yourdomain.com
 ```
 
 ### 3️⃣ 서비스 실행
 
-**개발 환경:**
+**백엔드만 실행 (기본):**
 ```bash
-docker compose --env-file .env.nestjs -f docker-compose.nestjs.yml up -d
+docker compose up -d
 ```
 
-**프로덕션 환경:**
+**전체 스택 실행 (Frontend 포함):**
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+docker compose --profile frontend up -d
+```
+
+**특정 서비스만 실행:**
+```bash
+# DB + Backend만
+docker compose up -d db backend
+
+# Frontend만 재시작
+docker compose restart frontend
 ```
 
 ### 4️⃣ 서비스 확인
 
 ```bash
 # 컨테이너 상태 확인
-docker compose -f docker-compose.nestjs.yml ps
+docker compose ps
 
 # 로그 확인
-docker compose -f docker-compose.nestjs.yml logs -f backend
+docker compose logs -f backend
+
+# 모든 서비스 로그
+docker compose logs -f
 
 # Health Check
 curl http://localhost:5001/api/health
@@ -157,16 +165,18 @@ customer-storage/
 │   ├── Dockerfile
 │   └── package.json
 │
+├── frontend/                     # React 프론트엔드 (선택적)
+│   ├── src/
+│   ├── Dockerfile
+│   └── package.json
+│
 ├── data/                         # MariaDB 데이터 볼륨
 ├── uploads/                      # 업로드 파일 저장소
 ├── logs/                         # 애플리케이션 로그
 │
-├── docker-compose.nestjs.yml     # 개발용 Docker Compose
-├── docker-compose.prod.yml       # 프로덕션용 Docker Compose
-├── .env.nestjs                   # 개발 환경 변수 (gitignore)
-├── .env.nestjs.example           # 개발 환경 변수 템플릿
-├── .env.production               # 프로덕션 환경 변수 (gitignore)
-├── .env.production.example       # 프로덕션 환경 변수 템플릿
+├── docker-compose.yml            # 통합 Docker Compose 설정
+├── .env                          # 환경 변수 (gitignore)
+├── .env.example                  # 환경 변수 템플릿
 └── README.md
 ```
 
@@ -177,17 +187,26 @@ customer-storage/
 ### 서비스 관리
 
 ```bash
-# 시작
-docker compose -f docker-compose.nestjs.yml up -d
+# 백엔드 시작 (DB + Backend)
+docker compose up -d
+
+# 전체 스택 시작 (DB + Backend + Frontend)
+docker compose --profile frontend up -d
 
 # 중지
-docker compose -f docker-compose.nestjs.yml down
+docker compose down
 
 # 재시작
-docker compose -f docker-compose.nestjs.yml restart
+docker compose restart
+
+# 특정 서비스 재시작
+docker compose restart backend
 
 # 로그 확인
-docker compose -f docker-compose.nestjs.yml logs -f backend
+docker compose logs -f backend
+
+# 모든 로그 확인
+docker compose logs -f
 
 # 컨테이너 접속
 docker exec -it customer_backend sh
@@ -354,59 +373,51 @@ npm run format
 ## 📊 시스템 아키텍처
 
 ```
-┌─────────────────────────────────────────┐
-│         Docker Environment              │
-│                                         │
-│  ┌──────────────────┐  ┌─────────────┐ │
-│  │  NestJS Backend  │  │   MariaDB   │ │
-│  │   (TypeScript)   │◄─┤   10.11     │ │
-│  │                  │  │             │ │
-│  │  - REST API      │  │ - Prisma    │ │
-│  │  - JWT Auth      │  │ - customer_ │ │
-│  │  - Swagger       │  │   db        │ │
-│  │  Port: 5000      │  │ Port: 3306  │ │
-│  └──────────────────┘  └─────────────┘ │
-│         │                               │
-└─────────┼───────────────────────────────┘
-          │
-    Host: 5001
-          │
-          ▼
-    React Frontend
-    (To be developed)
+┌─────────────────────────────────────────────────────────┐
+│              Docker Compose Environment                 │
+│                                                         │
+│  ┌──────────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │ React Frontend   │  │   NestJS    │  │  MariaDB  │ │
+│  │   (Optional)     │─►│  Backend    │◄─┤   10.11   │ │
+│  │                  │  │ (TypeScript)│  │           │ │
+│  │  - Vite + React  │  │             │  │  - Prisma │ │
+│  │  - Nginx         │  │ - REST API  │  │  - Data   │ │
+│  │  Port: 80        │  │ - JWT Auth  │  │  Storage  │ │
+│  │                  │  │ - Swagger   │  │           │ │
+│  └──────────────────┘  │ Port: 5000  │  │Port: 3306 │ │
+│         │              └─────────────┘  └───────────┘ │
+│    Host: 3000               │                          │
+│                        Host: 5001                      │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚧 다음 단계
+## 🚧 개선 계획
 
-현재 백엔드 마이그레이션이 완료된 상태입니다.
-
-### 계획된 작업
-
-**Phase 2-2: 로깅 및 모니터링**
+### 로깅 및 모니터링
 - [ ] Winston 로거 통합
 - [ ] 파일 로그 로테이션
-- [ ] 에러 추적 (Sentry 등)
-- [ ] API 응답 시간 로깅
+- [ ] 에러 추적 시스템 (Sentry 등)
+- [ ] API 응답 시간 모니터링
 
-**Phase 2-3: 성능 최적화**
+### 성능 최적화
 - [ ] 데이터베이스 인덱스 최적화
 - [ ] Redis 캐싱 구현
-- [ ] 쿼리 성능 모니터링
+- [ ] 쿼리 성능 분석 및 개선
 - [ ] API Rate Limiting
 
-**Phase 2-4: 추가 보안**
-- [ ] Helmet.js 미들웨어
+### 추가 보안
+- [ ] Helmet.js 미들웨어 적용
 - [ ] CSRF 보호
 - [ ] Request Validation 강화
-- [ ] IP 화이트리스트
+- [ ] IP 화이트리스트 관리
 
-**Phase 3: 프론트엔드 개발**
-- [ ] React 18+ 프로젝트 생성
-- [ ] TypeScript 설정
-- [ ] API 클라이언트 구현
-- [ ] 페이지 개발 (로그인, 대시보드, 고객사 관리 등)
+### 프론트엔드 개선
+- [ ] UI/UX 개선
+- [ ] 반응형 디자인 최적화
+- [ ] PWA 지원
+- [ ] 오프라인 모드
 
 ---
 
@@ -421,7 +432,3 @@ npm run format
 ## 📄 라이선스
 
 이 프로젝트는 내부 사용을 위한 프로젝트입니다.
-
----
-
-**🚀 NestJS 백엔드 마이그레이션 완료!**

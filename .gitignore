@@ -1,13 +1,9 @@
 # Environment variables (민감한 정보 포함)
 .env
 .env.local
-.env.development
-.env.production
-.env.nestjs
 .env.*
 # Example 파일은 추적 허용
 !.env.example
-!.env.*.example
 
 # Database
 *.db
@@ -35,12 +31,6 @@ logs/
 
 # Backup
 backup_*/
-
-# Private documentation
-DEPLOYMENT_GUIDE.md
-
-# Backend migration documentation
-BACKEND_SPEC.md
 
 # Node modules
 node_modules/
