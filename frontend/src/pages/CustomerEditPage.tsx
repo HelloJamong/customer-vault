@@ -42,6 +42,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
+import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer, InspectionTarget, UpdateCustomerDto } from '@/types/customer.types';
 
 type UserOption = {
@@ -56,6 +57,7 @@ dayjs.locale('ko');
 const CustomerEditPage = () => {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
+  const { deleteCustomer } = useCustomers();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -276,20 +278,22 @@ const CustomerEditPage = () => {
     }
   };
 
-  const handleDeleteCustomer = async () => {
+  const handleDeleteCustomer = () => {
     if (deleteConfirmName !== customer?.name) {
       alert('고객사명이 일치하지 않습니다.');
       return;
     }
 
-    try {
-      await apiClient.delete(`/customers/${customerId}`);
-      alert('고객사가 삭제되었습니다.');
-      navigate('/customers');
-    } catch (error) {
-      console.error('고객사 삭제 실패:', error);
-      alert('삭제에 실패했습니다.');
-    }
+    deleteCustomer(Number(customerId), {
+      onSuccess: () => {
+        alert('고객사가 삭제되었습니다.');
+        navigate('/customers');
+      },
+      onError: (error) => {
+        console.error('고객사 삭제 실패:', error);
+        alert('삭제에 실패했습니다.');
+      },
+    });
   };
 
   if (isLoading) {
