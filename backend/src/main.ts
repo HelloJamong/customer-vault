@@ -2,9 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { CustomLoggerService } from './common/logger/logger.service';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
+  });
+
+  // 커스텀 로거 설정
+  const customLogger = new CustomLoggerService();
+  app.useLogger(customLogger);
+
+  // 전역 예외 필터 적용
+  app.useGlobalFilters(new AllExceptionsFilter(customLogger));
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');

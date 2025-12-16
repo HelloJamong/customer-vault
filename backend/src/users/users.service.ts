@@ -23,7 +23,6 @@ export class UsersService {
         email: true,
         role: true,
         department: true,
-        description: true,
         isActive: true,
         isLocked: true,
         lockedUntil: true,

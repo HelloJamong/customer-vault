@@ -116,7 +116,7 @@ docker compose logs -f backend
 docker compose logs -f
 
 # Health Check
-curl http://localhost:5001/api/health
+curl http://localhost:5005/api/health
 ```
 
 **예상 응답:**
@@ -132,9 +132,9 @@ curl http://localhost:5001/api/health
 ### 5️⃣ 접속 정보
 
 **API 서버:**
-- Base URL: http://localhost:5001/api
-- Swagger 문서: http://localhost:5001/api/docs
-- Health Check: http://localhost:5001/api/health
+- Base URL: http://localhost:5005/api
+- Swagger 문서: http://localhost:5005/api/docs
+- Health Check: http://localhost:5005/api/health
 
 **기본 로그인 계정:**
 - ID: `vmadm`
@@ -235,6 +235,40 @@ docker exec customer_backend npx prisma generate
 docker exec customer_backend npx prisma db pull
 ```
 
+### 로그 관리
+
+애플리케이션은 Winston을 사용하여 구조화된 로깅을 제공합니다.
+
+**로그 파일 위치:**
+```
+logs/
+├── web-error-YYYY-MM-DD.log      # 웹 에러 (4xx)
+├── db-error-YYYY-MM-DD.log       # 데이터베이스 에러
+├── auth-error-YYYY-MM-DD.log     # 인증/인가 에러 (401, 403)
+├── api-error-YYYY-MM-DD.log      # API 에러 (5xx)
+├── system-error-YYYY-MM-DD.log   # 시스템 에러
+├── access-YYYY-MM-DD.log         # 접근 로그
+└── application-YYYY-MM-DD.log    # 일반 애플리케이션 로그
+```
+
+**로그 확인:**
+```bash
+# 최신 웹 에러 로그 확인
+tail -f logs/web-error-$(date +%Y-%m-%d).log
+
+# 최신 DB 에러 로그 확인
+tail -f logs/db-error-$(date +%Y-%m-%d).log
+
+# 모든 로그 파일 확인
+ls -lh logs/
+```
+
+**로그 정책:**
+- 로그 파일은 일별로 자동 로테이션됩니다
+- 각 파일 최대 크기: 20MB
+- 보관 기간: 14일
+- 프로덕션 환경에서는 에러 상세 정보가 클라이언트에 노출되지 않습니다
+
 ---
 
 ## 📡 API 문서
@@ -243,7 +277,7 @@ API 문서는 Swagger UI를 통해 제공됩니다.
 
 **접속 방법:**
 ```
-http://localhost:5001/api/docs
+http://localhost:5005/api/docs
 ```
 
 ### 주요 엔드포인트
@@ -271,7 +305,7 @@ API는 JWT Bearer 토큰 인증을 사용합니다.
 
 **로그인:**
 ```bash
-curl -X POST http://localhost:5001/api/auth/login \
+curl -X POST http://localhost:5005/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"vmadm","password":"1111"}'
 ```
@@ -291,7 +325,7 @@ curl -X POST http://localhost:5001/api/auth/login \
 
 **인증이 필요한 API 호출:**
 ```bash
-curl -X GET http://localhost:5001/api/users \
+curl -X GET http://localhost:5005/api/users \
   -H "Authorization: Bearer {access_token}"
 ```
 
@@ -386,8 +420,8 @@ npm run format
 │  │                  │  │ - Swagger   │  │           │ │
 │  └──────────────────┘  │ Port: 5000  │  │Port: 3306 │ │
 │         │              └─────────────┘  └───────────┘ │
-│    Host: 3000               │                          │
-│                        Host: 5001                      │
+│    Host: 3003               │                          │
+│                        Host: 5005                      │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -396,8 +430,9 @@ npm run format
 ## 🚧 개선 계획
 
 ### 로깅 및 모니터링
-- [ ] Winston 로거 통합
-- [ ] 파일 로그 로테이션
+- [x] Winston 로거 통합
+- [x] 파일 로그 로테이션
+- [x] 에러 타입별 로그 분리
 - [ ] 에러 추적 시스템 (Sentry 등)
 - [ ] API 응답 시간 모니터링
 
