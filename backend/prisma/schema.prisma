@@ -19,7 +19,7 @@ model User {
   passwordHash          String    @map("password_hash") @db.VarChar(255)
   email                 String?   @unique @db.VarChar(120)
   role                  String    @default("user") @db.VarChar(20) // super_admin, admin, user
-  department            String?   @db.VarChar(20)
+  department            String?   @db.VarChar(20) // 기술팀, 영업팀, 개발팀 (user role only)
   description           String?   @db.VarChar(200)
   isActive              Boolean   @default(true) @map("is_active")
   customerId            Int?      @map("customer_id")

@@ -20,6 +20,9 @@ import {
   TextField,
   Chip,
   CircularProgress,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import { Add, MoreVert } from '@mui/icons-material';
 import apiClient from '@/api/axios';
@@ -51,6 +54,7 @@ const UsersPage = () => {
   const [formData, setFormData] = useState({
     username: '',
     name: '',
+    department: '',
     description: '',
   });
 
@@ -81,14 +85,14 @@ const UsersPage = () => {
 
   const handleOpenDialog = () => {
     setSelectedUser(null); // 생성 모드를 위해 선택된 사용자 초기화
-    setFormData({ username: '', name: '', description: '' });
+    setFormData({ username: '', name: '', department: '', description: '' });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedUser(null);
-    setFormData({ username: '', name: '', description: '' });
+    setFormData({ username: '', name: '', department: '', description: '' });
   };
 
   const handleEdit = () => {
@@ -96,6 +100,7 @@ const UsersPage = () => {
       setFormData({
         username: selectedUser.username,
         name: selectedUser.name,
+        department: selectedUser.department || '',
         description: selectedUser.description || '',
       });
       setOpenDialog(true);
@@ -104,8 +109,8 @@ const UsersPage = () => {
   };
 
   const handleCreate = async () => {
-    if (!formData.username.trim() || !formData.name.trim()) {
-      alert('계정과 이름은 필수입니다.');
+    if (!formData.username.trim() || !formData.name.trim() || !formData.department.trim()) {
+      alert('계정, 이름, 소속은 필수입니다.');
       return;
     }
 
@@ -113,6 +118,7 @@ const UsersPage = () => {
       const response = await apiClient.post('/users', {
         username: formData.username,
         name: formData.name,
+        department: formData.department,
         description: formData.description || null,
         role: 'user',
       });
@@ -128,14 +134,15 @@ const UsersPage = () => {
   };
 
   const handleUpdate = async () => {
-    if (!selectedUser || !formData.name.trim()) {
-      alert('이름은 필수입니다.');
+    if (!selectedUser || !formData.name.trim() || !formData.department.trim()) {
+      alert('이름과 소속은 필수입니다.');
       return;
     }
 
     try {
       await apiClient.patch(`/users/${selectedUser.id}`, {
         name: formData.name,
+        department: formData.department,
         description: formData.description || null,
       });
 
@@ -249,6 +256,7 @@ const UsersPage = () => {
             <TableRow>
               <TableCell>계정</TableCell>
               <TableCell>이름</TableCell>
+              <TableCell>소속</TableCell>
               <TableCell>설명</TableCell>
               <TableCell>상태</TableCell>
               <TableCell>생성일</TableCell>
@@ -261,6 +269,7 @@ const UsersPage = () => {
               <TableRow key={user.id}>
                 <TableCell>{user.username}</TableCell>
                 <TableCell>{user.name}</TableCell>
+                <TableCell>{user.department || '-'}</TableCell>
                 <TableCell>{user.description || '-'}</TableCell>
                 <TableCell>
                   <Chip label={user.status} color={getStatusColor(user.status)} size="small" />
@@ -286,7 +295,7 @@ const UsersPage = () => {
             ))}
             {users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   등록된 일반 사용자가 없습니다.
                 </TableCell>
               </TableRow>
@@ -338,6 +347,18 @@ const UsersPage = () => {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
           />
+          <FormControl fullWidth margin="normal" required>
+            <InputLabel>소속</InputLabel>
+            <Select
+              value={formData.department}
+              label="소속"
+              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+            >
+              <MenuItem value="기술팀">기술팀</MenuItem>
+              <MenuItem value="영업팀">영업팀</MenuItem>
+              <MenuItem value="개발팀">개발팀</MenuItem>
+            </Select>
+          </FormControl>
           <TextField
             label="설명"
             fullWidth

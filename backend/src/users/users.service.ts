@@ -104,13 +104,31 @@ export class UsersService {
       }
     }
 
+    // 일반 사용자 생성 시 department 필수 확인
+    if (userData.role === 'user') {
+      if (!userData.department) {
+        throw new BadRequestException('일반 사용자는 소속이 필수입니다.');
+      }
+
+      const validDepartments = ['기술팀', '영업팀', '개발팀'];
+      if (!validDepartments.includes(userData.department)) {
+        throw new BadRequestException('소속은 기술팀, 영업팀, 개발팀 중 하나여야 합니다.');
+      }
+    }
+
+    // 관리자 계정은 department를 null로 설정
+    const userDataToCreate = {
+      ...userData,
+      department: userData.role === 'user' ? userData.department : null,
+    };
+
     // 기본 비밀번호 가져오기
     const settings = await this.getSystemSettings();
     const passwordHash = await bcrypt.hash(settings.defaultPassword, 10);
 
     const user = await this.prisma.user.create({
       data: {
-        ...userData,
+        ...userDataToCreate,
         passwordHash,
         isFirstLogin: true,
       },
