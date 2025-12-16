@@ -39,7 +39,7 @@ interface User {
   lastLogin?: string;
 }
 
-const UsersPage = () => {
+const AdminsPage = () => {
   const currentUser = useAuthStore((state) => state.user);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,13 +54,16 @@ const UsersPage = () => {
     description: '',
   });
 
+  // 현재 사용자가 슈퍼 관리자인지 확인
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
   useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const { data } = await apiClient.get('/users?role=user');
+      const { data } = await apiClient.get('/users?role=admin');
       setUsers(data);
     } catch (error) {
       console.error('사용자 목록 조회 실패:', error);
@@ -80,7 +83,7 @@ const UsersPage = () => {
   };
 
   const handleOpenDialog = () => {
-    setSelectedUser(null); // 생성 모드를 위해 선택된 사용자 초기화
+    setSelectedUser(null);
     setFormData({ username: '', name: '', description: '' });
     setOpenDialog(true);
   };
@@ -114,7 +117,7 @@ const UsersPage = () => {
         username: formData.username,
         name: formData.name,
         description: formData.description || null,
-        role: 'user',
+        role: 'admin',
       });
 
       alert(`${response.data.message}\n초기 패스워드: ${response.data.defaultPassword}`);
@@ -155,9 +158,10 @@ const UsersPage = () => {
       const response = await apiClient.patch(`/users/${selectedUser.id}/toggle-active`);
       alert(response.data.message);
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('상태 변경 실패:', error);
-      alert('상태 변경에 실패했습니다.');
+      const errorMessage = error.response?.data?.message || '상태 변경에 실패했습니다.';
+      alert(errorMessage);
     }
     handleMenuClose();
   };
@@ -215,6 +219,33 @@ const UsersPage = () => {
     }
   };
 
+  // 본인 계정인지 확인
+  const isOwnAccount = (userId: number) => userId === currentUser?.id;
+
+  // 비활성화/삭제 가능 여부 확인
+  const canToggleActive = (user: User | null) => {
+    if (!user) return false;
+    // 본인 계정을 비활성화하려는 경우
+    if (isOwnAccount(user.id) && user.isActive) {
+      return false;
+    }
+    // 일반 관리자는 다른 관리자 비활성화 불가
+    if (!isSuperAdmin) {
+      return false;
+    }
+    return true;
+  };
+
+  const canDelete = (user: User | null) => {
+    if (!user) return false;
+    // 본인 계정 삭제 불가
+    if (isOwnAccount(user.id)) {
+      return false;
+    }
+    // 슈퍼 관리자만 삭제 가능
+    return isSuperAdmin;
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -228,18 +259,19 @@ const UsersPage = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            일반 사용자
+            일반 관리자
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            일반 사용자를 관리합니다
+            일반 관리자를 관리합니다 (최대 10명)
           </Typography>
         </Box>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={handleOpenDialog}
+          disabled={users.length >= 10}
         >
-          일반 사용자 추가
+          일반 관리자 추가
         </Button>
       </Box>
 
@@ -259,7 +291,12 @@ const UsersPage = () => {
           <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.username}</TableCell>
+                <TableCell>
+                  {user.username}
+                  {isOwnAccount(user.id) && (
+                    <Chip label="본인" size="small" color="primary" sx={{ ml: 1 }} />
+                  )}
+                </TableCell>
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.description || '-'}</TableCell>
                 <TableCell>
@@ -287,7 +324,7 @@ const UsersPage = () => {
             {users.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} align="center">
-                  등록된 일반 사용자가 없습니다.
+                  등록된 일반 관리자가 없습니다.
                 </TableCell>
               </TableRow>
             )}
@@ -298,27 +335,27 @@ const UsersPage = () => {
       {/* 액션 메뉴 */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
         <MenuItem onClick={handleEdit}>수정</MenuItem>
-        <MenuItem
-          onClick={handleToggleActive}
-          disabled={selectedUser?.id === currentUser?.id && selectedUser?.isActive}
-        >
+        <MenuItem onClick={handleToggleActive} disabled={!canToggleActive(selectedUser)}>
           {selectedUser?.isActive ? '비활성화' : '활성화'}
-          {selectedUser?.id === currentUser?.id && selectedUser?.isActive && ' (본인)'}
+          {!canToggleActive(selectedUser) &&
+            (selectedUser && isOwnAccount(selectedUser.id) ? ' (본인)' : ' (권한 없음)')}
         </MenuItem>
         <MenuItem onClick={handleResetPassword}>패스워드 초기화</MenuItem>
         <MenuItem
           onClick={handleDelete}
-          disabled={selectedUser?.id === currentUser?.id}
-          sx={{ color: 'error.main' }}
+          disabled={!canDelete(selectedUser)}
+          sx={{ color: canDelete(selectedUser) ? 'error.main' : 'text.disabled' }}
         >
-          삭제 {selectedUser?.id === currentUser?.id && '(본인)'}
+          삭제{' '}
+          {!canDelete(selectedUser) &&
+            (selectedUser && isOwnAccount(selectedUser.id) ? '(본인)' : '(권한 없음)')}
         </MenuItem>
       </Menu>
 
       {/* 생성/수정 다이얼로그 */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {selectedUser ? '일반 사용자 수정' : '일반 사용자 추가'}
+          {selectedUser ? '일반 관리자 수정' : '일반 관리자 추가'}
         </DialogTitle>
         <DialogContent>
           <TextField
@@ -350,10 +387,7 @@ const UsersPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>취소</Button>
-          <Button
-            variant="contained"
-            onClick={selectedUser ? handleUpdate : handleCreate}
-          >
+          <Button variant="contained" onClick={selectedUser ? handleUpdate : handleCreate}>
             {selectedUser ? '수정' : '추가'}
           </Button>
         </DialogActions>
@@ -381,4 +415,4 @@ const UsersPage = () => {
   );
 };
 
-export default UsersPage;
+export default AdminsPage;

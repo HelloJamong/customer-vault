@@ -5,17 +5,22 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // 루트 디렉토리의 .env 파일을 읽도록 설정
+  envDir: path.resolve(__dirname, '..'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
-    port: 3000,
+    port: Number(process.env.VITE_PORT) || 3003,
     host: true,
+    hmr: {
+      overlay: false,
+    },
   },
   preview: {
-    port: 3000,
+    port: Number(process.env.VITE_PORT) || 3003,
     host: true,
   },
 })

@@ -93,6 +93,17 @@ export class UsersService {
       }
     }
 
+    // 일반 관리자 생성 시 최대 10명 제한 확인
+    if (userData.role === 'admin') {
+      const adminCount = await this.prisma.user.count({
+        where: { role: 'admin' },
+      });
+
+      if (adminCount >= 10) {
+        throw new BadRequestException('일반 관리자는 최대 10명까지만 생성할 수 있습니다.');
+      }
+    }
+
     // 기본 비밀번호 가져오기
     const settings = await this.getSystemSettings();
     const passwordHash = await bcrypt.hash(settings.defaultPassword, 10);
@@ -158,7 +169,7 @@ export class UsersService {
     };
   }
 
-  async toggleActive(id: number, currentUserId: number) {
+  async toggleActive(id: number, currentUserId: number, currentUserRole: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
@@ -168,6 +179,11 @@ export class UsersService {
     // 본인 계정 비활성화 방지
     if (id === currentUserId && user.isActive) {
       throw new ForbiddenException('본인 계정은 비활성화할 수 없습니다.');
+    }
+
+    // 일반 관리자는 슈퍼 관리자나 다른 관리자를 비활성화할 수 없음
+    if (currentUserRole === 'admin' && (user.role === 'super_admin' || user.role === 'admin')) {
+      throw new ForbiddenException('관리자 계정을 비활성화할 수 있는 권한이 없습니다. 슈퍼 관리자만 가능합니다.');
     }
 
     const updated = await this.prisma.user.update({
@@ -201,10 +217,21 @@ export class UsersService {
     };
   }
 
-  async remove(id: number, currentUserId: number) {
+  async remove(id: number, currentUserId: number, currentUserRole: string) {
     // 본인 계정 삭제 방지
     if (id === currentUserId) {
       throw new ForbiddenException('본인 계정은 삭제할 수 없습니다.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    // 슈퍼 관리자만 관리자 계정 삭제 가능
+    if ((user.role === 'super_admin' || user.role === 'admin') && currentUserRole !== 'super_admin') {
+      throw new ForbiddenException('관리자 계정을 삭제할 수 있는 권한이 없습니다. 슈퍼 관리자만 가능합니다.');
     }
 
     await this.prisma.user.delete({ where: { id } });

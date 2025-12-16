@@ -7,6 +7,8 @@ import {
   Settings,
   Logout,
   Description,
+  AdminPanelSettings,
+  SupervisorAccount,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,14 +22,16 @@ const Sidebar = () => {
   const menuItems = [
     { text: '대시보드', icon: <Dashboard />, path: '/dashboard', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER] },
     { text: '고객사 관리', icon: <Business />, path: '/customers', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-    { text: '사용자 관리', icon: <People />, path: '/users', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+    { text: '슈퍼 관리자', icon: <SupervisorAccount />, path: '/super-admins', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+    { text: '일반 관리자', icon: <AdminPanelSettings />, path: '/admins', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+    { text: '일반 사용자', icon: <People />, path: '/users', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
     { text: '문서 관리', icon: <Description />, path: '/documents', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER] },
     { text: '내 정보', icon: <AccountCircle />, path: '/profile', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER] },
     { text: '설정', icon: <Settings />, path: '/settings', roles: [UserRole.SUPER_ADMIN] },
   ];
 
   const filteredMenuItems = menuItems.filter((item) =>
-    user?.role ? item.roles.includes(user.role) : false
+    user?.role ? item.roles.includes(user.role as UserRole) : false
   );
 
   return (
@@ -48,7 +52,7 @@ const Sidebar = () => {
       <Divider />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => logout()}>
+          <ListItemButton onClick={() => logout({})}>
             <ListItemIcon>
               <Logout />
             </ListItemIcon>

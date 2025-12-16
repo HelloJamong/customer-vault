@@ -27,7 +27,7 @@ const MainLayout = () => {
 
   const handleLogout = () => {
     setUserAnchor(null);
-    logout();
+    logout({});
   };
 
   const handlePasswordDialogOpen = () => {
@@ -156,7 +156,7 @@ const MainLayout = () => {
                     <MenuItem
                       onClick={() => {
                         setAccountAnchor(null);
-                        navigate('/users?role=super_admin');
+                        navigate('/super-admins');
                       }}
                       sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
                     >
@@ -166,7 +166,7 @@ const MainLayout = () => {
                   <MenuItem
                     onClick={() => {
                       setAccountAnchor(null);
-                      navigate('/users?role=admin');
+                      navigate('/admins');
                     }}
                     sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
                   >
@@ -175,7 +175,7 @@ const MainLayout = () => {
                   <MenuItem
                     onClick={() => {
                       setAccountAnchor(null);
-                      navigate('/users?role=user');
+                      navigate('/users');
                     }}
                     sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
                   >

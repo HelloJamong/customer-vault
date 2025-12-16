@@ -137,7 +137,7 @@ curl http://localhost:5005/api/health
 - Health Check: http://localhost:5005/api/health
 
 **기본 로그인 계정:**
-- ID: `vmadm`
+- ID: `admin`
 - PW: `1111`
 
 ⚠️ **보안**: 프로덕션 환경에서는 반드시 비밀번호를 변경하세요!

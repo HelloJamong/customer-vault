@@ -39,7 +39,7 @@ interface User {
   lastLogin?: string;
 }
 
-const UsersPage = () => {
+const SuperAdminsPage = () => {
   const currentUser = useAuthStore((state) => state.user);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +60,7 @@ const UsersPage = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data } = await apiClient.get('/users?role=user');
+      const { data } = await apiClient.get('/users?role=super_admin');
       setUsers(data);
     } catch (error) {
       console.error('사용자 목록 조회 실패:', error);
@@ -114,7 +114,7 @@ const UsersPage = () => {
         username: formData.username,
         name: formData.name,
         description: formData.description || null,
-        role: 'user',
+        role: 'super_admin',
       });
 
       alert(`${response.data.message}\n초기 패스워드: ${response.data.defaultPassword}`);
@@ -228,18 +228,19 @@ const UsersPage = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            일반 사용자
+            슈퍼 관리자
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            일반 사용자를 관리합니다
+            슈퍼 관리자를 관리합니다 (최대 3명)
           </Typography>
         </Box>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={handleOpenDialog}
+          disabled={users.length >= 3}
         >
-          일반 사용자 추가
+          슈퍼 관리자 추가
         </Button>
       </Box>
 
@@ -287,7 +288,7 @@ const UsersPage = () => {
             {users.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} align="center">
-                  등록된 일반 사용자가 없습니다.
+                  등록된 슈퍼 관리자가 없습니다.
                 </TableCell>
               </TableRow>
             )}
@@ -318,7 +319,7 @@ const UsersPage = () => {
       {/* 생성/수정 다이얼로그 */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {selectedUser ? '일반 사용자 수정' : '일반 사용자 추가'}
+          {selectedUser ? '슈퍼 관리자 수정' : '슈퍼 관리자 추가'}
         </DialogTitle>
         <DialogContent>
           <TextField
@@ -381,4 +382,4 @@ const UsersPage = () => {
   );
 };
 
-export default UsersPage;
+export default SuperAdminsPage;

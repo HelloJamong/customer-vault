@@ -73,7 +73,7 @@ export class UsersController {
   @ApiOperation({ summary: '사용자 활성화/비활성화 토글' })
   @ApiResponse({ status: 200, description: '변경 성공' })
   toggleActive(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.usersService.toggleActive(id, req.user.userId);
+    return this.usersService.toggleActive(id, req.user.id, req.user.role);
   }
 
   @Post(':id/reset-password')
@@ -89,6 +89,6 @@ export class UsersController {
   @ApiOperation({ summary: '사용자 삭제' })
   @ApiResponse({ status: 200, description: '삭제 성공' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.usersService.remove(id, req.user.userId);
+    return this.usersService.remove(id, req.user.id, req.user.role);
   }
 }
