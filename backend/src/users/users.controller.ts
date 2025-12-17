@@ -45,6 +45,13 @@ export class UsersController {
     );
   }
 
+  @Get('team-members/all')
+  @ApiOperation({ summary: '사내 담당자 목록 조회 (모든 사용자 접근 가능)' })
+  @ApiResponse({ status: 200, description: '조회 성공' })
+  getTeamMembers() {
+    return this.usersService.findAllActiveUsersByDepartment();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '사용자 상세 조회' })
   @ApiResponse({ status: 200, description: '조회 성공' })

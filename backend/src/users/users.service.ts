@@ -54,6 +54,42 @@ export class UsersService {
     return '정상';
   }
 
+  async findAllActiveUsers() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        department: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return users;
+  }
+
+  async findAllActiveUsersByDepartment() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: 'user', // 일반 사용자만 조회
+      },
+      select: {
+        id: true,
+        name: true,
+        department: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return {
+      engineers: users.filter((user) => user.department === '기술팀'),
+      sales: users.filter((user) => user.department === '영업팀'),
+    };
+  }
+
   async findOne(id: number) {
     const user = await this.prisma.user.findUnique({
       where: { id },

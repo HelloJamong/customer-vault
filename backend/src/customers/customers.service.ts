@@ -115,7 +115,28 @@ export class CustomersService {
       throw new NotFoundException('고객사를 찾을 수 없습니다.');
     }
 
-    return customer;
+    // 날짜 필드를 YYYY-MM-DD 형식으로 변환
+    return {
+      ...customer,
+      contractStartDate: customer.contractStartDate
+        ? this.formatDate(customer.contractStartDate)
+        : null,
+      contractEndDate: customer.contractEndDate
+        ? this.formatDate(customer.contractEndDate)
+        : null,
+      lastInspectionDate: customer.lastInspectionDate
+        ? this.formatDate(customer.lastInspectionDate)
+        : null,
+    };
+  }
+
+  // 날짜를 YYYY-MM-DD 형식으로 변환하는 헬퍼 함수
+  private formatDate(date: Date): string {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   async create(createCustomerDto: CreateCustomerDto) {
@@ -142,20 +163,29 @@ export class CustomersService {
   }
 
   async update(id: number, updateCustomerDto: UpdateCustomerDto) {
+    // null 값 처리를 위한 데이터 준비
+    const updateData: any = { ...updateCustomerDto };
+
+    // 날짜 필드 처리
+    if (updateCustomerDto.contractStartDate !== undefined) {
+      updateData.contractStartDate = updateCustomerDto.contractStartDate
+        ? new Date(updateCustomerDto.contractStartDate)
+        : null;
+    }
+    if (updateCustomerDto.contractEndDate !== undefined) {
+      updateData.contractEndDate = updateCustomerDto.contractEndDate
+        ? new Date(updateCustomerDto.contractEndDate)
+        : null;
+    }
+    if (updateCustomerDto.lastInspectionDate !== undefined) {
+      updateData.lastInspectionDate = updateCustomerDto.lastInspectionDate
+        ? new Date(updateCustomerDto.lastInspectionDate)
+        : null;
+    }
+
     const customer = await this.prisma.customer.update({
       where: { id },
-      data: {
-        ...updateCustomerDto,
-        contractStartDate: updateCustomerDto.contractStartDate
-          ? new Date(updateCustomerDto.contractStartDate)
-          : undefined,
-        contractEndDate: updateCustomerDto.contractEndDate
-          ? new Date(updateCustomerDto.contractEndDate)
-          : undefined,
-        lastInspectionDate: updateCustomerDto.lastInspectionDate
-          ? new Date(updateCustomerDto.lastInspectionDate)
-          : undefined,
-      },
+      data: updateData,
     });
 
     return {

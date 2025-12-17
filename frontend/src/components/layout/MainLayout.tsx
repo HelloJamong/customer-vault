@@ -208,6 +208,28 @@ const MainLayout = () => {
               </Button>
             )}
 
+            {/* 점검서 업로드 (사용자 전용) */}
+            {userRole === 'user' && (
+              <Button
+                onClick={() => navigate('/documents')}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: isActive('/documents') ? 600 : 500,
+                  color: isActive('/documents') ? '#2563eb' : '#64748b',
+                  bgcolor: isActive('/documents') ? '#eff6ff' : 'transparent',
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  '&:hover': {
+                    color: '#0f172a',
+                  },
+                }}
+              >
+                점검서 업로드
+              </Button>
+            )}
+
             {/* 서비스 로그 Dropdown */}
             {isAdmin && (
               <>

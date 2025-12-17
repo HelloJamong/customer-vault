@@ -112,4 +112,19 @@ export class DocumentsService {
   getFilePath(document: any): string {
     return document.filepath;
   }
+
+  async isUserAssignedToCustomer(userId: number, customerId: number): Promise<boolean> {
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        OR: [
+          { engineerId: userId },
+          { engineerSubId: userId },
+          { salesId: userId },
+        ],
+      },
+    });
+
+    return !!customer;
+  }
 }

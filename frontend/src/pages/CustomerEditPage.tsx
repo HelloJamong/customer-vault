@@ -153,10 +153,10 @@ const CustomerEditPage = () => {
 
   const fetchTeamMembers = async () => {
     try {
-      const response = await apiClient.get('/users');
-      const users: UserOption[] = response.data;
-      setEngineerOptions(users.filter((user) => user.department === '기술팀'));
-      setSalesOptions(users.filter((user) => user.department === '영업팀'));
+      const response = await apiClient.get('/users/team-members/all');
+      const { engineers, sales } = response.data;
+      setEngineerOptions(engineers || []);
+      setSalesOptions(sales || []);
     } catch (error) {
       console.error('사내 담당자 목록 조회 실패:', error);
     }
