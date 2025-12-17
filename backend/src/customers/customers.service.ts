@@ -61,6 +61,43 @@ export class CustomersService {
     });
   }
 
+  async findMyCustomers(userId: number) {
+    const customers = await this.prisma.customer.findMany({
+      where: {
+        OR: [
+          { engineerId: userId },
+          { engineerSubId: userId },
+          { salesId: userId },
+        ],
+      },
+      include: {
+        engineer: { select: { id: true, name: true } },
+        engineerSub: { select: { id: true, name: true } },
+        sales: { select: { id: true, name: true } },
+        inspectionTargets: { select: { id: true } },
+        documents: {
+          select: {
+            id: true,
+            inspectionDate: true,
+            inspectionTargetId: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // 각 고객사의 점검 상태 계산
+    return customers.map((customer) => {
+      const inspectionStatus = this.getInspectionStatus(customer);
+      const { inspectionTargets, documents, ...customerData } = customer;
+
+      return {
+        ...customerData,
+        inspectionStatus,
+      };
+    });
+  }
+
   async findOne(id: number) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },

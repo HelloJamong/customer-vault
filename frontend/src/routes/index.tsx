@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
       {
         path: 'customers/:customerId/edit',
         element: (
-          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomerEditPage />
           </RoleRoute>
         ),

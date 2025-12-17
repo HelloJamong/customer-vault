@@ -9,6 +9,7 @@ import {
   UseGuards,
   Query,
   ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
@@ -48,6 +49,12 @@ export class CustomersController {
     });
   }
 
+  @Get('my')
+  @ApiOperation({ summary: '내 담당 고객사 목록 조회' })
+  findMyCustomers(@Request() req: any) {
+    return this.customersService.findMyCustomers(req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '고객사 상세 조회' })
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -55,7 +62,7 @@ export class CustomersController {
   }
 
   @Post()
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '고객사 생성' })
   create(@Body() createCustomerDto: CreateCustomerDto) {
     return this.customersService.create(createCustomerDto);
