@@ -43,6 +43,8 @@ import 'dayjs/locale/ko';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { useCustomers } from '@/hooks/useCustomers';
+import { useAuthStore } from '@/store/authStore';
+import { UserRole } from '@/types/auth.types';
 import type { Customer, InspectionTarget, UpdateCustomerDto } from '@/types/customer.types';
 
 type UserOption = {
@@ -58,6 +60,7 @@ const CustomerEditPage = () => {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
   const { deleteCustomer } = useCustomers();
+  const user = useAuthStore((state) => state.user);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -1030,24 +1033,26 @@ const CustomerEditPage = () => {
         />
       </Paper>
 
-      {/* 고객사 삭제 */}
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#fff5f5', border: '1px solid #ffcccc' }}>
-        <Typography variant="h6" fontWeight="bold" color="error" gutterBottom>
-          위험 구역
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-        <Typography variant="body2" color="text.secondary" mb={2}>
-          이 고객사를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다.
-        </Typography>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<DeleteForever />}
-          onClick={() => setOpenDeleteDialog(true)}
-        >
-          고객사 삭제
-        </Button>
-      </Paper>
+      {/* 고객사 삭제 - SUPER_ADMIN과 ADMIN만 표시 */}
+      {user && (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) && (
+        <Paper sx={{ p: 3, mb: 3, bgcolor: '#fff5f5', border: '1px solid #ffcccc' }}>
+          <Typography variant="h6" fontWeight="bold" color="error" gutterBottom>
+            위험 구역
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            이 고객사를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+          </Typography>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteForever />}
+            onClick={() => setOpenDeleteDialog(true)}
+          >
+            고객사 삭제
+          </Button>
+        </Paper>
+      )}
 
       {/* 점검 대상 추가 다이얼로그 */}
       <Dialog open={openTargetDialog} onClose={() => setOpenTargetDialog(false)} maxWidth="sm" fullWidth>
