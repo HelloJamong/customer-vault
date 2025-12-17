@@ -54,6 +54,7 @@ const UsersPage = () => {
   const [formData, setFormData] = useState({
     username: '',
     name: '',
+    email: '',
     department: '',
     description: '',
   });
@@ -85,14 +86,14 @@ const UsersPage = () => {
 
   const handleOpenDialog = () => {
     setSelectedUser(null); // 생성 모드를 위해 선택된 사용자 초기화
-    setFormData({ username: '', name: '', department: '', description: '' });
+    setFormData({ username: '', name: '', email: '', department: '', description: '' });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedUser(null);
-    setFormData({ username: '', name: '', department: '', description: '' });
+    setFormData({ username: '', name: '', email: '', department: '', description: '' });
   };
 
   const handleEdit = () => {
@@ -100,6 +101,7 @@ const UsersPage = () => {
       setFormData({
         username: selectedUser.username,
         name: selectedUser.name,
+        email: selectedUser.email || '',
         department: selectedUser.department || '',
         description: selectedUser.description || '',
       });
@@ -114,12 +116,19 @@ const UsersPage = () => {
       return;
     }
 
+    // 이메일 형식 검증
+    if (formData.email && !isValidEmail(formData.email)) {
+      alert('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
     try {
       const response = await apiClient.post('/users', {
         username: formData.username,
         name: formData.name,
+        email: formData.email || undefined,
         department: formData.department,
-        description: formData.description || null,
+        description: formData.description,
         role: 'user',
       });
 
@@ -133,17 +142,30 @@ const UsersPage = () => {
     }
   };
 
+  // 이메일 형식 검증 함수
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleUpdate = async () => {
     if (!selectedUser || !formData.name.trim() || !formData.department.trim()) {
       alert('이름과 소속은 필수입니다.');
       return;
     }
 
+    // 이메일 형식 검증
+    if (formData.email && !isValidEmail(formData.email)) {
+      alert('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
     try {
       await apiClient.patch(`/users/${selectedUser.id}`, {
         name: formData.name,
+        email: formData.email || undefined,
         department: formData.department,
-        description: formData.description || null,
+        description: formData.description,
       });
 
       alert('사용자 정보가 수정되었습니다.');
@@ -256,6 +278,7 @@ const UsersPage = () => {
             <TableRow>
               <TableCell>계정</TableCell>
               <TableCell>이름</TableCell>
+              <TableCell>이메일</TableCell>
               <TableCell>소속</TableCell>
               <TableCell>설명</TableCell>
               <TableCell>상태</TableCell>
@@ -269,6 +292,7 @@ const UsersPage = () => {
               <TableRow key={user.id}>
                 <TableCell>{user.username}</TableCell>
                 <TableCell>{user.name}</TableCell>
+                <TableCell>{user.email || '-'}</TableCell>
                 <TableCell>{user.department || '-'}</TableCell>
                 <TableCell>{user.description || '-'}</TableCell>
                 <TableCell>
@@ -295,7 +319,7 @@ const UsersPage = () => {
             ))}
             {users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   등록된 일반 사용자가 없습니다.
                 </TableCell>
               </TableRow>
@@ -346,6 +370,15 @@ const UsersPage = () => {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
+          />
+          <TextField
+            label="이메일"
+            fullWidth
+            margin="normal"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            placeholder="user@example.com"
           />
           <FormControl fullWidth margin="normal" required>
             <InputLabel>소속</InputLabel>

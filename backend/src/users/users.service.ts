@@ -23,6 +23,7 @@ export class UsersService {
         email: true,
         role: true,
         department: true,
+        description: true,
         isActive: true,
         isLocked: true,
         lockedUntil: true,
@@ -192,9 +193,18 @@ export class UsersService {
   async update(id: number, updateUserDto: UpdateUserDto) {
     const { customerIds, ...userData } = updateUserDto;
 
+    // undefined 값을 제거하여 실제로 업데이트할 필드만 전달
+    const updateData: any = {};
+    Object.keys(userData).forEach((key) => {
+      const value = userData[key as keyof typeof userData];
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    });
+
     const user = await this.prisma.user.update({
       where: { id },
-      data: userData,
+      data: updateData,
     });
 
     // 담당 고객사 업데이트

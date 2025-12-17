@@ -51,6 +51,7 @@ const SuperAdminsPage = () => {
   const [formData, setFormData] = useState({
     username: '',
     name: '',
+    email: '',
     description: '',
   });
 
@@ -81,14 +82,14 @@ const SuperAdminsPage = () => {
 
   const handleOpenDialog = () => {
     setSelectedUser(null); // 생성 모드를 위해 선택된 사용자 초기화
-    setFormData({ username: '', name: '', description: '' });
+    setFormData({ username: '', name: '', email: '', description: '' });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedUser(null);
-    setFormData({ username: '', name: '', description: '' });
+    setFormData({ username: '', name: '', email: '', description: '' });
   };
 
   const handleEdit = () => {
@@ -96,6 +97,7 @@ const SuperAdminsPage = () => {
       setFormData({
         username: selectedUser.username,
         name: selectedUser.name,
+        email: selectedUser.email || '',
         description: selectedUser.description || '',
       });
       setOpenDialog(true);
@@ -109,11 +111,18 @@ const SuperAdminsPage = () => {
       return;
     }
 
+    // 이메일 형식 검증
+    if (formData.email && !isValidEmail(formData.email)) {
+      alert('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
     try {
       const response = await apiClient.post('/users', {
         username: formData.username,
         name: formData.name,
-        description: formData.description || null,
+        email: formData.email || undefined,
+        description: formData.description,
         role: 'super_admin',
       });
 
@@ -127,16 +136,29 @@ const SuperAdminsPage = () => {
     }
   };
 
+  // 이메일 형식 검증 함수
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleUpdate = async () => {
     if (!selectedUser || !formData.name.trim()) {
       alert('이름은 필수입니다.');
       return;
     }
 
+    // 이메일 형식 검증
+    if (formData.email && !isValidEmail(formData.email)) {
+      alert('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
     try {
       await apiClient.patch(`/users/${selectedUser.id}`, {
         name: formData.name,
-        description: formData.description || null,
+        email: formData.email || undefined,
+        description: formData.description,
       });
 
       alert('사용자 정보가 수정되었습니다.');
@@ -250,6 +272,7 @@ const SuperAdminsPage = () => {
             <TableRow>
               <TableCell>계정</TableCell>
               <TableCell>이름</TableCell>
+              <TableCell>이메일</TableCell>
               <TableCell>설명</TableCell>
               <TableCell>상태</TableCell>
               <TableCell>생성일</TableCell>
@@ -262,6 +285,7 @@ const SuperAdminsPage = () => {
               <TableRow key={user.id}>
                 <TableCell>{user.username}</TableCell>
                 <TableCell>{user.name}</TableCell>
+                <TableCell>{user.email || '-'}</TableCell>
                 <TableCell>{user.description || '-'}</TableCell>
                 <TableCell>
                   <Chip label={user.status} color={getStatusColor(user.status)} size="small" />
@@ -287,7 +311,7 @@ const SuperAdminsPage = () => {
             ))}
             {users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   등록된 슈퍼 관리자가 없습니다.
                 </TableCell>
               </TableRow>
@@ -338,6 +362,15 @@ const SuperAdminsPage = () => {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
+          />
+          <TextField
+            label="이메일"
+            fullWidth
+            margin="normal"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            placeholder="superadmin@example.com"
           />
           <TextField
             label="설명"
