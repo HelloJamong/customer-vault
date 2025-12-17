@@ -40,3 +40,9 @@ frontend/node_modules/
 # Build outputs
 frontend/dist/
 frontend/.vite/
+backend/dist/
+backend/build/
+
+# Backend specific
+backend/prisma/migrations/
+backend/generated/prisma
