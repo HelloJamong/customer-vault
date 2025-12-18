@@ -239,8 +239,10 @@ model ServiceLog {
   id          Int       @id @default(autoincrement())
   userId      Int?      @map("user_id")
   logType     String    @map("log_type") @db.VarChar(20) // 정상, 경고, 오류, 정보
-  action      String    @db.VarChar(50)
+  action      String    @db.VarChar(100)
   description String?   @db.Text
+  beforeValue String?   @map("before_value") @db.Text
+  afterValue  String?   @map("after_value") @db.Text
   ipAddress   String?   @map("ip_address") @db.VarChar(45)
   createdAt   DateTime  @default(now()) @map("created_at")
 

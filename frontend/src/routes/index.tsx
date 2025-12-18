@@ -20,6 +20,7 @@ import UsersPage from '@/pages/UsersPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import UnauthorizedPage from '@/pages/UnauthorizedPage';
+import SystemLogsPage from '@/pages/SystemLogsPage';
 
 export const router = createBrowserRouter([
   {
@@ -115,6 +116,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
             <SettingsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'logs/system',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <SystemLogsPage />
           </RoleRoute>
         ),
       },

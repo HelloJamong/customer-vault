@@ -3,10 +3,13 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { LogsService } from '../logs/logs.service';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginDto, ChangePasswordDto } from './dto/login.dto';
@@ -17,6 +20,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    @Inject(forwardRef(() => LogsService))
+    private logsService: LogsService,
   ) {}
 
   async login(loginDto: LoginDto, ipAddress: string) {
@@ -77,7 +82,13 @@ export class AuthService {
     };
   }
 
-  async logout(userId: number, sessionId?: string) {
+  async logout(userId: number, sessionId?: string, ipAddress?: string) {
+    // 사용자 정보 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+
     // 세션 삭제
     if (sessionId) {
       await this.prisma.userSession.deleteMany({
@@ -90,10 +101,19 @@ export class AuthService {
       });
     }
 
+    // 로그아웃 로그 기록
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정상',
+      action: '로그아웃',
+      description: `${user?.username} 사용자가 로그아웃했습니다.`,
+      ipAddress,
+    });
+
     return { message: '로그아웃 성공' };
   }
 
-  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto, ipAddress?: string) {
     const { currentPassword, newPassword } = changePasswordDto;
 
     const user = await this.prisma.user.findUnique({
@@ -107,6 +127,14 @@ export class AuthService {
     // 현재 비밀번호 확인
     const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isPasswordValid) {
+      // 비밀번호 오류 로그 기록
+      await this.logsService.createServiceLog({
+        userId,
+        logType: '경고',
+        action: '비밀번호 변경 실패',
+        description: `${user.username} 사용자의 비밀번호 변경 시도가 실패했습니다. (현재 비밀번호 불일치)`,
+        ipAddress,
+      });
       throw new UnauthorizedException('현재 비밀번호가 일치하지 않습니다.');
     }
 
@@ -125,6 +153,15 @@ export class AuthService {
         passwordChangedAt: new Date(),
         isFirstLogin: false,
       },
+    });
+
+    // 비밀번호 변경 로그 기록
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정상',
+      action: '비밀번호 변경',
+      description: `${user.username} 사용자가 비밀번호를 변경했습니다.`,
+      ipAddress,
     });
 
     return { message: '비밀번호가 변경되었습니다.' };

@@ -34,8 +34,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '로그아웃' })
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
-  async logout(@Request() req) {
-    return this.authService.logout(req.user.id);
+  async logout(@Request() req, @Ip() ipAddress: string) {
+    return this.authService.logout(req.user.id, undefined, ipAddress);
   }
 
   @Post('change-password')
@@ -44,8 +44,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '비밀번호 변경' })
   @ApiResponse({ status: 200, description: '비밀번호 변경 성공' })
-  async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
-    return this.authService.changePassword(req.user.id, changePasswordDto);
+  async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto, @Ip() ipAddress: string) {
+    return this.authService.changePassword(req.user.id, changePasswordDto, ipAddress);
   }
 
   @Post('refresh')

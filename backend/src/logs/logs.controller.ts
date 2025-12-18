@@ -46,4 +46,28 @@ export class LogsController {
       endDate,
     });
   }
+
+  @Get('system')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  getSystemLogs(
+    @Query('username') username?: string,
+    @Query('logType') logType?: string,
+    @Query('searchText') searchText?: string,
+    @Query('ipAddress') ipAddress?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getSystemLogs({
+      username,
+      logType,
+      searchText,
+      ipAddress,
+      startDate,
+      endDate,
+      page: page ? parseInt(page) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
+    });
+  }
 }
