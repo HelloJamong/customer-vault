@@ -70,6 +70,10 @@ const DocumentsPage = () => {
     onSuccess: (data) => {
       setSuccess(data.message || '점검서가 업로드되었습니다.');
       setError('');
+      // 고객사 목록 및 대시보드 갱신 (점검 상태 업데이트 반영)
+      queryClient.invalidateQueries({ queryKey: ['customers'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['myCustomers'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'active' });
       // 폼 초기화
       setFormData({
         customerId: '',

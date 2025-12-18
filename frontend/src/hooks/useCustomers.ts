@@ -9,6 +9,8 @@ export const useCustomers = () => {
   const customersQuery = useQuery({
     queryKey: ['customers'],
     queryFn: customersAPI.getAll,
+    staleTime: 0, // 항상 데이터를 stale로 간주하여 재조회 가능하게 함
+    gcTime: 5 * 60 * 1000, // 5분간 캐시 유지
   });
 
   // 고객사 생성

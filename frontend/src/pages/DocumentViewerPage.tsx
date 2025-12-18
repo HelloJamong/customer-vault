@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Box, Typography, Button, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { ArrowBack, Delete } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/axios';
 import { documentsAPI } from '@/api/documents.api';
 import { useAuthStore } from '@/store/authStore';
@@ -18,6 +18,7 @@ interface Document {
 
 const DocumentViewerPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { documentId } = useParams<{ documentId: string }>();
   const [isLoading, setIsLoading] = useState(true);
   const [document, setDocument] = useState<Document | null>(null);
@@ -32,6 +33,10 @@ const DocumentViewerPage = () => {
   const deleteMutation = useMutation({
     mutationFn: () => documentsAPI.deleteDocument(Number(documentId)),
     onSuccess: () => {
+      // 고객사 목록 및 대시보드 갱신 (점검 상태 업데이트 반영)
+      queryClient.invalidateQueries({ queryKey: ['customers'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['myCustomers'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'active' });
       // 삭제 성공 시 점검서 목록으로 이동
       if (document?.customer.id) {
         navigate(`/customers/${document.customer.id}/documents`, {

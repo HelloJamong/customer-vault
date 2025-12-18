@@ -173,11 +173,15 @@ export class DocumentsController {
     @Query('inspectionTargetId') inspectionTargetId?: string,
     @Query('year') year?: string,
     @Query('month') month?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.service.findByCustomer(customerId, {
       inspectionTargetId: inspectionTargetId ? parseInt(inspectionTargetId) : undefined,
       year: year ? parseInt(year) : undefined,
       month: month ? parseInt(month) : undefined,
+      startDate,
+      endDate,
     });
   }
 

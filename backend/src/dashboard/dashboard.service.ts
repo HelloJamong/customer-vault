@@ -71,6 +71,18 @@ export class DashboardService {
 
       // 모든 점검 대상이 완료되었는지 확인
       const allCompleted = targetIds.every((id) => completedTargetIds.has(id));
+
+      // 디버깅 로그
+      console.log(`[DashboardService] Customer: ${customer.name} (ID: ${customer.id})`);
+      console.log(`[DashboardService] - Target IDs: ${JSON.stringify(targetIds)}`);
+      console.log(`[DashboardService] - Completed Target IDs: ${JSON.stringify([...completedTargetIds])}`);
+      console.log(`[DashboardService] - Total Documents: ${customer.documents?.length || 0}`);
+      console.log(`[DashboardService] - This Month Documents: ${customer.documents?.filter((doc) => {
+        const inspectionDate = new Date(doc.inspectionDate);
+        return inspectionDate >= startOfMonth && inspectionDate <= endOfMonth;
+      }).length || 0}`);
+      console.log(`[DashboardService] - All Completed: ${allCompleted}`);
+
       if (allCompleted) {
         completedInspections++;
       }

@@ -11,6 +11,8 @@ export class DocumentsService {
     inspectionTargetId?: number;
     year?: number;
     month?: number;
+    startDate?: string;
+    endDate?: string;
   }) {
     const where: any = { customerId };
 
@@ -18,7 +20,14 @@ export class DocumentsService {
       where.inspectionTargetId = filters.inspectionTargetId;
     }
 
-    if (filters?.year && filters?.month) {
+    // 날짜 범위 필터 (startDate, endDate가 우선순위)
+    if (filters?.startDate && filters?.endDate) {
+      where.inspectionDate = {
+        gte: new Date(filters.startDate),
+        lte: new Date(filters.endDate),
+      };
+    } else if (filters?.year && filters?.month) {
+      // 기존 year/month 필터 (하위 호환성)
       const startDate = new Date(filters.year, filters.month - 1, 1);
       const endDate = new Date(filters.year, filters.month, 0);
       where.inspectionDate = {
@@ -203,6 +212,9 @@ export class DocumentsService {
 
       console.log('[DocumentsService.create] Upload completed successfully');
 
+      // 점검 상태 자동 갱신: 모든 점검 항목이 완료되었는지 확인
+      await this.updateInspectionStatus(data.customerId);
+
       return {
         id: document.id,
         title: document.title,
@@ -232,6 +244,8 @@ export class DocumentsService {
     const document = await this.prisma.document.findUnique({ where: { id } });
 
     if (document) {
+      const customerId = document.customerId;
+
       // 파일 삭제
       if (fs.existsSync(document.filepath)) {
         fs.unlinkSync(document.filepath);
@@ -239,6 +253,9 @@ export class DocumentsService {
 
       // DB 레코드 삭제
       await this.prisma.document.delete({ where: { id } });
+
+      // 점검 상태 자동 갱신: 삭제 후 완료 상태가 미완료로 변경될 수 있음
+      await this.updateInspectionStatus(customerId);
     }
 
     return { message: '문서가 삭제되었습니다.' };
@@ -261,5 +278,137 @@ export class DocumentsService {
     });
 
     return !!customer;
+  }
+
+  /**
+   * 점검 상태 자동 갱신
+   * - 모든 점검 항목에 대한 이번 달 점검서가 업로드되면 '점검 완료'로 변경
+   * - 하나라도 누락되면 '미완료' 상태 유지
+   */
+  private async updateInspectionStatus(customerId: number): Promise<void> {
+    console.log('[DocumentsService.updateInspectionStatus] Checking inspection status for customer:', customerId);
+
+    // 고객사 정보 조회 (점검 대상 포함)
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      include: {
+        inspectionTargets: { select: { id: true } },
+      },
+    });
+
+    if (!customer) {
+      console.log('[DocumentsService.updateInspectionStatus] Customer not found');
+      return;
+    }
+
+    // 점검 대상이 아닌 경우 (계약 만료, 미계약, 협력사진행, 무상기간 등)
+    if (!this.isInspectionNeededThisMonth(customer)) {
+      console.log('[DocumentsService.updateInspectionStatus] Customer is not an inspection target this month');
+      return;
+    }
+
+    // 점검 대상 항목이 없으면 미완료
+    const targetIds = customer.inspectionTargets?.map((t) => t.id) || [];
+    if (targetIds.length === 0) {
+      console.log('[DocumentsService.updateInspectionStatus] No inspection targets found');
+      return;
+    }
+
+    // 이번 달 업로드된 점검서 확인
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const thisMonthDocuments = await this.prisma.document.findMany({
+      where: {
+        customerId,
+        inspectionTargetId: { in: targetIds },
+        inspectionDate: {
+          gte: startOfMonth,
+          lte: endOfMonth,
+        },
+      },
+      select: { inspectionTargetId: true },
+    });
+
+    // 완료된 점검 대상 ID 수집
+    const completedTargetIds = new Set(
+      thisMonthDocuments
+        .map((doc) => doc.inspectionTargetId)
+        .filter((id): id is number => id !== null)
+    );
+
+    // 모든 점검 대상이 완료되었는지 확인
+    const allCompleted = targetIds.every((id) => completedTargetIds.has(id));
+
+    console.log('[DocumentsService.updateInspectionStatus] Inspection status:', {
+      totalTargets: targetIds.length,
+      completedTargets: completedTargetIds.size,
+      allCompleted,
+    });
+
+    // 점검 상태를 inspectionStatus 필드에 저장 (현재는 로그만 출력)
+    // Note: customers 테이블에 inspectionStatus 컬럼이 필요한 경우 마이그레이션 추가 필요
+  }
+
+  /**
+   * 이번 달 점검 대상 여부 확인
+   */
+  private isInspectionNeededThisMonth(customer: any): boolean {
+    // 계약 상태가 만료 또는 미계약인 경우
+    if (['만료', '미계약'].includes(customer.contractType)) {
+      return false;
+    }
+
+    // 점검 주기가 협력사진행 또는 무상기간인 경우
+    if (['협력사진행', '무상기간'].includes(customer.inspectionCycleType)) {
+      return false;
+    }
+
+    // 계약 상태가 유상이거나, 무상이지만 점검 주기가 설정된 경우
+    const isValidContract = customer.contractType === '유상' ||
+      (customer.contractType === '무상' && customer.inspectionCycleType &&
+       !['협력사진행', '무상기간'].includes(customer.inspectionCycleType));
+
+    if (!isValidContract) {
+      return false;
+    }
+
+    const currentMonth = new Date().getMonth() + 1;
+
+    if (customer.inspectionCycleType === '매월') {
+      return true;
+    }
+
+    if (!customer.inspectionCycleMonth) {
+      return false;
+    }
+
+    if (customer.inspectionCycleType === '분기') {
+      const quarterMonths: { [key: number]: number[] } = {
+        1: [1, 4, 7, 10],
+        2: [2, 5, 8, 11],
+        3: [3, 6, 9, 12],
+      };
+      return quarterMonths[customer.inspectionCycleMonth]?.includes(currentMonth) || false;
+    }
+
+    if (customer.inspectionCycleType === '반기') {
+      const halfYearMonths: { [key: number]: number[] } = {
+        1: [1, 7],
+        2: [2, 8],
+        3: [3, 9],
+        4: [4, 10],
+        5: [5, 11],
+        6: [6, 12],
+      };
+      return halfYearMonths[customer.inspectionCycleMonth]?.includes(currentMonth) || false;
+    }
+
+    if (customer.inspectionCycleType === '연1회') {
+      return currentMonth === customer.inspectionCycleMonth;
+    }
+
+    return false;
   }
 }
