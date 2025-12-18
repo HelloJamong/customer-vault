@@ -190,7 +190,7 @@ cd customer-storage
 
 # 디렉토리 구조 확인
 ls -la
-# docs/, app/, migrations/, docker-compose.yml 등이 보여야 함
+# docs/, app/, docker-compose.yml 등이 보여야 함
 ```
 
 ---

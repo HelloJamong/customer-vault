@@ -132,7 +132,7 @@ ls -la
 
 # 3. 필요한 디렉토리가 있는지 확인
 # - app/ (애플리케이션 코드)
-# - migrations/ (DB 마이그레이션)
+# - docs/migrations/ (DB 마이그레이션)
 # - Dockerfile
 # - docker-compose.yml
 # - env.example
@@ -350,10 +350,10 @@ docker compose up -d --build web
 
 ```bash
 # 마이그레이션 파일 실행
-docker compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} < migrations/add_sub_contacts.sql
+docker compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} < docs/migrations/add_sub_contacts.sql
 
 # 초기화 스크립트 실행
-docker compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} < migrations/reset_for_demo.sql
+docker compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} < docs/migrations/reset_for_demo.sql
 ```
 
 #### 데이터베이스 직접 조작

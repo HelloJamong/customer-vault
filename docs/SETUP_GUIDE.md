@@ -234,7 +234,7 @@ docker-compose exec db mysql -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} -e "SHOW 
 
 ```bash
 # 데이터베이스 초기화 스크립트 실행
-docker-compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} < migrations/reset_for_demo.sql
+docker-compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} ${DB_NAME} < docs/migrations/reset_for_demo.sql
 
 # 애플리케이션 재시작
 docker-compose restart web
