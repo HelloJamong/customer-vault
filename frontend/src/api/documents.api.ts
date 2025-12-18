@@ -42,8 +42,12 @@ export const documentsAPI = {
     }
 
     try {
-      // Content-Type 헤더를 명시하지 않으면 Axios가 자동으로 multipart/form-data와 boundary를 설정
-      const { data } = await apiClient.post('/documents/my/upload', formData);
+      // Content-Type을 명시적으로 제거하여 브라우저가 자동으로 multipart/form-data와 boundary를 설정하도록 함
+      const { data } = await apiClient.post('/documents/my/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       console.log('[Frontend] Upload success:', data);
       return data;
     } catch (error: any) {
@@ -52,5 +56,10 @@ export const documentsAPI = {
       console.error('[Frontend] Error status:', error.response?.status);
       throw error;
     }
+  },
+
+  // 점검서 삭제 (관리자 전용)
+  deleteDocument: async (documentId: number): Promise<void> => {
+    await apiClient.delete(`/documents/${documentId}`);
   },
 };

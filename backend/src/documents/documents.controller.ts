@@ -158,6 +158,11 @@ export class DocumentsController {
       return result;
     } catch (error) {
       console.error('[uploadByUser] Upload failed:', error);
+      console.error('[uploadByUser] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        error,
+      });
       throw error;
     }
   }
@@ -231,7 +236,7 @@ export class DocumentsController {
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
           const customerId = req.params.customerId;
-          const dir = path.join(uploadDir, String(year), month, `customer_${customerId}`);
+          const dir = path.join(uploadDir, `customer_${customerId}`, String(year), month);
 
           if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -282,6 +287,7 @@ export class DocumentsController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
   }

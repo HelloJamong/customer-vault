@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Button, CircularProgress, Alert } from '@mui/material';
-import { ArrowBack } from '@mui/icons-material';
+import { Box, Typography, Button, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { ArrowBack, Delete } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import apiClient from '@/api/axios';
+import { documentsAPI } from '@/api/documents.api';
+import { useAuthStore } from '@/store/authStore';
 
 interface Document {
   id: number;
@@ -19,27 +22,74 @@ const DocumentViewerPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [document, setDocument] = useState<Document | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  // 삭제 mutation
+  const deleteMutation = useMutation({
+    mutationFn: () => documentsAPI.deleteDocument(Number(documentId)),
+    onSuccess: () => {
+      // 삭제 성공 시 점검서 목록으로 이동
+      if (document?.customer.id) {
+        navigate(`/customers/${document.customer.id}/documents`, {
+          state: { message: '점검서가 삭제되었습니다.' },
+        });
+      } else {
+        navigate(-1);
+      }
+    },
+    onError: (error: any) => {
+      console.error('점검서 삭제 실패:', error);
+      setError(error.response?.data?.message || '점검서 삭제에 실패했습니다.');
+      setDeleteDialogOpen(false);
+    },
+  });
 
   useEffect(() => {
-    const fetchDocument = async () => {
+    const fetchDocumentAndPdf = async () => {
       try {
         setIsLoading(true);
-        const response = await apiClient.get(`/documents/${documentId}`);
-        setDocument(response.data);
+
+        // 1. 문서 정보 가져오기
+        const docResponse = await apiClient.get(`/documents/${documentId}`);
+        setDocument(docResponse.data);
+
+        // 2. PDF 파일 가져오기 (Blob으로)
+        const pdfResponse = await apiClient.get(`/documents/${documentId}/view`, {
+          responseType: 'blob',
+        });
+
+        // 3. Blob URL 생성
+        const blob = new Blob([pdfResponse.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+
+        console.log('[DocumentViewerPage] PDF loaded successfully');
       } catch (error) {
-        console.error('문서 정보 로드 실패:', error);
-        setError('문서를 찾을 수 없습니다.');
+        console.error('문서 로드 실패:', error);
+        setError('문서를 불러올 수 없습니다.');
       } finally {
         setIsLoading(false);
       }
     };
 
     if (documentId) {
-      fetchDocument();
+      fetchDocumentAndPdf();
     }
+
+    // Cleanup: Blob URL 해제
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
   }, [documentId]);
 
-  const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5005/api'}/documents/${documentId}/view`;
+  console.log('[DocumentViewerPage] PDF URL:', pdfUrl);
+  console.log('[DocumentViewerPage] Document:', document);
 
   if (isLoading) {
     return (
@@ -65,6 +115,18 @@ const DocumentViewerPage = () => {
     );
   }
 
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    deleteMutation.mutate();
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+  };
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -84,6 +146,19 @@ const DocumentViewerPage = () => {
             </Typography>
           </Box>
         </Box>
+
+        {/* 관리자만 삭제 버튼 표시 */}
+        {isAdmin && (
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<Delete />}
+            onClick={handleDeleteClick}
+            disabled={deleteMutation.isPending}
+          >
+            삭제
+          </Button>
+        )}
       </Box>
 
       <Box
@@ -103,6 +178,42 @@ const DocumentViewerPage = () => {
           title={document.filename}
         />
       </Box>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          점검서 삭제
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-dialog-description">
+            정말로 이 점검서를 삭제하시겠습니까?
+            <br />
+            <strong>{document.filename}</strong>
+            <br />
+            <br />
+            이 작업은 되돌릴 수 없습니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleteMutation.isPending}>
+            취소
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={deleteMutation.isPending}
+            autoFocus
+          >
+            {deleteMutation.isPending ? '삭제 중...' : '삭제'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
