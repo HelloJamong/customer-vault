@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { LogsService } from '../logs/logs.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+  ) {}
 
   async findAll(role?: string, isActive?: boolean, department?: string) {
     const where: any = {};
@@ -116,7 +120,7 @@ export class UsersService {
     return result;
   }
 
-  async create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto, currentUserId: number, ipAddress?: string) {
     const { customerIds, ...userData } = createUserDto;
 
     // 슈퍼 관리자 생성 시 최대 3명 제한 확인
@@ -181,6 +185,16 @@ export class UsersService {
       });
     }
 
+    // 로그 기록
+    const roleText = userData.role === 'super_admin' ? '슈퍼관리자' : userData.role === 'admin' ? '일반관리자' : '일반사용자';
+    await this.logsService.createServiceLog({
+      userId: currentUserId,
+      logType: '정상',
+      action: '계정 추가',
+      description: `새로운 ${roleText} 계정 "${user.username} (${user.name})"을 생성했습니다.`,
+      ipAddress,
+    });
+
     return {
       id: user.id,
       username: user.username,
@@ -190,7 +204,17 @@ export class UsersService {
     };
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto) {
+  async update(id: number, updateUserDto: UpdateUserDto, currentUserId: number, ipAddress?: string) {
+    // 변경 전 데이터 조회
+    const beforeUser = await this.prisma.user.findUnique({
+      where: { id },
+      select: { username: true, name: true, role: true, department: true, email: true },
+    });
+
+    if (!beforeUser) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
     const { customerIds, ...userData } = updateUserDto;
 
     // undefined 값을 제거하여 실제로 업데이트할 필드만 전달
@@ -225,6 +249,29 @@ export class UsersService {
       }
     }
 
+    // 변경 사항 추적
+    const changes: string[] = [];
+    if (updateUserDto.name !== undefined && updateUserDto.name !== beforeUser.name) {
+      changes.push(`이름: ${beforeUser.name} → ${updateUserDto.name}`);
+    }
+    if (updateUserDto.email !== undefined && updateUserDto.email !== beforeUser.email) {
+      changes.push(`이메일: ${beforeUser.email || '없음'} → ${updateUserDto.email || '없음'}`);
+    }
+    if (updateUserDto.department !== undefined && updateUserDto.department !== beforeUser.department) {
+      changes.push(`소속: ${beforeUser.department || '없음'} → ${updateUserDto.department || '없음'}`);
+    }
+
+    // 로그 기록 (변경 사항이 있을 경우에만)
+    if (changes.length > 0 || customerIds !== undefined) {
+      await this.logsService.createServiceLog({
+        userId: currentUserId,
+        logType: '정상',
+        action: '계정 수정',
+        description: `사용자 "${beforeUser.username} (${beforeUser.name})" 정보를 수정했습니다.${changes.length > 0 ? ' ' + changes.join(', ') : ''}`,
+        ipAddress,
+      });
+    }
+
     return {
       id: user.id,
       username: user.username,
@@ -233,8 +280,11 @@ export class UsersService {
     };
   }
 
-  async toggleActive(id: number, currentUserId: number, currentUserRole: string) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async toggleActive(id: number, currentUserId: number, currentUserRole: string, ipAddress?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, username: true, name: true, isActive: true, role: true },
+    });
 
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
@@ -255,6 +305,17 @@ export class UsersService {
       data: { isActive: !user.isActive },
     });
 
+    // 로그 기록
+    const action = updated.isActive ? '계정 활성화' : '계정 비활성화';
+    const logType = updated.isActive ? '정상' : '경고';
+    await this.logsService.createServiceLog({
+      userId: currentUserId,
+      logType,
+      action,
+      description: `사용자 "${user.username} (${user.name})" 계정을 ${updated.isActive ? '활성화' : '비활성화'}했습니다.`,
+      ipAddress,
+    });
+
     return {
       id: updated.id,
       isActive: updated.isActive,
@@ -262,7 +323,16 @@ export class UsersService {
     };
   }
 
-  async resetPassword(id: number) {
+  async resetPassword(id: number, currentUserId: number, ipAddress?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { username: true, name: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
     const settings = await this.getSystemSettings();
     const passwordHash = await bcrypt.hash(settings.defaultPassword, 10);
 
@@ -275,19 +345,31 @@ export class UsersService {
       },
     });
 
+    // 로그 기록
+    await this.logsService.createServiceLog({
+      userId: currentUserId,
+      logType: '경고',
+      action: '비밀번호 초기화',
+      description: `사용자 "${user.username} (${user.name})"의 비밀번호를 초기화했습니다.`,
+      ipAddress,
+    });
+
     return {
       message: '비밀번호가 초기화되었습니다.',
       defaultPassword: settings.defaultPassword,
     };
   }
 
-  async remove(id: number, currentUserId: number, currentUserRole: string) {
+  async remove(id: number, currentUserId: number, currentUserRole: string, ipAddress?: string) {
     // 본인 계정 삭제 방지
     if (id === currentUserId) {
       throw new ForbiddenException('본인 계정은 삭제할 수 없습니다.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { username: true, name: true, role: true },
+    });
 
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
@@ -299,6 +381,16 @@ export class UsersService {
     }
 
     await this.prisma.user.delete({ where: { id } });
+
+    // 로그 기록
+    await this.logsService.createServiceLog({
+      userId: currentUserId,
+      logType: '경고',
+      action: '계정 삭제',
+      description: `사용자 "${user.username} (${user.name})" 계정을 삭제했습니다.`,
+      ipAddress,
+    });
+
     return { message: '사용자가 삭제되었습니다.' };
   }
 

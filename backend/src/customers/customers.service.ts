@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 
 @Injectable()
 export class CustomersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+  ) {}
 
   async findAll(filters?: {
     contractType?: string;
@@ -139,7 +143,8 @@ export class CustomersService {
     return `${year}-${month}-${day}`;
   }
 
-  async create(createCustomerDto: CreateCustomerDto) {
+  async create(createCustomerDto: CreateCustomerDto, userId: number, ipAddress?: string) {
+    console.log('[CustomersService] create 메서드 호출됨:', { userId, ipAddress });
     const customer = await this.prisma.customer.create({
       data: {
         ...createCustomerDto,
@@ -155,6 +160,17 @@ export class CustomersService {
       },
     });
 
+    // 로그 기록
+    console.log('[CustomersService] 로그 기록 시작:', { userId, customerName: customer.name });
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정상',
+      action: '고객사 추가',
+      description: `새로운 고객사 "${customer.name}"를 추가했습니다.`,
+      ipAddress,
+    });
+    console.log('[CustomersService] 로그 기록 완료');
+
     return {
       id: customer.id,
       name: customer.name,
@@ -162,7 +178,21 @@ export class CustomersService {
     };
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto) {
+  async update(id: number, updateCustomerDto: UpdateCustomerDto, userId: number, ipAddress?: string) {
+    // 변경 전 데이터 조회
+    const beforeCustomer = await this.prisma.customer.findUnique({
+      where: { id },
+      include: {
+        engineer: { select: { name: true } },
+        engineerSub: { select: { name: true } },
+        sales: { select: { name: true } },
+      },
+    });
+
+    if (!beforeCustomer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다.');
+    }
+
     // null 값 처리를 위한 데이터 준비
     const updateData: any = { ...updateCustomerDto };
 
@@ -188,6 +218,30 @@ export class CustomersService {
       data: updateData,
     });
 
+    // 변경 사항 추적
+    const changes: string[] = [];
+    if (updateCustomerDto.name !== undefined && updateCustomerDto.name !== beforeCustomer.name) {
+      changes.push(`고객사명: ${beforeCustomer.name} → ${updateCustomerDto.name}`);
+    }
+    if (updateCustomerDto.contractType !== undefined && updateCustomerDto.contractType !== beforeCustomer.contractType) {
+      changes.push(`계약상태: ${beforeCustomer.contractType || '없음'} → ${updateCustomerDto.contractType}`);
+    }
+    if (updateCustomerDto.engineerId !== undefined && updateCustomerDto.engineerId !== beforeCustomer.engineerId) {
+      const beforeName = beforeCustomer.engineer?.name || '없음';
+      changes.push(`담당엔지니어 변경 (이전: ${beforeName})`);
+    }
+
+    // 로그 기록 (변경 사항이 있을 경우에만)
+    if (changes.length > 0 || Object.keys(updateCustomerDto).length > 0) {
+      await this.logsService.createServiceLog({
+        userId,
+        logType: '정상',
+        action: '고객사 수정',
+        description: `고객사 "${beforeCustomer.name}" 정보를 수정했습니다.${changes.length > 0 ? ' ' + changes.join(', ') : ''}`,
+        ipAddress,
+      });
+    }
+
     return {
       id: customer.id,
       name: customer.name,
@@ -195,8 +249,28 @@ export class CustomersService {
     };
   }
 
-  async remove(id: number) {
+  async remove(id: number, userId: number, ipAddress?: string) {
+    // 삭제 전 고객사 정보 조회
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      select: { name: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다.');
+    }
+
     await this.prisma.customer.delete({ where: { id } });
+
+    // 로그 기록
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '경고',
+      action: '고객사 삭제',
+      description: `고객사 "${customer.name}"를 삭제했습니다.`,
+      ipAddress,
+    });
+
     return { message: '고객사가 삭제되었습니다.' };
   }
 

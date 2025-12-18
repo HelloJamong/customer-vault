@@ -64,21 +64,21 @@ export class CustomersController {
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '고객사 생성' })
-  create(@Body() createCustomerDto: CreateCustomerDto) {
-    return this.customersService.create(createCustomerDto);
+  create(@Body() createCustomerDto: CreateCustomerDto, @Request() req: any) {
+    return this.customersService.create(createCustomerDto, req.user.id, req.ip);
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '고객사 정보 수정' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto) {
-    return this.customersService.update(id, updateCustomerDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto, @Request() req: any) {
+    return this.customersService.update(id, updateCustomerDto, req.user.id, req.ip);
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @ApiOperation({ summary: '고객사 삭제' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.customersService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.customersService.remove(id, req.user.id, req.ip);
   }
 }

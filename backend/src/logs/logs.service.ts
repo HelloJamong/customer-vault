@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { cleanIpAddress } from '../common/utils/ip.util';
 
 export interface SystemLogEntry {
   id: number;
@@ -45,7 +46,7 @@ export class LogsService {
         description: data.description,
         beforeValue: data.beforeValue,
         afterValue: data.afterValue,
-        ipAddress: data.ipAddress,
+        ipAddress: cleanIpAddress(data.ipAddress),
       },
     });
   }

@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
+import { cleanIpAddress } from '../common/utils/ip.util';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginDto, ChangePasswordDto } from './dto/login.dto';
@@ -298,6 +299,7 @@ export class AuthService {
 
   private async handleFailedLogin(userId: number, ipAddress: string) {
     const settings = await this.getSystemSettings();
+    const cleanedIp = cleanIpAddress(ipAddress);
 
     // 실패 횟수 증가
     const user = await this.prisma.user.update({
@@ -312,7 +314,7 @@ export class AuthService {
       data: {
         userId,
         success: false,
-        ipAddress,
+        ipAddress: cleanedIp,
       },
     });
 
@@ -334,12 +336,14 @@ export class AuthService {
         logType: '경고',
         action: '계정 잠금',
         description: `로그인 실패 횟수 초과로 계정이 잠겼습니다. (${settings.accountLockMinutes}분)`,
-        ipAddress,
+        ipAddress: cleanedIp,
       });
     }
   }
 
   private async handleSuccessfulLogin(userId: number, ipAddress: string) {
+    const cleanedIp = cleanIpAddress(ipAddress);
+
     // 실패 횟수 초기화
     await this.prisma.user.update({
       where: { id: userId },
@@ -356,7 +360,7 @@ export class AuthService {
       data: {
         userId,
         success: true,
-        ipAddress,
+        ipAddress: cleanedIp,
       },
     });
 
@@ -367,7 +371,7 @@ export class AuthService {
       logType: '정상',
       action: '로그인',
       description: `${user.name}(${user.username}) 사용자가 로그인했습니다.`,
-      ipAddress,
+      ipAddress: cleanedIp,
     });
   }
 

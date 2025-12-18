@@ -76,6 +76,30 @@ export class SettingsService {
       afterValues.push(`${data.accountLockMinutes}분`);
     }
 
+    if (data.defaultPassword !== undefined && data.defaultPassword !== settings.defaultPassword) {
+      changes.push('초기 비밀번호');
+      beforeValues.push('***');
+      afterValues.push('***');
+    }
+
+    if (data.passwordExpiryEnabled !== undefined && data.passwordExpiryEnabled !== settings.passwordExpiryEnabled) {
+      changes.push('비밀번호 변경 주기 활성화');
+      beforeValues.push(settings.passwordExpiryEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.passwordExpiryEnabled ? '활성화' : '비활성화');
+    }
+
+    if (data.preventDuplicateLogin !== undefined && data.preventDuplicateLogin !== settings.preventDuplicateLogin) {
+      changes.push('중복 로그인 방지');
+      beforeValues.push(settings.preventDuplicateLogin ? '활성화' : '비활성화');
+      afterValues.push(data.preventDuplicateLogin ? '활성화' : '비활성화');
+    }
+
+    if (data.loginFailureLimitEnabled !== undefined && data.loginFailureLimitEnabled !== settings.loginFailureLimitEnabled) {
+      changes.push('로그인 실패 횟수 제한 활성화');
+      beforeValues.push(settings.loginFailureLimitEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.loginFailureLimitEnabled ? '활성화' : '비활성화');
+    }
+
     const updated = await this.prisma.systemSettings.update({
       where: { id: settings.id },
       data: {
