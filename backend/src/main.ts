@@ -4,11 +4,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { CustomLoggerService } from './common/logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
+    bodyParser: false,
   });
+
+  // JSON body parser with relaxed settings for special characters
+  app.use(express.json({ limit: '10mb', strict: false }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // 커스텀 로거 설정
   const customLogger = new CustomLoggerService();

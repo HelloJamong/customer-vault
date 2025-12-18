@@ -329,14 +329,12 @@ export class AuthService {
       });
 
       // 서비스 로그 기록
-      await this.prisma.serviceLog.create({
-        data: {
-          userId,
-          logType: '경고',
-          action: '계정 잠금',
-          description: `로그인 실패 횟수 초과로 계정이 잠겼습니다. (${settings.accountLockMinutes}분)`,
-          ipAddress,
-        },
+      await this.logsService.createServiceLog({
+        userId,
+        logType: '경고',
+        action: '계정 잠금',
+        description: `로그인 실패 횟수 초과로 계정이 잠겼습니다. (${settings.accountLockMinutes}분)`,
+        ipAddress,
       });
     }
   }
@@ -364,14 +362,12 @@ export class AuthService {
 
     // 서비스 로그 기록
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    await this.prisma.serviceLog.create({
-      data: {
-        userId,
-        logType: '정상',
-        action: '로그인',
-        description: `${user.name}(${user.username}) 사용자가 로그인했습니다.`,
-        ipAddress,
-      },
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정상',
+      action: '로그인',
+      description: `${user.name}(${user.username}) 사용자가 로그인했습니다.`,
+      ipAddress,
     });
   }
 
