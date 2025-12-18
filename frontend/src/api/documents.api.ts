@@ -13,8 +13,6 @@ export interface InspectionTarget {
 export interface UploadInspectionDocumentDto {
   customerId: number;
   inspectionTargetId: number;
-  title: string;
-  description?: string;
   inspectionDate: string;
   inspectionType: string;
   file: File;
@@ -29,22 +27,30 @@ export const documentsAPI = {
 
   // 사용자용 점검서 업로드
   uploadInspectionDocument: async (dto: UploadInspectionDocumentDto): Promise<any> => {
+    console.log('[Frontend] Upload DTO:', dto);
+
     const formData = new FormData();
     formData.append('customerId', dto.customerId.toString());
     formData.append('inspectionTargetId', dto.inspectionTargetId.toString());
-    formData.append('title', dto.title);
-    if (dto.description) {
-      formData.append('description', dto.description);
-    }
     formData.append('inspectionDate', dto.inspectionDate);
     formData.append('inspectionType', dto.inspectionType);
     formData.append('file', dto.file);
 
-    const { data } = await apiClient.post('/documents/my/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return data;
+    console.log('[Frontend] FormData entries:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
+
+    try {
+      // Content-Type 헤더를 명시하지 않으면 Axios가 자동으로 multipart/form-data와 boundary를 설정
+      const { data } = await apiClient.post('/documents/my/upload', formData);
+      console.log('[Frontend] Upload success:', data);
+      return data;
+    } catch (error: any) {
+      console.error('[Frontend] Upload error:', error);
+      console.error('[Frontend] Error response:', error.response?.data);
+      console.error('[Frontend] Error status:', error.response?.status);
+      throw error;
+    }
   },
 };

@@ -41,8 +41,6 @@ const DocumentsPage = () => {
     inspectionTargetId: '',
     inspectionType: '',
     inspectionDate: new Date().toISOString().split('T')[0],
-    title: '',
-    description: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string>('');
@@ -78,8 +76,6 @@ const DocumentsPage = () => {
         inspectionTargetId: '',
         inspectionType: '',
         inspectionDate: new Date().toISOString().split('T')[0],
-        title: '',
-        description: '',
       });
       setSelectedFile(null);
       // 파일 입력 초기화
@@ -116,10 +112,6 @@ const DocumentsPage = () => {
       setError('점검 방식을 선택해주세요.');
       return;
     }
-    if (!formData.title.trim()) {
-      setError('제목을 입력해주세요.');
-      return;
-    }
     if (!selectedFile) {
       setError('파일을 선택해주세요.');
       return;
@@ -128,8 +120,6 @@ const DocumentsPage = () => {
     uploadMutation.mutate({
       customerId: parseInt(formData.customerId),
       inspectionTargetId: parseInt(formData.inspectionTargetId),
-      title: formData.title,
-      description: formData.description,
       inspectionDate: formData.inspectionDate,
       inspectionType: formData.inspectionType,
       file: selectedFile,
@@ -219,39 +209,16 @@ const DocumentsPage = () => {
             InputLabelProps={{ shrink: true }}
           />
 
-          {/* 제목 */}
-          <TextField
-            fullWidth
-            margin="normal"
-            label="제목"
-            required
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="예: 2025년 1월 점검"
-          />
-
-          {/* 설명 */}
-          <TextField
-            fullWidth
-            margin="normal"
-            label="설명"
-            multiline
-            rows={3}
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="점검 내용에 대한 간단한 설명을 입력하세요"
-          />
-
-          {/* 파일 선택 */}
+          {/* 파일 선택 (PDF만) */}
           <Box mt={2}>
             <Button variant="outlined" component="label" fullWidth>
-              파일 선택
+              PDF 파일 선택
               <input
                 id="file-upload"
                 type="file"
                 hidden
                 onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp"
+                accept=".pdf"
               />
             </Button>
             {selectedFile && (
@@ -259,6 +226,12 @@ const DocumentsPage = () => {
                 선택된 파일: {selectedFile.name}
               </Typography>
             )}
+            <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+              * PDF 파일만 업로드 가능합니다
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block">
+              * 파일명은 자동으로 "고객사명_제품명_N월_정기점검보고서.pdf" 형식으로 저장됩니다
+            </Typography>
           </Box>
 
           {/* 제출 버튼 */}

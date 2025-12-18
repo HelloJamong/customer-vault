@@ -13,6 +13,7 @@ import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import CustomerEditPage from '@/pages/CustomerEditPage';
 import CustomerDocumentsPage from '@/pages/CustomerDocumentsPage';
+import DocumentViewerPage from '@/pages/DocumentViewerPage';
 import SuperAdminsPage from '@/pages/SuperAdminsPage';
 import AdminsPage from '@/pages/AdminsPage';
 import UsersPage from '@/pages/UsersPage';
@@ -70,6 +71,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomerDocumentsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'documents/:documentId/view',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
+            <DocumentViewerPage />
           </RoleRoute>
         ),
       },

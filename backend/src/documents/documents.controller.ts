@@ -35,6 +35,133 @@ export class DocumentsController {
     private readonly service: DocumentsService,
   ) {}
 
+  // 구체적인 경로를 먼저 정의 (라우트 매칭 순서 중요!)
+  @Post('my/upload')
+  @Roles(Role.USER)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          console.log('[Multer destination] Creating upload directory...');
+
+          const uploadDir = process.env.UPLOAD_DIR || './uploads';
+          const date = new Date();
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+
+          // customerId는 아직 파싱되지 않았을 수 있으므로 임시 디렉토리 사용
+          const dir = path.join(uploadDir, String(year), month, 'temp');
+
+          console.log('[Multer destination] Upload directory:', dir);
+
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+
+          cb(null, dir);
+        },
+        filename: (req, file, cb) => {
+          console.log('[Multer filename] Processing file:', file.originalname);
+
+          // PDF 확장자 검증
+          const ext = path.extname(file.originalname).toLowerCase();
+          console.log('[Multer filename] File extension:', ext);
+
+          if (ext !== '.pdf') {
+            console.error('[Multer filename] Invalid file type:', ext);
+            return cb(new Error('PDF 파일만 업로드 가능합니다.'), null);
+          }
+
+          // 파일명은 서비스에서 생성하므로 임시로 저장
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const tempFilename = `temp_${uniqueSuffix}.pdf`;
+          console.log('[Multer filename] Generated temp filename:', tempFilename);
+          cb(null, tempFilename);
+        },
+      }),
+      limits: {
+        fileSize: parseInt(process.env.MAX_UPLOAD_SIZE || '16777216'),
+      },
+      fileFilter: (req, file, cb) => {
+        console.log('[Multer fileFilter] Checking file:', file.originalname);
+        console.log('[Multer fileFilter] File mimetype:', file.mimetype);
+
+        const ext = path.extname(file.originalname).toLowerCase();
+        console.log('[Multer fileFilter] File extension:', ext);
+
+        if (ext !== '.pdf') {
+          console.error('[Multer fileFilter] Rejected - not a PDF');
+          return cb(new Error('PDF 파일만 업로드 가능합니다.'), false);
+        }
+        console.log('[Multer fileFilter] Accepted');
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadByUser(
+    @UploadedFile() file: any,
+    @Body() body: any,
+    @Request() req,
+  ) {
+    console.log('[uploadByUser] ===== Upload started =====');
+    console.log('[uploadByUser] Request body:', body);
+    console.log('[uploadByUser] File info:', file ? {
+      originalname: file.originalname,
+      filename: file.filename,
+      path: file.path,
+      size: file.size,
+      mimetype: file.mimetype,
+    } : 'No file');
+    console.log('[uploadByUser] User info:', req.user);
+
+    if (!file) {
+      console.error('[uploadByUser] No file uploaded');
+      throw new Error('파일이 업로드되지 않았습니다.');
+    }
+
+    const customerId = parseInt(body.customerId);
+    const userId = req.user.id;
+
+    console.log('[uploadByUser] Parsed customerId:', customerId);
+    console.log('[uploadByUser] User ID:', userId);
+
+    // 사용자가 해당 고객사를 담당하는지 확인
+    const isAssigned = await this.service.isUserAssignedToCustomer(userId, customerId);
+    console.log('[uploadByUser] Is user assigned to customer?', isAssigned);
+
+    if (!isAssigned) {
+      // 업로드된 파일 삭제
+      if (file && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      console.error('[uploadByUser] User not assigned to customer');
+      throw new ForbiddenException('담당하지 않는 고객사에는 점검서를 업로드할 수 없습니다.');
+    }
+
+    const uploadData = {
+      customerId,
+      inspectionTargetId: parseInt(body.inspectionTargetId),
+      originalFilename: file.originalname,
+      tempFilepath: file.path,
+      fileSize: file.size,
+      uploadedBy: userId,
+      inspectionDate: body.inspectionDate,
+      inspectionType: body.inspectionType,
+    };
+
+    console.log('[uploadByUser] Calling service.create with data:', uploadData);
+
+    try {
+      const result = await this.service.create(uploadData);
+      console.log('[uploadByUser] Upload successful:', result);
+      return result;
+    } catch (error) {
+      console.error('[uploadByUser] Upload failed:', error);
+      throw error;
+    }
+  }
+
   @Get('customer/:customerId')
   findByCustomer(
     @Param('customerId', ParseIntPipe) customerId: number,
@@ -71,6 +198,28 @@ export class DocumentsController {
     res.download(filepath, document.filename);
   }
 
+  @Get(':id/view')
+  async view(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const document = await this.service.findOne(id);
+
+    if (!document) {
+      return res.status(404).json({ message: '문서를 찾을 수 없습니다.' });
+    }
+
+    const filepath = this.service.getFilePath(document);
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ message: '파일을 찾을 수 없습니다.' });
+    }
+
+    // PDF 파일을 브라우저에서 직접 볼 수 있도록 inline으로 전송
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.filename)}"`);
+
+    const fileStream = fs.createReadStream(filepath);
+    fileStream.pipe(res);
+  }
+
   @Post('customer/:customerId')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
@@ -91,13 +240,26 @@ export class DocumentsController {
           cb(null, dir);
         },
         filename: (req, file, cb) => {
+          // PDF 확장자 검증
+          const ext = path.extname(file.originalname).toLowerCase();
+          if (ext !== '.pdf') {
+            return cb(new Error('PDF 파일만 업로드 가능합니다.'), null);
+          }
+
+          // 파일명은 서비스에서 생성하므로 임시로 저장
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = path.extname(file.originalname);
-          cb(null, `${uniqueSuffix}${ext}`);
+          cb(null, `temp_${uniqueSuffix}.pdf`);
         },
       }),
       limits: {
         fileSize: parseInt(process.env.MAX_UPLOAD_SIZE || '16777216'),
+      },
+      fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (ext !== '.pdf') {
+          return cb(new Error('PDF 파일만 업로드 가능합니다.'), false);
+        }
+        cb(null, true);
       },
     }),
   )
@@ -110,76 +272,10 @@ export class DocumentsController {
     return this.service.create({
       customerId,
       inspectionTargetId: parseInt(body.inspectionTargetId),
-      title: body.title,
-      description: body.description,
-      filename: file.originalname,
-      filepath: file.path,
+      originalFilename: file.originalname,
+      tempFilepath: file.path,
       fileSize: file.size,
       uploadedBy: req.user.id,
-      inspectionDate: body.inspectionDate,
-      inspectionType: body.inspectionType,
-    });
-  }
-
-  @Post('my/upload')
-  @Roles(Role.USER)
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req, file, cb) => {
-          const uploadDir = process.env.UPLOAD_DIR || './uploads';
-          const date = new Date();
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const customerId = req.body.customerId;
-          const dir = path.join(uploadDir, String(year), month, `customer_${customerId}`);
-
-          if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-          }
-
-          cb(null, dir);
-        },
-        filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = path.extname(file.originalname);
-          cb(null, `${uniqueSuffix}${ext}`);
-        },
-      }),
-      limits: {
-        fileSize: parseInt(process.env.MAX_UPLOAD_SIZE || '16777216'),
-      },
-    }),
-  )
-  async uploadByUser(
-    @UploadedFile() file: any,
-    @Body() body: any,
-    @Request() req,
-  ) {
-    const customerId = parseInt(body.customerId);
-    const userId = req.user.id;
-
-    // 사용자가 해당 고객사를 담당하는지 확인
-    const isAssigned = await this.service.isUserAssignedToCustomer(userId, customerId);
-
-    if (!isAssigned) {
-      // 업로드된 파일 삭제
-      if (file && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
-      throw new ForbiddenException('담당하지 않는 고객사에는 점검서를 업로드할 수 없습니다.');
-    }
-
-    return this.service.create({
-      customerId,
-      inspectionTargetId: parseInt(body.inspectionTargetId),
-      title: body.title,
-      description: body.description,
-      filename: file.originalname,
-      filepath: file.path,
-      fileSize: file.size,
-      uploadedBy: userId,
       inspectionDate: body.inspectionDate,
       inspectionType: body.inspectionType,
     });
