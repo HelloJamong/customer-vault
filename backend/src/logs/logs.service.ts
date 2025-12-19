@@ -332,4 +332,319 @@ export class LogsService {
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }
+
+  async getUploadLogs(filters?: {
+    username?: string;
+    logType?: string;
+    searchText?: string;
+    ipAddress?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<SystemLogsResponse> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 30;
+    const skip = (page - 1) * limit;
+
+    // 점검서 업로드/삭제 관련 로그만 조회
+    const serviceLogWhere: any = {
+      OR: [
+        { action: { contains: '점검서 업로드' } },
+        { action: { contains: '점검서 삭제' } },
+      ],
+    };
+
+    if (filters?.logType) {
+      serviceLogWhere.logType = filters.logType;
+    }
+
+    if (filters?.searchText) {
+      serviceLogWhere.AND = [
+        serviceLogWhere.OR,
+        {
+          OR: [
+            { action: { contains: filters.searchText } },
+            { description: { contains: filters.searchText } },
+          ],
+        },
+      ];
+      delete serviceLogWhere.OR;
+    }
+
+    if (filters?.ipAddress) {
+      serviceLogWhere.ipAddress = { contains: filters.ipAddress };
+    }
+
+    if (filters?.startDate && filters?.endDate) {
+      serviceLogWhere.createdAt = {
+        gte: new Date(filters.startDate),
+        lte: new Date(filters.endDate),
+      };
+    }
+
+    if (filters?.username) {
+      serviceLogWhere.user = {
+        username: { contains: filters.username },
+      };
+    }
+
+    const serviceLogs = await this.prisma.serviceLog.findMany({
+      where: serviceLogWhere,
+      include: {
+        user: { select: { id: true, username: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // 통합 로그 생성
+    const allLogs: SystemLogEntry[] = serviceLogs.map((log) => ({
+      id: log.id,
+      timestamp: log.createdAt,
+      username: log.user?.username || '시스템',
+      userId: log.userId || 0,
+      logType: log.logType,
+      action: log.action,
+      description: log.description || '',
+      ipAddress: log.ipAddress || '-',
+      beforeValue: log.beforeValue || undefined,
+      afterValue: log.afterValue || undefined,
+    }));
+
+    // 전체 개수
+    const total = allLogs.length;
+
+    // 페이지네이션
+    const paginatedLogs = allLogs.slice(skip, skip + limit);
+
+    return {
+      data: paginatedLogs,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async exportUploadLogsToExcel(filters?: {
+    username?: string;
+    logType?: string;
+    searchText?: string;
+    ipAddress?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Buffer> {
+    // 모든 로그 가져오기 (페이지네이션 없이)
+    const result = await this.getUploadLogs({
+      ...filters,
+      page: 1,
+      limit: 999999,
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('업로드 이력');
+
+    // 헤더 설정
+    worksheet.columns = [
+      { header: '번호', key: 'id', width: 10 },
+      { header: '이력 발생 시간', key: 'timestamp', width: 20 },
+      { header: '계정', key: 'username', width: 15 },
+      { header: '구분', key: 'logType', width: 10 },
+      { header: '작업', key: 'action', width: 20 },
+      { header: '세부 정보', key: 'description', width: 40 },
+      { header: 'IP 주소', key: 'ipAddress', width: 15 },
+      { header: '변경 전', key: 'beforeValue', width: 30 },
+      { header: '변경 후', key: 'afterValue', width: 30 },
+    ];
+
+    // 헤더 스타일 설정
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    // 데이터 추가
+    result.data.forEach((log) => {
+      worksheet.addRow({
+        id: log.id,
+        timestamp: new Date(log.timestamp).toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        username: log.username,
+        logType: log.logType,
+        action: log.action,
+        description: log.description,
+        ipAddress: log.ipAddress,
+        beforeValue: log.beforeValue || '-',
+        afterValue: log.afterValue || '-',
+      });
+    });
+
+    // 버퍼로 변환
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
+  async getLoginLogs(filters?: {
+    username?: string;
+    logType?: string;
+    searchText?: string;
+    ipAddress?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<SystemLogsResponse> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 30;
+    const skip = (page - 1) * limit;
+
+    // 로그인 시도 조회 조건 구성
+    const loginAttemptWhere: any = {};
+
+    if (filters?.ipAddress) {
+      loginAttemptWhere.ipAddress = { contains: filters.ipAddress };
+    }
+
+    if (filters?.startDate && filters?.endDate) {
+      loginAttemptWhere.attemptTime = {
+        gte: new Date(filters.startDate),
+        lte: new Date(filters.endDate),
+      };
+    }
+
+    if (filters?.username) {
+      loginAttemptWhere.user = {
+        username: { contains: filters.username },
+      };
+    }
+
+    const loginAttempts = await this.prisma.loginAttempt.findMany({
+      where: loginAttemptWhere,
+      include: {
+        user: { select: { id: true, username: true, name: true } },
+      },
+      orderBy: { attemptTime: 'desc' },
+    });
+
+    // 로그인 시도 로그 변환
+    let allLogs: SystemLogEntry[] = loginAttempts.map((attempt) => {
+      const logType = attempt.success ? '정상' : '경고';
+      const action = attempt.success ? '로그인 성공' : '로그인 실패';
+
+      return {
+        id: attempt.id,
+        timestamp: attempt.attemptTime,
+        username: attempt.user?.username || '알 수 없음',
+        userId: attempt.userId,
+        logType,
+        action,
+        description: attempt.success
+          ? `${attempt.user?.username} 사용자가 로그인했습니다.`
+          : `${attempt.user?.username} 사용자의 로그인이 실패했습니다.`,
+        ipAddress: attempt.ipAddress || '-',
+      };
+    });
+
+    // 로그 타입 필터링
+    if (filters?.logType) {
+      allLogs = allLogs.filter((log) => log.logType === filters.logType);
+    }
+
+    // 검색 텍스트 필터링
+    if (filters?.searchText) {
+      allLogs = allLogs.filter(
+        (log) =>
+          log.action.includes(filters.searchText!) ||
+          log.description.includes(filters.searchText!),
+      );
+    }
+
+    // 전체 개수
+    const total = allLogs.length;
+
+    // 페이지네이션
+    const paginatedLogs = allLogs.slice(skip, skip + limit);
+
+    return {
+      data: paginatedLogs,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async exportLoginLogsToExcel(filters?: {
+    username?: string;
+    logType?: string;
+    searchText?: string;
+    ipAddress?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Buffer> {
+    // 모든 로그 가져오기 (페이지네이션 없이)
+    const result = await this.getLoginLogs({
+      ...filters,
+      page: 1,
+      limit: 999999,
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('로그인 이력');
+
+    // 헤더 설정
+    worksheet.columns = [
+      { header: '번호', key: 'id', width: 10 },
+      { header: '이력 발생 시간', key: 'timestamp', width: 20 },
+      { header: '계정', key: 'username', width: 15 },
+      { header: '구분', key: 'logType', width: 10 },
+      { header: '작업', key: 'action', width: 20 },
+      { header: '세부 정보', key: 'description', width: 40 },
+      { header: 'IP 주소', key: 'ipAddress', width: 15 },
+    ];
+
+    // 헤더 스타일 설정
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    // 데이터 추가
+    result.data.forEach((log) => {
+      worksheet.addRow({
+        id: log.id,
+        timestamp: new Date(log.timestamp).toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        username: log.username,
+        logType: log.logType,
+        action: log.action,
+        description: log.description,
+        ipAddress: log.ipAddress,
+      });
+    });
+
+    // 버퍼로 변환
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
 }

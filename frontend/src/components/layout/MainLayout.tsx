@@ -284,15 +284,17 @@ const MainLayout = () => {
                   >
                     업로드 이력
                   </MenuItem>
-                  <MenuItem
-                    onClick={() => {
-                      setLogAnchor(null);
-                      navigate('/logs/system');
-                    }}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
-                  >
-                    시스템 이력
-                  </MenuItem>
+                  {isSuperAdmin && (
+                    <MenuItem
+                      onClick={() => {
+                        setLogAnchor(null);
+                        navigate('/logs/system');
+                      }}
+                      sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    >
+                      시스템 이력
+                    </MenuItem>
+                  )}
                 </Menu>
               </>
             )}

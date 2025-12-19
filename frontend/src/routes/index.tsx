@@ -21,6 +21,8 @@ import DocumentsPage from '@/pages/DocumentsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import UnauthorizedPage from '@/pages/UnauthorizedPage';
 import SystemLogsPage from '@/pages/SystemLogsPage';
+import UploadLogsPage from '@/pages/UploadLogsPage';
+import LoginLogsPage from '@/pages/LoginLogsPage';
 
 export const router = createBrowserRouter([
   {
@@ -122,8 +124,24 @@ export const router = createBrowserRouter([
       {
         path: 'logs/system',
         element: (
-          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
             <SystemLogsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'logs/upload',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <UploadLogsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'logs/login',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <LoginLogsPage />
           </RoleRoute>
         ),
       },
