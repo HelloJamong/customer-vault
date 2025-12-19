@@ -1,5 +1,6 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Response } from 'express';
 import { LogsService } from './logs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -45,6 +46,33 @@ export class LogsController {
       startDate,
       endDate,
     });
+  }
+
+  @Get('system/export')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  async exportSystemLogs(
+    @Query('username') username?: string,
+    @Query('logType') logType?: string,
+    @Query('searchText') searchText?: string,
+    @Query('ipAddress') ipAddress?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Res() res?: Response,
+  ) {
+    const buffer = await this.service.exportSystemLogsToExcel({
+      username,
+      logType,
+      searchText,
+      ipAddress,
+      startDate,
+      endDate,
+    });
+
+    const filename = `system-logs-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   }
 
   @Get('system')

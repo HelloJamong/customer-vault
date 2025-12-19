@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { cleanIpAddress } from '../common/utils/ip.util';
+import * as ExcelJS from 'exceljs';
 
 export interface SystemLogEntry {
   id: number;
@@ -264,5 +265,71 @@ export class LogsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async exportSystemLogsToExcel(filters?: {
+    username?: string;
+    logType?: string;
+    searchText?: string;
+    ipAddress?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Buffer> {
+    // 모든 로그 가져오기 (페이지네이션 없이)
+    const result = await this.getSystemLogs({
+      ...filters,
+      page: 1,
+      limit: 999999, // 모든 데이터 가져오기
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('시스템 이력');
+
+    // 헤더 설정
+    worksheet.columns = [
+      { header: '번호', key: 'id', width: 10 },
+      { header: '이력 발생 시간', key: 'timestamp', width: 20 },
+      { header: '계정', key: 'username', width: 15 },
+      { header: '구분', key: 'logType', width: 10 },
+      { header: '작업', key: 'action', width: 20 },
+      { header: '세부 정보', key: 'description', width: 40 },
+      { header: 'IP 주소', key: 'ipAddress', width: 15 },
+      { header: '변경 전', key: 'beforeValue', width: 30 },
+      { header: '변경 후', key: 'afterValue', width: 30 },
+    ];
+
+    // 헤더 스타일 설정
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    // 데이터 추가
+    result.data.forEach((log) => {
+      worksheet.addRow({
+        id: log.id,
+        timestamp: new Date(log.timestamp).toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        username: log.username,
+        logType: log.logType,
+        action: log.action,
+        description: log.description,
+        ipAddress: log.ipAddress,
+        beforeValue: log.beforeValue || '-',
+        afterValue: log.afterValue || '-',
+      });
+    });
+
+    // 버퍼로 변환
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }

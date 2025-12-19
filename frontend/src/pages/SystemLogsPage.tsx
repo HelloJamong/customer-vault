@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import {
   Box,
   Typography,
@@ -15,13 +15,18 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  Grid,
   Chip,
   Pagination,
   IconButton,
   Collapse,
+  Button,
 } from '@mui/material';
-import { ExpandMore, ExpandLess } from '@mui/icons-material';
+import { ExpandMore, ExpandLess, Search, Refresh, Download } from '@mui/icons-material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import 'dayjs/locale/ko';
 import { logsApi } from '@/api/logs.api';
 import type { SystemLogEntry } from '@/api/logs.api';
 
@@ -30,7 +35,17 @@ const SystemLogsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
-  // 필터 상태
+  // 적용된 필터 상태 (실제 API 호출에 사용)
+  const [appliedFilters, setAppliedFilters] = useState({
+    username: '',
+    logType: '',
+    searchText: '',
+    ipAddress: '',
+    startDate: '',
+    endDate: '',
+  });
+
+  // 임시 필터 상태 (사용자 입력)
   const [filters, setFilters] = useState({
     username: '',
     logType: '',
@@ -48,13 +63,13 @@ const SystemLogsPage = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [filters, page, limit]);
+  }, [appliedFilters, page, limit]);
 
   const fetchLogs = async () => {
     setIsLoading(true);
     try {
       const response = await logsApi.getSystemLogs({
-        ...filters,
+        ...appliedFilters,
         page,
         limit,
       });
@@ -71,7 +86,42 @@ const SystemLogsPage = () => {
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
-    setPage(1); // 필터 변경 시 첫 페이지로 이동
+  };
+
+  const handleSearch = () => {
+    setAppliedFilters(filters);
+    setPage(1); // 검색 시 첫 페이지로 이동
+  };
+
+  const handleReset = () => {
+    const emptyFilters = {
+      username: '',
+      logType: '',
+      searchText: '',
+      ipAddress: '',
+      startDate: '',
+      endDate: '',
+    };
+    setFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+    setPage(1); // 초기화 시 첫 페이지로 이동
+  };
+
+  const handleExport = async () => {
+    try {
+      const blob = await logsApi.exportSystemLogs(appliedFilters);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `system-logs-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('엑셀 다운로드 실패:', error);
+      alert('엑셀 파일 다운로드에 실패했습니다.');
+    }
   };
 
   const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
@@ -120,92 +170,134 @@ const SystemLogsPage = () => {
         <Typography variant="h4" component="h1">
           시스템 이력
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          전체 {total}건
-        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            전체 {total}건
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            onClick={handleExport}
+            size="small"
+          >
+            엑셀 다운로드
+          </Button>
+        </Box>
       </Box>
 
       {/* 필터 섹션 */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          {/* 기간 검색 */}
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="시작일"
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="종료일"
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </Grid>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* 첫 번째 행: 날짜 필터 */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
+                <DatePicker
+                  label="시작일"
+                  value={filters.startDate ? dayjs(filters.startDate) : null}
+                  onChange={(newValue: Dayjs | null) => {
+                    handleFilterChange('startDate', newValue ? newValue.format('YYYY-MM-DD') : '');
+                  }}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      size: 'small',
+                      placeholder: 'YYYY-MM-DD',
+                    },
+                  }}
+                />
+              </LocalizationProvider>
+            </Box>
+            <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
+                <DatePicker
+                  label="종료일"
+                  value={filters.endDate ? dayjs(filters.endDate) : null}
+                  onChange={(newValue: Dayjs | null) => {
+                    handleFilterChange('endDate', newValue ? newValue.format('YYYY-MM-DD') : '');
+                  }}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      size: 'small',
+                      placeholder: 'YYYY-MM-DD',
+                    },
+                  }}
+                />
+              </LocalizationProvider>
+            </Box>
+            <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+              <TextField
+                fullWidth
+                label="계정 검색"
+                value={filters.username}
+                onChange={(e) => handleFilterChange('username', e.target.value)}
+                placeholder="계정명을 입력하세요"
+                size="small"
+              />
+            </Box>
+            <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>구분</InputLabel>
+                <Select
+                  value={filters.logType}
+                  label="구분"
+                  onChange={(e) => handleFilterChange('logType', e.target.value)}
+                >
+                  <MenuItem value="">전체</MenuItem>
+                  <MenuItem value="정상">정상</MenuItem>
+                  <MenuItem value="경고">경고</MenuItem>
+                  <MenuItem value="오류">오류</MenuItem>
+                  <MenuItem value="정보">정보</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
 
-          {/* 계정 검색 */}
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="계정 검색"
-              value={filters.username}
-              onChange={(e) => handleFilterChange('username', e.target.value)}
-              placeholder="계정명을 입력하세요"
-              size="small"
-            />
-          </Grid>
+          {/* 두 번째 행: 로그 및 IP 검색 */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
+              <TextField
+                fullWidth
+                label="로그 검색"
+                value={filters.searchText}
+                onChange={(e) => handleFilterChange('searchText', e.target.value)}
+                placeholder="로그 내용을 입력하세요"
+                size="small"
+              />
+            </Box>
+            <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
+              <TextField
+                fullWidth
+                label="IP 검색"
+                value={filters.ipAddress}
+                onChange={(e) => handleFilterChange('ipAddress', e.target.value)}
+                placeholder="IP 주소를 입력하세요"
+                size="small"
+              />
+            </Box>
+          </Box>
 
-          {/* 구분 필터 */}
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>구분</InputLabel>
-              <Select
-                value={filters.logType}
-                label="구분"
-                onChange={(e) => handleFilterChange('logType', e.target.value)}
-              >
-                <MenuItem value="">전체</MenuItem>
-                <MenuItem value="정상">정상</MenuItem>
-                <MenuItem value="경고">경고</MenuItem>
-                <MenuItem value="오류">오류</MenuItem>
-                <MenuItem value="정보">정보</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* 로그 필터 */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="로그 검색"
-              value={filters.searchText}
-              onChange={(e) => handleFilterChange('searchText', e.target.value)}
-              placeholder="로그 내용을 입력하세요"
+          {/* 세 번째 행: 버튼 */}
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={handleReset}
               size="small"
-            />
-          </Grid>
-
-          {/* IP 검색 */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="IP 검색"
-              value={filters.ipAddress}
-              onChange={(e) => handleFilterChange('ipAddress', e.target.value)}
-              placeholder="IP 주소를 입력하세요"
+            >
+              초기화
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Search />}
+              onClick={handleSearch}
               size="small"
-            />
-          </Grid>
-        </Grid>
+            >
+              검색
+            </Button>
+          </Box>
+        </Box>
       </Paper>
 
       {/* 테이블 */}
@@ -236,8 +328,8 @@ const SystemLogsPage = () => {
               </TableRow>
             ) : (
               logs.map((log) => (
-                <>
-                  <TableRow key={log.id} hover>
+                <Fragment key={log.id}>
+                  <TableRow hover>
                     <TableCell>
                       {(log.beforeValue || log.afterValue) && (
                         <IconButton
@@ -301,7 +393,7 @@ const SystemLogsPage = () => {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </TableBody>

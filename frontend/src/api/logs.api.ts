@@ -54,4 +54,23 @@ export const logsApi = {
     );
     return response.data;
   },
+
+  exportSystemLogs: async (filters?: Omit<SystemLogsFilters, 'page' | 'limit'>): Promise<Blob> => {
+    const params = new URLSearchParams();
+
+    if (filters?.username) params.append('username', filters.username);
+    if (filters?.logType) params.append('logType', filters.logType);
+    if (filters?.searchText) params.append('searchText', filters.searchText);
+    if (filters?.ipAddress) params.append('ipAddress', filters.ipAddress);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+
+    const response = await apiClient.get(
+      `/logs/system/export?${params.toString()}`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  },
 };
