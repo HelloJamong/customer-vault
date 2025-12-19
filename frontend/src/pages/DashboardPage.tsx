@@ -689,14 +689,16 @@ const UserDashboard = () => {
     );
   }
 
-  const totalMyCustomers = myCustomers.length;
-  const completedCount = myCustomers.filter((customer) => customer.inspectionStatus === '점검 완료').length;
-  const incompleteCount = myCustomers.filter((customer) => customer.inspectionStatus === '미완료').length;
+  // 점검 대상 고객사만 필터링 (대상아님 제외)
+  const inspectionTargetCustomers = myCustomers.filter((customer) => customer.inspectionStatus !== '대상아님');
+  const totalMyCustomers = inspectionTargetCustomers.length;
+  const completedCount = inspectionTargetCustomers.filter((customer) => customer.inspectionStatus === '점검 완료').length;
+  const incompleteCount = inspectionTargetCustomers.filter((customer) => customer.inspectionStatus === '미완료').length;
   const completionRate = totalMyCustomers > 0 ? Math.round((completedCount / totalMyCustomers) * 100) : 0;
 
   const inspectionStats = [
     {
-      title: '담당 고객사',
+      title: '점검 대상 고객사',
       value: totalMyCustomers.toLocaleString(),
       icon: <Business />,
       bgColor: '#dbeafe',

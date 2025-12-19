@@ -179,12 +179,18 @@ const DocumentsPage = () => {
               onChange={(e) => setFormData({ ...formData, inspectionTargetId: e.target.value })}
               disabled={isLoadingTargets || !formData.customerId}
             >
-              {inspectionTargets.map((target) => (
-                <MenuItem key={target.id} value={target.id}>
-                  {target.productName || target.customName || target.targetType}
-                  {target.productName && ` (${target.targetType})`}
+              {inspectionTargets.length === 0 && formData.customerId && !isLoadingTargets ? (
+                <MenuItem disabled value="">
+                  점검 대상이 없습니다. 고객사 상세 페이지에서 추가해주세요.
                 </MenuItem>
-              ))}
+              ) : (
+                inspectionTargets.map((target) => (
+                  <MenuItem key={target.id} value={target.id}>
+                    {target.productName || target.customName || target.targetType}
+                    {target.productName && ` (${target.targetType})`}
+                  </MenuItem>
+                ))
+              )}
             </Select>
           </FormControl>
 
