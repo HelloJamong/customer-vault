@@ -20,7 +20,7 @@ export const useDashboard = () => {
     refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 재조회 비활성화
     refetchOnMount: true, // 마운트 시 재조회 활성화 (기본값)
     refetchOnReconnect: false, // 재연결 시 재조회 비활성화
-    refetchInterval: false, // 자동 갱신 비활성화 (무한 루프 방지)
+    refetchInterval: 60 * 1000, // 60초(1분) 간격으로 자동 갱신
   });
 
   return {

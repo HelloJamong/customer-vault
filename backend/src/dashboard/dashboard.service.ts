@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import * as os from 'os';
 import * as fs from 'fs';
+import * as si from 'systeminformation';
 
 @Injectable()
 export class DashboardService {
@@ -92,7 +93,7 @@ export class DashboardService {
     const incompleteInspections = totalInspectionCustomers - completedInspections;
 
     // 시스템 리소스 모니터링
-    const systemResources = this.getSystemResources();
+    const systemResources = await this.getSystemResources();
 
     const contractStatus = await this.prisma.customer.groupBy({
       by: ['contractType'],
@@ -143,71 +144,128 @@ export class DashboardService {
     };
   }
 
-  private getSystemResources() {
-    // CPU 사용률 계산
-    const cpus = os.cpus();
-    let totalIdle = 0;
-    let totalTick = 0;
-
-    cpus.forEach((cpu) => {
-      for (const type in cpu.times) {
-        totalTick += cpu.times[type];
-      }
-      totalIdle += cpu.times.idle;
-    });
-
-    const cpuUsage = 100 - Math.floor((totalIdle / totalTick) * 100);
-
-    // 메모리 사용률 계산
-    const totalMemory = os.totalmem();
-    const freeMemory = os.freemem();
-    const usedMemory = totalMemory - freeMemory;
-    const memoryUsagePercent = Math.round((usedMemory / totalMemory) * 100);
-
-    // 스토리지 사용량 계산 (루트 디렉토리 기준)
-    let storageUsed = 0;
-    let storageTotal = 0;
-    let storageUsagePercent = 0;
-
+  private async getSystemResources() {
     try {
-      // Linux/Mac에서만 작동
-      if (process.platform !== 'win32') {
-        const stats = fs.statfsSync('/');
-        storageTotal = (stats.blocks * stats.bsize) / (1024 * 1024 * 1024); // GB
-        const storageFree = (stats.bfree * stats.bsize) / (1024 * 1024 * 1024); // GB
-        storageUsed = storageTotal - storageFree;
-        storageUsagePercent = Math.round((storageUsed / storageTotal) * 100);
-      } else {
-        // Windows에서는 임시 값 사용
-        storageTotal = 500;
-        storageUsed = 325;
-        storageUsagePercent = 65;
-      }
-    } catch (error) {
-      // 기본값 설정
-      storageTotal = 500;
-      storageUsed = 325;
-      storageUsagePercent = 65;
-    }
+      // systeminformation을 사용하여 호스트 시스템 정보 수집
+      const [cpuLoad, memInfo, fsSize, cpuInfo] = await Promise.all([
+        si.currentLoad(),
+        si.mem(),
+        si.fsSize(),
+        si.cpu(),
+      ]);
 
-    return {
-      storage: {
-        used: parseFloat(storageUsed.toFixed(2)),
-        total: parseFloat(storageTotal.toFixed(2)),
-        usagePercent: storageUsagePercent,
-        unit: 'GB',
-      },
-      memory: {
-        used: parseFloat((usedMemory / (1024 * 1024 * 1024)).toFixed(2)),
-        total: parseFloat((totalMemory / (1024 * 1024 * 1024)).toFixed(2)),
-        usagePercent: memoryUsagePercent,
-        unit: 'GB',
-      },
-      cpu: {
-        usagePercent: cpuUsage,
-        cores: cpus.length,
-      },
-    };
+      // CPU 사용률
+      const cpuUsage = Math.round(cpuLoad.currentLoad);
+      const cores = cpuInfo.cores || os.cpus().length;
+
+      // 메모리 사용률 - Docker 환경에서는 호스트 정보를 직접 읽음
+      let totalMemory = memInfo.total;
+      let usedMemory = memInfo.used;
+
+      // Docker 컨테이너에서 실행 중이고 /host/proc/meminfo가 있으면 호스트 메모리 정보 사용
+      try {
+        if (fs.existsSync('/host/proc/meminfo')) {
+          const meminfoContent = fs.readFileSync('/host/proc/meminfo', 'utf8');
+          const memTotalMatch = meminfoContent.match(/MemTotal:\s+(\d+)\s+kB/);
+          const memAvailableMatch = meminfoContent.match(/MemAvailable:\s+(\d+)\s+kB/);
+
+          if (memTotalMatch && memAvailableMatch) {
+            totalMemory = parseInt(memTotalMatch[1]) * 1024; // kB to bytes
+            const availableMemory = parseInt(memAvailableMatch[1]) * 1024;
+            usedMemory = totalMemory - availableMemory;
+            console.log('[DashboardService] 호스트 메모리 정보 사용 (from /host/proc/meminfo)');
+          }
+        }
+      } catch (hostMemError) {
+        console.log('[DashboardService] 호스트 메모리 정보 읽기 실패, systeminformation 사용:', hostMemError.message);
+      }
+
+      const memoryUsagePercent = Math.round((usedMemory / totalMemory) * 100);
+
+      // 스토리지 사용량 (첫 번째 파일시스템 기준)
+      let storageUsed = 0;
+      let storageTotal = 0;
+      let storageUsagePercent = 0;
+
+      if (fsSize && fsSize.length > 0) {
+        // 가장 큰 파일시스템 선택 (일반적으로 메인 디스크)
+        const mainFs = fsSize.reduce((max, fs) => fs.size > max.size ? fs : max, fsSize[0]);
+        storageTotal = mainFs.size / (1024 * 1024 * 1024); // 바이트를 GB로 변환
+        storageUsed = mainFs.used / (1024 * 1024 * 1024);
+        storageUsagePercent = Math.round(mainFs.use);
+      } else {
+        // fallback: os 모듈 사용
+        if (process.platform !== 'win32') {
+          const stats = fs.statfsSync('/');
+          storageTotal = (stats.blocks * stats.bsize) / (1024 * 1024 * 1024);
+          const storageFree = (stats.bfree * stats.bsize) / (1024 * 1024 * 1024);
+          storageUsed = storageTotal - storageFree;
+          storageUsagePercent = Math.round((storageUsed / storageTotal) * 100);
+        } else {
+          storageTotal = 500;
+          storageUsed = 325;
+          storageUsagePercent = 65;
+        }
+      }
+
+      return {
+        storage: {
+          used: parseFloat(storageUsed.toFixed(2)),
+          total: parseFloat(storageTotal.toFixed(2)),
+          usagePercent: storageUsagePercent,
+          unit: 'GB',
+        },
+        memory: {
+          used: parseFloat((usedMemory / (1024 * 1024 * 1024)).toFixed(2)),
+          total: parseFloat((totalMemory / (1024 * 1024 * 1024)).toFixed(2)),
+          usagePercent: memoryUsagePercent,
+          unit: 'GB',
+        },
+        cpu: {
+          usagePercent: cpuUsage,
+          cores: cores,
+        },
+      };
+    } catch (error) {
+      // 오류 발생 시 기본 os 모듈로 fallback
+      console.error('[DashboardService] systeminformation 오류, fallback 사용:', error.message);
+
+      const cpus = os.cpus();
+      let totalIdle = 0;
+      let totalTick = 0;
+
+      cpus.forEach((cpu) => {
+        for (const type in cpu.times) {
+          totalTick += cpu.times[type];
+        }
+        totalIdle += cpu.times.idle;
+      });
+
+      const cpuUsage = 100 - Math.floor((totalIdle / totalTick) * 100);
+      const totalMemory = os.totalmem();
+      const freeMemory = os.freemem();
+      const usedMemory = totalMemory - freeMemory;
+      const memoryUsagePercent = Math.round((usedMemory / totalMemory) * 100);
+
+      return {
+        storage: {
+          used: 325,
+          total: 500,
+          usagePercent: 65,
+          unit: 'GB',
+        },
+        memory: {
+          used: parseFloat((usedMemory / (1024 * 1024 * 1024)).toFixed(2)),
+          total: parseFloat((totalMemory / (1024 * 1024 * 1024)).toFixed(2)),
+          usagePercent: memoryUsagePercent,
+          unit: 'GB',
+        },
+        cpu: {
+          usagePercent: cpuUsage,
+          cores: cpus.length,
+        },
+      };
+    }
   }
 
   private async getUserStats(userId: number) {

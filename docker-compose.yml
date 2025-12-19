@@ -55,6 +55,9 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - /sys:/host/sys:ro
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
     ports:
       - "${BACKEND_PORT:-5005}:5000"
     depends_on:
