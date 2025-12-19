@@ -1,10 +1,11 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Typography, Button, Menu, MenuItem } from '@mui/material';
+import { Box, Button, Menu, MenuItem } from '@mui/material';
 import { KeyboardArrowDown } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
+import headerLogo from '@/assets/images/logo.svg';
 
 const MainLayout = () => {
   const user = useAuthStore((state) => state.user);
@@ -86,15 +87,16 @@ const MainLayout = () => {
           {/* Left: Logo + Navigation */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             {/* Logo */}
-            <Typography
+            <Box
+              component="img"
+              src={headerLogo}
+              alt="Customer Vault"
               sx={{
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                color: '#1e293b',
+                height: 40,
+                cursor: 'pointer',
               }}
-            >
-              CS Manager
-            </Typography>
+              onClick={() => navigate('/dashboard')}
+            />
 
           {/* Navigation */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

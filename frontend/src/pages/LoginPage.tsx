@@ -12,7 +12,7 @@ import {
   Paper,
   Alert,
 } from '@mui/material';
-import { Lock } from '@mui/icons-material';
+import symbolLogo from '@/assets/images/symbol.svg';
 
 const loginSchema = z.object({
   username: z.string().min(1, '아이디를 입력해주세요'),
@@ -73,18 +73,14 @@ const LoginPage = () => {
           }}
         >
           <Box
+            component="img"
+            src={symbolLogo}
+            alt="Customer Vault Logo"
             sx={{
-              width: 80,
-              height: 80,
-              bgcolor: '#e2e8f0', // slate-200
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              width: 120,
+              height: 120,
             }}
-          >
-            <Lock sx={{ fontSize: 48, color: '#64748b' }} /> {/* slate-500 */}
-          </Box>
+          />
         </Box>
 
         {/* Login Card */}
@@ -100,16 +96,6 @@ const LoginPage = () => {
         >
           {/* Card Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-                color: '#1e293b', // slate-800
-                mb: 1,
-              }}
-            >
-              CS 매니저
-            </Typography>
             <Typography
               variant="body2"
               sx={{
