@@ -10,10 +10,12 @@ import {
   Query,
   ParseIntPipe,
   Request,
+  Put,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
+import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -80,5 +82,35 @@ export class CustomersController {
   @ApiOperation({ summary: '고객사 삭제' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.customersService.remove(id, req.user.id, req.ip);
+  }
+
+  // 소스 관리
+  @Get(':id/source-management')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '소스 관리 정보 조회' })
+  getSourceManagement(@Param('id', ParseIntPipe) id: number) {
+    return this.customersService.getSourceManagement(id);
+  }
+
+  @Post(':id/source-management')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '소스 관리 정보 생성' })
+  createSourceManagement(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateSourceManagementDto,
+    @Request() req: any,
+  ) {
+    return this.customersService.createSourceManagement(id, dto, req.user.id, req.ip);
+  }
+
+  @Put(':id/source-management')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '소스 관리 정보 수정' })
+  updateSourceManagement(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSourceManagementDto,
+    @Request() req: any,
+  ) {
+    return this.customersService.updateSourceManagement(id, dto, req.user.id, req.ip);
   }
 }

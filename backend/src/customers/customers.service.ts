@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
+import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
 
 @Injectable()
 export class CustomersService {
@@ -410,5 +411,149 @@ export class CustomersService {
     });
 
     return completedTargets.length === targetIds.length;
+  }
+
+  // 소스 관리
+  async getSourceManagement(customerId: number) {
+    const sourceManagement = await this.prisma.sourceManagement.findUnique({
+      where: { customerId },
+    });
+
+    if (!sourceManagement) {
+      return null;
+    }
+
+    // 프론트엔드 형식에 맞게 변환
+    return {
+      id: sourceManagement.id,
+      customerId: sourceManagement.customerId,
+      clientVersion: sourceManagement.clientVersion,
+      clientCustomInfo: sourceManagement.clientCustomInfo,
+      virtualPcOsVersion: sourceManagement.virtualPcOsVersion,
+      virtualPcBuildVersion: sourceManagement.virtualPcBuildVersion,
+      virtualPcGuestAddition: sourceManagement.virtualPcGuestAddition,
+      virtualPcImageInfo: sourceManagement.virtualPcImageInfo,
+      adminWebReleaseDate: sourceManagement.adminWebReleaseDate,
+      adminWebCustomInfo: sourceManagement.adminWebCustomInfo,
+      redundancyType: sourceManagement.redundancyType,
+      serverConfig: {
+        managementServer: sourceManagement.managementServer,
+        securityGatewayServer: sourceManagement.securityGatewayServer,
+        integratedServer: sourceManagement.integratedServer,
+      },
+      hrIntegration: {
+        enabled: sourceManagement.hrIntegrationEnabled,
+        dbType: sourceManagement.hrDbType,
+        dbVersion: sourceManagement.hrDbVersion,
+      },
+    };
+  }
+
+  async createSourceManagement(customerId: number, dto: CreateSourceManagementDto, userId: number, ipAddress: string) {
+    // 고객사 존재 확인
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다');
+    }
+
+    // 이미 존재하는지 확인
+    const existing = await this.prisma.sourceManagement.findUnique({
+      where: { customerId },
+    });
+
+    if (existing) {
+      throw new Error('이미 소스 관리 정보가 존재합니다');
+    }
+
+    const sourceManagement = await this.prisma.sourceManagement.create({
+      data: {
+        customerId,
+        clientVersion: dto.clientVersion,
+        clientCustomInfo: dto.clientCustomInfo,
+        virtualPcOsVersion: dto.virtualPcOsVersion,
+        virtualPcBuildVersion: dto.virtualPcBuildVersion,
+        virtualPcGuestAddition: dto.virtualPcGuestAddition,
+        virtualPcImageInfo: dto.virtualPcImageInfo,
+        adminWebReleaseDate: dto.adminWebReleaseDate,
+        adminWebCustomInfo: dto.adminWebCustomInfo,
+        redundancyType: dto.redundancyType || '단일 구성',
+        managementServer: dto.serverConfig?.managementServer || 0,
+        securityGatewayServer: dto.serverConfig?.securityGatewayServer || 0,
+        integratedServer: dto.serverConfig?.integratedServer || 0,
+        hrIntegrationEnabled: dto.hrIntegration?.enabled || false,
+        hrDbType: dto.hrIntegration?.dbType,
+        hrDbVersion: dto.hrIntegration?.dbVersion,
+      },
+    });
+
+    // 로그 기록
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정보',
+      action: '소스 관리 생성',
+      description: `고객사 ${customer.name}의 소스 관리 정보를 생성했습니다`,
+      beforeValue: null,
+      afterValue: JSON.stringify(sourceManagement),
+      ipAddress,
+    });
+
+    return this.getSourceManagement(customerId);
+  }
+
+  async updateSourceManagement(customerId: number, dto: UpdateSourceManagementDto, userId: number, ipAddress: string) {
+    // 고객사 존재 확인
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다');
+    }
+
+    // 기존 데이터 조회
+    const existing = await this.prisma.sourceManagement.findUnique({
+      where: { customerId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('소스 관리 정보가 없습니다');
+    }
+
+    const updated = await this.prisma.sourceManagement.update({
+      where: { customerId },
+      data: {
+        clientVersion: dto.clientVersion,
+        clientCustomInfo: dto.clientCustomInfo,
+        virtualPcOsVersion: dto.virtualPcOsVersion,
+        virtualPcBuildVersion: dto.virtualPcBuildVersion,
+        virtualPcGuestAddition: dto.virtualPcGuestAddition,
+        virtualPcImageInfo: dto.virtualPcImageInfo,
+        adminWebReleaseDate: dto.adminWebReleaseDate,
+        adminWebCustomInfo: dto.adminWebCustomInfo,
+        redundancyType: dto.redundancyType,
+        managementServer: dto.serverConfig?.managementServer,
+        securityGatewayServer: dto.serverConfig?.securityGatewayServer,
+        integratedServer: dto.serverConfig?.integratedServer,
+        hrIntegrationEnabled: dto.hrIntegration?.enabled,
+        hrDbType: dto.hrIntegration?.dbType,
+        hrDbVersion: dto.hrIntegration?.dbVersion,
+      },
+    });
+
+    // 로그 기록
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정보',
+      action: '소스 관리 수정',
+      description: `고객사 ${customer.name}의 소스 관리 정보를 수정했습니다`,
+      beforeValue: JSON.stringify(existing),
+      afterValue: JSON.stringify(updated),
+      ipAddress,
+    });
+
+    return this.getSourceManagement(customerId);
   }
 }

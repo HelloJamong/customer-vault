@@ -119,6 +119,7 @@ model Customer {
   assignedUsers           UserCustomer[]
   documents               Document[]
   inspectionTargets       InspectionTarget[]
+  sourceManagement        SourceManagement?
 
   @@map("customers")
 }
@@ -249,4 +250,42 @@ model ServiceLog {
   user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("service_logs")
+}
+
+// 소스 관리
+model SourceManagement {
+  id                    Int      @id @default(autoincrement())
+  customerId            Int      @unique @map("customer_id")
+
+  // 클라이언트 정보
+  clientVersion         String?  @map("client_version") @db.VarChar(100)
+  clientCustomInfo      String?  @map("client_custom_info") @db.Text
+
+  // 가상PC 정보
+  virtualPcOsVersion    String?  @map("virtual_pc_os_version") @db.VarChar(50)
+  virtualPcBuildVersion String?  @map("virtual_pc_build_version") @db.VarChar(100)
+  virtualPcGuestAddition String? @map("virtual_pc_guest_addition") @db.VarChar(100)
+  virtualPcImageInfo    String?  @map("virtual_pc_image_info") @db.Text
+
+  // 관리웹 정보
+  adminWebReleaseDate   String?  @map("admin_web_release_date") @db.VarChar(20)
+  adminWebCustomInfo    String?  @map("admin_web_custom_info") @db.Text
+
+  // 서버 구성
+  redundancyType        String   @default("단일 구성") @map("redundancy_type") @db.VarChar(20)
+  managementServer      Int      @default(0) @map("management_server")
+  securityGatewayServer Int      @default(0) @map("security_gateway_server")
+  integratedServer      Int      @default(0) @map("integrated_server")
+
+  // 인사연동
+  hrIntegrationEnabled  Boolean  @default(false) @map("hr_integration_enabled")
+  hrDbType              String?  @map("hr_db_type") @db.VarChar(50)
+  hrDbVersion           String?  @map("hr_db_version") @db.VarChar(50)
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  customer              Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("source_management")
 }

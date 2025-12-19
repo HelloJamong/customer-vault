@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { Add, Visibility, Info } from '@mui/icons-material';
+import { Add, Visibility, Info, Code, SupportAgent } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
@@ -85,6 +85,41 @@ const CustomersPage = () => {
           onClick={() => navigate(`/customers/${params.row.id}/documents`)}
         >
           보기
+        </Button>
+      ),
+    },
+    {
+      field: 'sourceManagement',
+      headerName: '형상 관리',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<Code />}
+          onClick={() => navigate(`/customers/${params.row.id}/source-management`)}
+        >
+          형상 관리
+        </Button>
+      ),
+    },
+    {
+      field: 'supportList',
+      headerName: '지원 목록',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<SupportAgent />}
+          onClick={() => {
+            // TODO: 지원 목록 페이지로 이동
+            console.log('지원 목록:', params.row.id);
+          }}
+        >
+          지원 목록
         </Button>
       ),
     },

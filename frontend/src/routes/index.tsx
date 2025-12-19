@@ -13,6 +13,8 @@ import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import CustomerEditPage from '@/pages/CustomerEditPage';
 import CustomerDocumentsPage from '@/pages/CustomerDocumentsPage';
+import CustomerSourceManagementDetailPage from '@/pages/CustomerSourceManagementDetailPage';
+import CustomerSourceManagementEditPage from '@/pages/CustomerSourceManagementEditPage';
 import DocumentViewerPage from '@/pages/DocumentViewerPage';
 import SuperAdminsPage from '@/pages/SuperAdminsPage';
 import AdminsPage from '@/pages/AdminsPage';
@@ -74,6 +76,22 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomerDocumentsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId/source-management',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
+            <CustomerSourceManagementDetailPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId/source-management/edit',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
+            <CustomerSourceManagementEditPage />
           </RoleRoute>
         ),
       },

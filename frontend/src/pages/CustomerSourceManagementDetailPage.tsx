@@ -1,0 +1,315 @@
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Paper,
+  Grid,
+  CircularProgress,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from '@mui/material';
+import { ArrowBack, Edit } from '@mui/icons-material';
+import { useNavigate, useParams } from 'react-router-dom';
+import apiClient from '@/api/axios';
+
+interface ServerConfig {
+  managementServer: number;
+  securityGatewayServer: number;
+  integratedServer: number;
+}
+
+interface HRIntegration {
+  enabled: boolean;
+  dbType: string;
+  dbVersion: string;
+}
+
+interface SourceManagement {
+  id?: number;
+  customerId: number;
+  clientVersion: string;
+  clientCustomInfo: string;
+  virtualPcOsVersion: string;
+  virtualPcBuildVersion: string;
+  virtualPcGuestAddition: string;
+  virtualPcImageInfo: string;
+  adminWebReleaseDate: string;
+  adminWebCustomInfo: string;
+  redundancyType: '이중화 구성' | '단일 구성';
+  serverConfig: ServerConfig;
+  hrIntegration: HRIntegration;
+}
+
+const CustomerSourceManagementDetailPage = () => {
+  const navigate = useNavigate();
+  const { customerId } = useParams<{ customerId: string }>();
+  const [customerName, setCustomerName] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [sourceData, setSourceData] = useState<SourceManagement | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // 고객사 이름 조회
+        const customerResponse = await apiClient.get(`/customers/${customerId}`);
+        setCustomerName(customerResponse.data.name);
+
+        // 소스 관리 정보 조회
+        try {
+          const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management`);
+          if (sourceResponse.data) {
+            setSourceData(sourceResponse.data);
+          }
+        } catch (error: any) {
+          // 404인 경우 데이터 없음
+          if (error.response?.status === 404) {
+            setSourceData(null);
+          } else {
+            throw error;
+          }
+        }
+      } catch (error) {
+        console.error('데이터 로드 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (customerId) {
+      fetchData();
+    }
+  }, [customerId]);
+
+  const InfoItem = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
+    <Grid container spacing={2} sx={{ mb: 2 }}>
+      <Grid item xs={12} sm={3}>
+        <Typography variant="body2" color="text.secondary" fontWeight="bold">
+          {label}
+        </Typography>
+      </Grid>
+      <Grid item xs={12} sm={9}>
+        <Typography variant="body1">{value || '-'}</Typography>
+      </Grid>
+    </Grid>
+  );
+
+  const formatReleaseDate = (value: string) => {
+    if (!value) return '-';
+    return `Release ${value}`;
+  };
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Button startIcon={<ArrowBack />} onClick={() => navigate('/customers')}>
+            목록으로
+          </Button>
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              {customerName}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              형상 관리
+            </Typography>
+          </Box>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<Edit />}
+          onClick={() => navigate(`/customers/${customerId}/source-management/edit`)}
+        >
+          수정
+        </Button>
+      </Box>
+
+      {!sourceData ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            형상 관리 정보가 등록되지 않았습니다.
+          </Typography>
+          <Button
+            variant="contained"
+            sx={{ mt: 2 }}
+            onClick={() => navigate(`/customers/${customerId}/source-management/edit`)}
+          >
+            정보 등록하기
+          </Button>
+        </Paper>
+      ) : (
+        <>
+          {/* 클라이언트 정보 */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              클라이언트 정보
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <InfoItem label="클라이언트 버전" value={sourceData.clientVersion} />
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                  클라이언트 커스텀 정보
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={9}>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {sourceData.clientCustomInfo || '-'}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* 가상PC 정보 */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              가상PC 정보
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                  버전 정보
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={9}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      OS 버전
+                    </Typography>
+                    <Typography variant="body1">{sourceData.virtualPcOsVersion || '-'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      빌드 버전
+                    </Typography>
+                    <Typography variant="body1">{sourceData.virtualPcBuildVersion || '-'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      GuestAddition 버전
+                    </Typography>
+                    <Typography variant="body1">{sourceData.virtualPcGuestAddition || '-'}</Typography>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                  가상PC 이미지 정보
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={9}>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {sourceData.virtualPcImageInfo || '-'}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* 관리웹 정보 */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              관리웹 정보
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <InfoItem
+              label="관리웹 소스 릴리즈 날짜"
+              value={formatReleaseDate(sourceData.adminWebReleaseDate)}
+            />
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                  관리웹 커스텀 정보
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={9}>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {sourceData.adminWebCustomInfo || '-'}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* 서버 구성 */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              서버 구성
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <InfoItem label="이중화 구성 여부" value={sourceData.redundancyType} />
+
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                  서버 수량
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={9}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      관리서버
+                    </Typography>
+                    <Typography variant="body1">{sourceData.serverConfig.managementServer}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      보안게이트웨이서버
+                    </Typography>
+                    <Typography variant="body1">{sourceData.serverConfig.securityGatewayServer}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      통합서버
+                    </Typography>
+                    <Typography variant="body1">{sourceData.serverConfig.integratedServer}</Typography>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* 인사연동 */}
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              인사연동
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <InfoItem label="인사연동 여부" value={sourceData.hrIntegration.enabled ? '사용' : '미사용'} />
+
+            {sourceData.hrIntegration.enabled && (
+              <>
+                <InfoItem label="인사DB 종류" value={sourceData.hrIntegration.dbType} />
+                <InfoItem label="인사DB 버전" value={sourceData.hrIntegration.dbVersion} />
+              </>
+            )}
+          </Paper>
+        </>
+      )}
+    </Box>
+  );
+};
+
+export default CustomerSourceManagementDetailPage;
