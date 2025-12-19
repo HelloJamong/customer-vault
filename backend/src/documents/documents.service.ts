@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { LogsService } from '../logs/logs.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+  ) {}
 
   async findByCustomer(customerId: number, filters?: {
     inspectionTargetId?: number;
@@ -215,6 +219,14 @@ export class DocumentsService {
       // 점검 상태 자동 갱신: 모든 점검 항목이 완료되었는지 확인
       await this.updateInspectionStatus(data.customerId);
 
+      // 시스템 로그 기록
+      await this.logsService.createServiceLog({
+        userId: data.uploadedBy,
+        logType: '정보',
+        action: '점검서 업로드',
+        description: `${customer.name}의 ${inspectionTarget.productName} 점검서가 업로드되었습니다. (파일명: ${finalFilename})`,
+      });
+
       return {
         id: document.id,
         title: document.title,
@@ -240,11 +252,20 @@ export class DocumentsService {
     }
   }
 
-  async remove(id: number) {
-    const document = await this.prisma.document.findUnique({ where: { id } });
+  async remove(id: number, userId?: number) {
+    const document = await this.prisma.document.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { name: true } },
+        inspectionTarget: { select: { productName: true } },
+      },
+    });
 
     if (document) {
       const customerId = document.customerId;
+      const customerName = document.customer.name;
+      const productName = document.inspectionTarget?.productName || '알 수 없음';
+      const filename = document.filename;
 
       // 파일 삭제
       if (fs.existsSync(document.filepath)) {
@@ -256,6 +277,14 @@ export class DocumentsService {
 
       // 점검 상태 자동 갱신: 삭제 후 완료 상태가 미완료로 변경될 수 있음
       await this.updateInspectionStatus(customerId);
+
+      // 시스템 로그 기록
+      await this.logsService.createServiceLog({
+        userId,
+        logType: '정보',
+        action: '점검서 삭제',
+        description: `${customerName}의 ${productName} 점검서가 삭제되었습니다. (파일명: ${filename})`,
+      });
     }
 
     return { message: '문서가 삭제되었습니다.' };
