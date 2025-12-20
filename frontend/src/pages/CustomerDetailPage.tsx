@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Button, Paper, Grid, CircularProgress, Divider, Chip } from '@mui/material';
-import { ArrowBack, Edit } from '@mui/icons-material';
+import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import type { Customer } from '@/types/customer.types';
+import * as XLSX from 'xlsx';
 
 const CustomerDetailPage = () => {
   const navigate = useNavigate();
@@ -76,6 +77,107 @@ const CustomerDetailPage = () => {
     return customer.inspectionCycleType || '-';
   };
 
+  const handleExportToExcel = () => {
+    if (!customer) return;
+
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    const filename = `${customer.name}_세부사항_${dateStr}.xlsx`;
+
+    const data: (string | number)[][] = [];
+
+    // 헤더
+    data.push(['고객사 세부사항']);
+    data.push([]);
+
+    // 기본 정보
+    data.push(['[기본 정보]']);
+    data.push(['고객사명', customer.name || '']);
+    data.push(['위치', customer.location || '']);
+    data.push([]);
+
+    // 담당자 정보
+    data.push(['[담당자 정보]']);
+    data.push(['담당자명', customer.contactName || '']);
+    data.push(['직책', customer.contactPosition || '']);
+    data.push(['부서', customer.contactDepartment || '']);
+    data.push(['휴대전화', customer.contactMobile || '']);
+    data.push(['유선전화', customer.contactPhone || '']);
+    data.push(['이메일', customer.contactEmail || '']);
+    data.push([]);
+
+    // 부 담당자 1
+    if (customer.contactNameSub1) {
+      data.push(['[부 담당자 1]']);
+      data.push(['담당자명', customer.contactNameSub1 || '']);
+      data.push(['직책', customer.contactPositionSub1 || '']);
+      data.push(['부서', customer.contactDepartmentSub1 || '']);
+      data.push(['휴대전화', customer.contactMobileSub1 || '']);
+      data.push(['유선전화', customer.contactPhoneSub1 || '']);
+      data.push(['이메일', customer.contactEmailSub1 || '']);
+      data.push([]);
+    }
+
+    // 부 담당자 2
+    if (customer.contactNameSub2) {
+      data.push(['[부 담당자 2]']);
+      data.push(['담당자명', customer.contactNameSub2 || '']);
+      data.push(['직책', customer.contactPositionSub2 || '']);
+      data.push(['부서', customer.contactDepartmentSub2 || '']);
+      data.push(['휴대전화', customer.contactMobileSub2 || '']);
+      data.push(['유선전화', customer.contactPhoneSub2 || '']);
+      data.push(['이메일', customer.contactEmailSub2 || '']);
+      data.push([]);
+    }
+
+    // 부 담당자 3
+    if (customer.contactNameSub3) {
+      data.push(['[부 담당자 3]']);
+      data.push(['담당자명', customer.contactNameSub3 || '']);
+      data.push(['직책', customer.contactPositionSub3 || '']);
+      data.push(['부서', customer.contactDepartmentSub3 || '']);
+      data.push(['휴대전화', customer.contactMobileSub3 || '']);
+      data.push(['유선전화', customer.contactPhoneSub3 || '']);
+      data.push(['이메일', customer.contactEmailSub3 || '']);
+      data.push([]);
+    }
+
+    // 계약 정보
+    data.push(['[계약 정보]']);
+    data.push(['계약 상태', customer.contractType || '']);
+    data.push(['계약 시작일', customer.contractStartDate || '']);
+    data.push(['계약 종료일', customer.contractEndDate || '']);
+    data.push([]);
+
+    // 점검 정보
+    data.push(['[점검 정보]']);
+    data.push(['점검 주기', getInspectionCycleText()]);
+    data.push(['최근 점검일', customer.lastInspectionDate || '']);
+    data.push(['점검 상태', customer.inspectionStatus || '']);
+    data.push([]);
+
+    // 사내 담당자
+    data.push(['[사내 담당자]']);
+    data.push(['엔지니어', customer.engineer?.name || '']);
+    data.push(['부 엔지니어', customer.engineerSub?.name || '']);
+    data.push(['영업 담당', customer.sales?.name || '']);
+    data.push([]);
+
+    // 비고
+    if (customer.notes) {
+      data.push(['[비고]']);
+      data.push([customer.notes]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, { wch: 50 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '세부사항');
+
+    XLSX.writeFile(wb, filename);
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -95,13 +197,22 @@ const CustomerDetailPage = () => {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Edit />}
-          onClick={() => navigate(`/customers/${customerId}/edit`)}
-        >
-          수정
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            onClick={handleExportToExcel}
+          >
+            엑셀로 내보내기
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Edit />}
+            onClick={() => navigate(`/customers/${customerId}/edit`)}
+          >
+            수정
+          </Button>
+        </Box>
       </Box>
 
       {/* 기본 정보 */}
@@ -129,6 +240,57 @@ const CustomerDetailPage = () => {
         <InfoItem label="유선전화" value={customer.contactPhone} />
         <InfoItem label="이메일" value={customer.contactEmail} />
       </Paper>
+
+      {/* 부 담당자 1 */}
+      {customer.contactNameSub1 && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            부 담당자 1
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <InfoItem label="담당자명" value={customer.contactNameSub1} />
+          <InfoItem label="직책" value={customer.contactPositionSub1} />
+          <InfoItem label="부서" value={customer.contactDepartmentSub1} />
+          <InfoItem label="휴대전화" value={customer.contactMobileSub1} />
+          <InfoItem label="유선전화" value={customer.contactPhoneSub1} />
+          <InfoItem label="이메일" value={customer.contactEmailSub1} />
+        </Paper>
+      )}
+
+      {/* 부 담당자 2 */}
+      {customer.contactNameSub2 && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            부 담당자 2
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <InfoItem label="담당자명" value={customer.contactNameSub2} />
+          <InfoItem label="직책" value={customer.contactPositionSub2} />
+          <InfoItem label="부서" value={customer.contactDepartmentSub2} />
+          <InfoItem label="휴대전화" value={customer.contactMobileSub2} />
+          <InfoItem label="유선전화" value={customer.contactPhoneSub2} />
+          <InfoItem label="이메일" value={customer.contactEmailSub2} />
+        </Paper>
+      )}
+
+      {/* 부 담당자 3 */}
+      {customer.contactNameSub3 && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            부 담당자 3
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <InfoItem label="담당자명" value={customer.contactNameSub3} />
+          <InfoItem label="직책" value={customer.contactPositionSub3} />
+          <InfoItem label="부서" value={customer.contactDepartmentSub3} />
+          <InfoItem label="휴대전화" value={customer.contactMobileSub3} />
+          <InfoItem label="유선전화" value={customer.contactPhoneSub3} />
+          <InfoItem label="이메일" value={customer.contactEmailSub3} />
+        </Paper>
+      )}
 
       {/* 계약 정보 */}
       <Paper sx={{ p: 3, mb: 3 }}>

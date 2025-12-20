@@ -728,6 +728,14 @@ const UserDashboard = () => {
     navigate(`/customers/${customerId}/documents`);
   };
 
+  const handleGoSourceManagement = (customerId: number) => {
+    navigate(`/customers/${customerId}/source-management`);
+  };
+
+  const handleGoSupportLogs = (customerId: number) => {
+    navigate(`/customers/${customerId}/support-logs`);
+  };
+
   const renderStatusChip = (status?: string) => {
     if (!status) return null;
 
@@ -1033,7 +1041,7 @@ const UserDashboard = () => {
             mt: 0.5,
           }}
         >
-          세부정보 또는 점검서를 바로 확인하세요.
+          세부정보, 형상 관리, 지원 목록 또는 점검서를 바로 확인하세요.
         </Typography>
 
         <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1091,6 +1099,12 @@ const UserDashboard = () => {
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
                   <Button variant="outlined" size="small" onClick={() => handleGoDetail(customer.id)}>
                     세부정보
+                  </Button>
+                  <Button variant="outlined" size="small" onClick={() => handleGoSourceManagement(customer.id)}>
+                    형상 관리
+                  </Button>
+                  <Button variant="outlined" size="small" onClick={() => handleGoSupportLogs(customer.id)}>
+                    지원 목록
                   </Button>
                   <Button variant="contained" size="small" onClick={() => handleGoDocuments(customer.id)}>
                     점검서 보기

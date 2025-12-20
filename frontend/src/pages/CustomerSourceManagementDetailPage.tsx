@@ -14,9 +14,10 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { ArrowBack, Edit } from '@mui/icons-material';
+import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
+import * as XLSX from 'xlsx';
 
 interface ServerConfig {
   managementServer: number;
@@ -104,6 +105,62 @@ const CustomerSourceManagementDetailPage = () => {
     return `Release ${value}`;
   };
 
+  const handleExportToExcel = () => {
+    if (!sourceData) return;
+
+    // 현재 날짜를 YYYYMMDD 형식으로 포맷
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    const filename = `${customerName}_운영정보_${dateStr}.xlsx`;
+
+    // 엑셀 데이터 준비
+    const data = [
+      ['형상 관리 정보', ''],
+      ['고객사명', customerName],
+      ['', ''],
+      ['클라이언트 정보', ''],
+      ['클라이언트 버전', sourceData.clientVersion || '-'],
+      ['클라이언트 커스텀 정보', sourceData.clientCustomInfo || '-'],
+      ['', ''],
+      ['가상PC 정보', ''],
+      ['OS 버전', sourceData.virtualPcOsVersion || '-'],
+      ['빌드 버전', sourceData.virtualPcBuildVersion || '-'],
+      ['GuestAddition 버전', sourceData.virtualPcGuestAddition || '-'],
+      ['가상PC 이미지 정보', sourceData.virtualPcImageInfo || '-'],
+      ['', ''],
+      ['관리웹 정보', ''],
+      ['관리웹 소스 릴리즈 날짜', formatReleaseDate(sourceData.adminWebReleaseDate)],
+      ['관리웹 커스텀 정보', sourceData.adminWebCustomInfo || '-'],
+      ['', ''],
+      ['서버 구성', ''],
+      ['이중화 구성', sourceData.redundancyType || '-'],
+      ['관리 서버', sourceData.serverConfig.managementServer + '대'],
+      ['보안 게이트웨이 서버', sourceData.serverConfig.securityGatewayServer + '대'],
+      ['통합 서버', sourceData.serverConfig.integratedServer + '대'],
+      ['', ''],
+      ['인사연동', ''],
+      ['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용'],
+      ['인사 DB 종류', sourceData.hrIntegration.dbType || '-'],
+      ['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-'],
+    ];
+
+    // 워크시트 생성
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // 열 너비 설정
+    ws['!cols'] = [
+      { wch: 25 }, // 첫 번째 열
+      { wch: 50 }, // 두 번째 열
+    ];
+
+    // 워크북 생성
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '형상 관리');
+
+    // 파일 다운로드
+    XLSX.writeFile(wb, filename);
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -128,13 +185,23 @@ const CustomerSourceManagementDetailPage = () => {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Edit />}
-          onClick={() => navigate(`/customers/${customerId}/source-management/edit`)}
-        >
-          수정
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            onClick={handleExportToExcel}
+            disabled={!sourceData}
+          >
+            엑셀로 내보내기
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Edit />}
+            onClick={() => navigate(`/customers/${customerId}/source-management/edit`)}
+          >
+            수정
+          </Button>
+        </Box>
       </Box>
 
       {!sourceData ? (

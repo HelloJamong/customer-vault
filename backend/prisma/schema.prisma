@@ -48,6 +48,7 @@ model User {
   customersAsEngineerSub Customer[] @relation("EngineerSub")
   customersAsSales      Customer[] @relation("Sales")
   updatedSettings       SystemSettings[]
+  createdSupportLogs    SupportLog[] @relation("SupportLogCreator")
 
   @@map("users")
 }
@@ -120,6 +121,7 @@ model Customer {
   documents               Document[]
   inspectionTargets       InspectionTarget[]
   sourceManagement        SourceManagement?
+  supportLogs             SupportLog[]
 
   @@map("customers")
 }
@@ -288,4 +290,27 @@ model SourceManagement {
   customer              Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@map("source_management")
+}
+
+// 고객사 지원 로그
+model SupportLog {
+  id              Int       @id @default(autoincrement())
+  customerId      Int       @map("customer_id")
+  supportDate     DateTime  @map("support_date") @db.Date
+  inquirer        String?   @db.VarChar(100)       // 문의자
+  target          String?   @db.VarChar(200)       // 대상
+  category        String?   @db.VarChar(100)       // 구분
+  userInfo        String?   @map("user_info") @db.VarChar(200)  // 사용자 정보
+  actionStatus    String?   @map("action_status") @db.VarChar(50) // 조치 여부
+  inquiryContent  String?   @map("inquiry_content") @db.Text    // 문의 내용
+  actionContent   String?   @map("action_content") @db.Text     // 조치 내용
+  remarks         String?   @db.Text               // 비고
+  createdBy       Int?      @map("created_by")     // 작성자 (지원 엔지니어)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  creator         User?     @relation("SupportLogCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("support_logs")
 }

@@ -10,6 +10,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { LogsModule } from './logs/logs.module';
 import { SettingsModule } from './settings/settings.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SupportLogsModule } from './support-logs/support-logs.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     LogsModule,
     SettingsModule,
     DashboardModule,
+    SupportLogsModule,
   ],
 })
 export class AppModule {}

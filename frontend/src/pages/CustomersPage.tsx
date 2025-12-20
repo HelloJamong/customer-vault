@@ -114,10 +114,7 @@ const CustomersPage = () => {
           size="small"
           variant="outlined"
           startIcon={<SupportAgent />}
-          onClick={() => {
-            // TODO: 지원 목록 페이지로 이동
-            console.log('지원 목록:', params.row.id);
-          }}
+          onClick={() => navigate(`/customers/${params.row.id}/support-logs`)}
         >
           지원 목록
         </Button>
