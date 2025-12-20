@@ -17,6 +17,7 @@ import {
 import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
+import { logsApi } from '@/api/logs.api';
 import * as XLSX from 'xlsx';
 
 interface ServerConfig {
@@ -105,7 +106,7 @@ const CustomerSourceManagementDetailPage = () => {
     return `Release ${value}`;
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (!sourceData) return;
 
     // 현재 날짜를 YYYYMMDD 형식으로 포맷
@@ -159,6 +160,16 @@ const CustomerSourceManagementDetailPage = () => {
 
     // 파일 다운로드
     XLSX.writeFile(wb, filename);
+
+    // 로그 기록
+    try {
+      await logsApi.logExcelExport({
+        action: '형상 관리 정보 엑셀 내보내기',
+        description: `${customerName} 고객사 형상 관리 정보를 엑셀로 내보냄`,
+      });
+    } catch (error) {
+      console.error('로그 기록 실패:', error);
+    }
   };
 
   if (isLoading) {

@@ -147,4 +147,11 @@ export const logsApi = {
     );
     return response.data;
   },
+
+  logExcelExport: async (data: {
+    action: string;
+    description: string;
+  }): Promise<void> => {
+    await apiClient.post('/logs/excel-export', data);
+  },
 };

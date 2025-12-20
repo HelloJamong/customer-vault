@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import type { Customer } from '@/types/customer.types';
 import * as XLSX from 'xlsx';
+import { logsApi } from '@/api/logs.api';
 
 const CustomerDetailPage = () => {
   const navigate = useNavigate();
@@ -77,7 +78,7 @@ const CustomerDetailPage = () => {
     return customer.inspectionCycleType || '-';
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (!customer) return;
 
     const today = new Date();
@@ -176,6 +177,16 @@ const CustomerDetailPage = () => {
     XLSX.utils.book_append_sheet(wb, ws, '세부사항');
 
     XLSX.writeFile(wb, filename);
+
+    // 로그 기록
+    try {
+      await logsApi.logExcelExport({
+        action: '고객사 세부사항 엑셀 내보내기',
+        description: `${customer.name} 고객사 세부사항을 엑셀로 내보냄`,
+      });
+    } catch (error) {
+      console.error('로그 기록 실패:', error);
+    }
   };
 
   return (

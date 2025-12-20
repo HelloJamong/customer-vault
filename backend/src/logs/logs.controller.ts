@@ -1,6 +1,6 @@
-import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, UseGuards, Res, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { LogsService } from './logs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -66,6 +66,7 @@ export class LogsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Res() res?: Response,
+    @Req() req?: Request,
   ) {
     const buffer = await this.service.exportSystemLogsToExcel({
       username,
@@ -81,6 +82,21 @@ export class LogsController {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+
+    // 로그 기록
+    try {
+      const user = req.user as any;
+      const userIpAddress = req.ip || req.socket?.remoteAddress;
+      await this.service.createServiceLog({
+        userId: user.id,
+        logType: '정보',
+        action: '시스템 로그 엑셀 내보내기',
+        description: '시스템 로그를 엑셀로 내보냄',
+        ipAddress: userIpAddress,
+      });
+    } catch (error) {
+      console.error('로그 기록 실패:', error);
+    }
   }
 
   @Get('system')
@@ -117,6 +133,7 @@ export class LogsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Res() res?: Response,
+    @Req() req?: Request,
   ) {
     const buffer = await this.service.exportUploadLogsToExcel({
       username,
@@ -132,6 +149,21 @@ export class LogsController {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+
+    // 로그 기록
+    try {
+      const user = req.user as any;
+      const userIpAddress = req.ip || req.socket?.remoteAddress;
+      await this.service.createServiceLog({
+        userId: user.id,
+        logType: '정보',
+        action: '업로드 로그 엑셀 내보내기',
+        description: '업로드 로그를 엑셀로 내보냄',
+        ipAddress: userIpAddress,
+      });
+    } catch (error) {
+      console.error('로그 기록 실패:', error);
+    }
   }
 
   @Get('upload')
@@ -168,6 +200,7 @@ export class LogsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Res() res?: Response,
+    @Req() req?: Request,
   ) {
     const buffer = await this.service.exportLoginLogsToExcel({
       username,
@@ -183,5 +216,40 @@ export class LogsController {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+
+    // 로그 기록
+    try {
+      const user = req.user as any;
+      const userIpAddress = req.ip || req.socket?.remoteAddress;
+      await this.service.createServiceLog({
+        userId: user.id,
+        logType: '정보',
+        action: '로그인 로그 엑셀 내보내기',
+        description: '로그인 로그를 엑셀로 내보냄',
+        ipAddress: userIpAddress,
+      });
+    } catch (error) {
+      console.error('로그 기록 실패:', error);
+    }
+  }
+
+  @Post('excel-export')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  async logExcelExport(
+    @Body() body: { action: string; description: string },
+    @Req() req: Request,
+  ) {
+    const user = req.user as any;
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+
+    await this.service.createServiceLog({
+      userId: user.id,
+      logType: '정보',
+      action: body.action,
+      description: body.description,
+      ipAddress,
+    });
+
+    return { message: '로그가 기록되었습니다.' };
   }
 }
