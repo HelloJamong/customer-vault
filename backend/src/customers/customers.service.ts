@@ -420,7 +420,7 @@ export class CustomersService {
     });
 
     if (!sourceManagement) {
-      return null;
+      throw new NotFoundException('소스 관리 정보를 찾을 수 없습니다');
     }
 
     // 프론트엔드 형식에 맞게 변환
