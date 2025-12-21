@@ -114,6 +114,19 @@ export class AuthService {
     return { message: '로그아웃 성공' };
   }
 
+  async logoutWithAccessToken(accessToken: string, ipAddress?: string) {
+    // sendBeacon 등에서 Authorization 헤더를 붙일 수 없는 경우를 위한 로그아웃 처리
+    const payload = this.jwtService.verify(accessToken, {
+      secret: this.configService.get<string>('JWT_SECRET'),
+    }) as { sub: number };
+
+    if (!payload?.sub) {
+      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+    }
+
+    return this.logout(payload.sub, undefined, ipAddress);
+  }
+
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto, ipAddress?: string) {
     const { currentPassword, newPassword } = changePasswordDto;
 

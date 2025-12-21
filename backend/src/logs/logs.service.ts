@@ -508,6 +508,43 @@ export class LogsService {
     const limit = filters?.limit || 30;
     const skip = (page - 1) * limit;
 
+    // 로그인/로그아웃 서비스 로그 조회 조건
+    const serviceLogWhere: any = {
+      OR: [
+        { action: { contains: '로그인' } },
+        { action: { contains: '로그아웃' } },
+      ],
+    };
+
+    if (filters?.ipAddress) {
+      serviceLogWhere.ipAddress = { contains: filters.ipAddress };
+    }
+
+    if (filters?.startDate && filters?.endDate) {
+      serviceLogWhere.createdAt = {
+        gte: new Date(filters.startDate),
+        lte: new Date(filters.endDate),
+      };
+    }
+
+    if (filters?.username) {
+      serviceLogWhere.user = {
+        username: { contains: filters.username },
+      };
+    }
+
+    if (filters?.logType) {
+      serviceLogWhere.logType = filters.logType;
+    }
+
+    const serviceLogs = await this.prisma.serviceLog.findMany({
+      where: serviceLogWhere,
+      include: {
+        user: { select: { id: true, username: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
     // 로그인 시도 조회 조건 구성
     const loginAttemptWhere: any = {};
 
@@ -536,8 +573,22 @@ export class LogsService {
       orderBy: { attemptTime: 'desc' },
     });
 
+    // 서비스 로그(로그인/로그아웃) 변환
+    const serviceLogEntries: SystemLogEntry[] = serviceLogs.map((log) => ({
+      id: log.id,
+      timestamp: log.createdAt,
+      username: log.user?.username || '시스템',
+      userId: log.userId || 0,
+      logType: log.logType,
+      action: log.action,
+      description: log.description || '',
+      ipAddress: log.ipAddress || '-',
+      beforeValue: log.beforeValue || undefined,
+      afterValue: log.afterValue || undefined,
+    }));
+
     // 로그인 시도 로그 변환
-    let allLogs: SystemLogEntry[] = loginAttempts.map((attempt) => {
+    const loginAttemptEntries: SystemLogEntry[] = loginAttempts.map((attempt) => {
       const logType = attempt.success ? '정상' : '경고';
       const action = attempt.success ? '로그인 성공' : '로그인 실패';
 
@@ -555,24 +606,21 @@ export class LogsService {
       };
     });
 
-    // 로그 타입 필터링
-    if (filters?.logType) {
-      allLogs = allLogs.filter((log) => log.logType === filters.logType);
-    }
+    // 통합 후 검색/정렬/페이징
+    let allLogs: SystemLogEntry[] = [...serviceLogEntries, ...loginAttemptEntries];
 
-    // 검색 텍스트 필터링
     if (filters?.searchText) {
       allLogs = allLogs.filter(
         (log) =>
           log.action.includes(filters.searchText!) ||
-          log.description.includes(filters.searchText!),
+          (log.description && log.description.includes(filters.searchText!)),
       );
     }
 
-    // 전체 개수
-    const total = allLogs.length;
+    // 최신순 정렬
+    allLogs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    // 페이지네이션
+    const total = allLogs.length;
     const paginatedLogs = allLogs.slice(skip, skip + limit);
 
     return {

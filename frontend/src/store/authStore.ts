@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { User } from '@/types/auth.types';
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/utils/constants';
 
@@ -23,8 +23,8 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
 
       login: (accessToken, refreshToken, user) => {
-        localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+        sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
         set({
           user,
           accessToken,
@@ -33,8 +33,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
         set({
           user: null,
           accessToken: null,
@@ -45,12 +45,13 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
 
       updateAccessToken: (token) => {
-        localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
         set({ accessToken: token });
       },
     }),
     {
       name: 'auth-storage',
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
       }),
@@ -61,6 +62,6 @@ export const useAuthStore = create<AuthState>()(
 // Helper function to check authentication
 export const isAuthenticated = (): boolean => {
   const state = useAuthStore.getState();
-  const hasToken = !!localStorage.getItem(ACCESS_TOKEN_KEY);
+  const hasToken = !!sessionStorage.getItem(ACCESS_TOKEN_KEY);
   return !!state.user && hasToken;
 };

@@ -16,7 +16,7 @@ let isRedirecting = false;
 // 요청 인터셉터: Access Token 자동 추가
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,7 +36,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+        const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
 
         if (!refreshToken) {
           throw new Error('No refresh token');
@@ -48,7 +48,7 @@ apiClient.interceptors.response.use(
         });
 
         // 새 토큰 저장
-        localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+        sessionStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
 
         // 원래 요청 재시도
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;

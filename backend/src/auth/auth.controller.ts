@@ -38,6 +38,24 @@ export class AuthController {
     return this.authService.logout(req.user.id, undefined, ipAddress);
   }
 
+  @Post('logout-beacon')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '로그아웃 (beacon/창 닫힘 대응)' })
+  @ApiResponse({ status: 200, description: '로그아웃 성공' })
+  async logoutBeacon(@Body('accessToken') accessToken?: string, @Ip() ipAddress?: string) {
+    if (!accessToken) {
+      return { message: '토큰 없음' };
+    }
+
+    try {
+      return await this.authService.logoutWithAccessToken(accessToken, ipAddress);
+    } catch (error) {
+      // 토큰 검증 실패 등은 로그만 남기고 성공 응답
+      console.error('logout-beacon 실패:', error);
+      return { message: '로그아웃 처리 중 오류가 발생했습니다.' };
+    }
+  }
+
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
