@@ -5,12 +5,25 @@ import { AppModule } from './app.module';
 import { CustomLoggerService } from './common/logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import * as express from 'express';
+import * as cors from 'cors';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
     bodyParser: false,
   });
+
+  // Enable CORS first - before any other middleware
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Always allow requests (for development)
+      callback(null, origin || '*');
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+    exposedHeaders: ['Content-Disposition'],
+  }));
 
   // JSON body parser with relaxed settings for special characters
   app.use(express.json({ limit: '10mb', strict: false }));
@@ -25,15 +38,6 @@ async function bootstrap() {
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');
-
-  // Enable CORS
-  const corsOrigin = process.env.CORS_ORIGIN || '*';
-  app.enableCors({
-    origin: corsOrigin === '*' ? true : corsOrigin.split(',').map(o => o.trim()),
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
 
   // Global validation pipe
   app.useGlobalPipes(

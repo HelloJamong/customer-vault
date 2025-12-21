@@ -189,6 +189,7 @@ const CustomerDetailPage = () => {
     }
   };
 
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>

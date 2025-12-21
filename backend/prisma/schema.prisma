@@ -273,11 +273,8 @@ model SourceManagement {
   adminWebReleaseDate   String?  @map("admin_web_release_date") @db.VarChar(20)
   adminWebCustomInfo    String?  @map("admin_web_custom_info") @db.Text
 
-  // 서버 구성
+  // 서버 구성 (이중화 타입만 유지)
   redundancyType        String   @default("단일 구성") @map("redundancy_type") @db.VarChar(20)
-  managementServer      Int      @default(0) @map("management_server")
-  securityGatewayServer Int      @default(0) @map("security_gateway_server")
-  integratedServer      Int      @default(0) @map("integrated_server")
 
   // 인사연동
   hrIntegrationEnabled  Boolean  @default(false) @map("hr_integration_enabled")
@@ -288,8 +285,44 @@ model SourceManagement {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   customer              Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  servers               ServerInfo[]
 
   @@map("source_management")
+}
+
+// 서버 정보
+model ServerInfo {
+  id                    Int      @id @default(autoincrement())
+  sourceManagementId    Int      @map("source_management_id")
+
+  // 서버 기본 정보
+  serverType            String   @map("server_type") @db.VarChar(50) // 관리서버, 보안게이트웨이서버, 통합서버
+  manufacturer          String?  @db.VarChar(100)      // 제조사
+  modelName             String?  @map("model_name") @db.VarChar(100) // 모델명
+  hostname              String?  @db.VarChar(100)      // 호스트네임
+
+  // OS 정보
+  osType                String?  @map("os_type") @db.VarChar(50)     // OS 종류 (예: CentOS, Ubuntu, Windows Server)
+  osVersion             String?  @map("os_version") @db.VarChar(50)  // OS 버전 (예: 7.9, 20.04)
+
+  // 하드웨어 정보
+  cpuType               String?  @map("cpu_type") @db.VarChar(100)   // CPU 종류
+  memoryCapacity        String?  @map("memory_capacity") @db.VarChar(50) // 메모리 용량 (예: 32GB)
+  diskCapacity          String?  @map("disk_capacity") @db.VarChar(50)   // 디스크 용량 (예: 500GB)
+
+  // 네트워크 정보
+  nicFiberCount         Int      @default(0) @map("nic_fiber_count")     // Fiber NIC 수량
+  nicUtpCount           Int      @default(0) @map("nic_utp_count")       // UTP NIC 수량
+
+  // 전원 정보
+  powerSupplyCount      Int      @default(0) @map("power_supply_count")  // 전원 수량
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  sourceManagement      SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+
+  @@map("server_info")
 }
 
 // 고객사 지원 로그

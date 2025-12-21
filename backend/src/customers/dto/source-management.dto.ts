@@ -2,24 +2,73 @@ import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject }
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
-class ServerConfigDto {
-  @ApiProperty({ required: false, default: 0 })
+export class ServerInfoDto {
+  @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
   @IsInt()
-  @Min(0)
-  managementServer?: number;
+  id?: number;
 
-  @ApiProperty({ required: false, default: 0 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  securityGatewayServer?: number;
+  @ApiProperty({ required: true, description: '서버 구분 (관리서버, 보안게이트웨이서버, 통합서버)' })
+  @IsString()
+  serverType: string;
 
-  @ApiProperty({ required: false, default: 0 })
+  @ApiProperty({ required: false, description: '제조사' })
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  @ApiProperty({ required: false, description: '모델명' })
+  @IsOptional()
+  @IsString()
+  modelName?: string;
+
+  @ApiProperty({ required: false, description: '호스트네임' })
+  @IsOptional()
+  @IsString()
+  hostname?: string;
+
+  @ApiProperty({ required: false, description: 'OS 종류' })
+  @IsOptional()
+  @IsString()
+  osType?: string;
+
+  @ApiProperty({ required: false, description: 'OS 버전' })
+  @IsOptional()
+  @IsString()
+  osVersion?: string;
+
+  @ApiProperty({ required: false, description: 'CPU 종류' })
+  @IsOptional()
+  @IsString()
+  cpuType?: string;
+
+  @ApiProperty({ required: false, description: '메모리 용량' })
+  @IsOptional()
+  @IsString()
+  memoryCapacity?: string;
+
+  @ApiProperty({ required: false, description: '디스크 용량' })
+  @IsOptional()
+  @IsString()
+  diskCapacity?: string;
+
+  @ApiProperty({ required: false, default: 0, description: 'Fiber NIC 수량' })
   @IsOptional()
   @IsInt()
   @Min(0)
-  integratedServer?: number;
+  nicFiberCount?: number;
+
+  @ApiProperty({ required: false, default: 0, description: 'UTP NIC 수량' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  nicUtpCount?: number;
+
+  @ApiProperty({ required: false, default: 0, description: '전원 수량' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  powerSupplyCount?: number;
 }
 
 class HRIntegrationDto {
@@ -85,12 +134,11 @@ export class CreateSourceManagementDto {
   @IsString()
   redundancyType?: string;
 
-  @ApiProperty({ required: false, type: ServerConfigDto })
+  @ApiProperty({ required: false, type: [ServerInfoDto], description: '서버 정보 목록' })
   @IsOptional()
-  @IsObject()
-  @ValidateNested()
-  @Type(() => ServerConfigDto)
-  serverConfig?: ServerConfigDto;
+  @ValidateNested({ each: true })
+  @Type(() => ServerInfoDto)
+  servers?: ServerInfoDto[];
 
   @ApiProperty({ required: false, type: HRIntegrationDto })
   @IsOptional()

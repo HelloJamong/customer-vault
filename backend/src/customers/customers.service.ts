@@ -417,6 +417,11 @@ export class CustomersService {
   async getSourceManagement(customerId: number) {
     const sourceManagement = await this.prisma.sourceManagement.findUnique({
       where: { customerId },
+      include: {
+        servers: {
+          orderBy: { id: 'asc' },
+        },
+      },
     });
 
     if (!sourceManagement) {
@@ -436,11 +441,21 @@ export class CustomersService {
       adminWebReleaseDate: sourceManagement.adminWebReleaseDate,
       adminWebCustomInfo: sourceManagement.adminWebCustomInfo,
       redundancyType: sourceManagement.redundancyType,
-      serverConfig: {
-        managementServer: sourceManagement.managementServer,
-        securityGatewayServer: sourceManagement.securityGatewayServer,
-        integratedServer: sourceManagement.integratedServer,
-      },
+      servers: sourceManagement.servers.map(server => ({
+        id: server.id,
+        serverType: server.serverType,
+        manufacturer: server.manufacturer,
+        modelName: server.modelName,
+        hostname: server.hostname,
+        osType: server.osType,
+        osVersion: server.osVersion,
+        cpuType: server.cpuType,
+        memoryCapacity: server.memoryCapacity,
+        diskCapacity: server.diskCapacity,
+        nicFiberCount: server.nicFiberCount,
+        nicUtpCount: server.nicUtpCount,
+        powerSupplyCount: server.powerSupplyCount,
+      })),
       hrIntegration: {
         enabled: sourceManagement.hrIntegrationEnabled,
         dbType: sourceManagement.hrDbType,
@@ -480,12 +495,25 @@ export class CustomersService {
         adminWebReleaseDate: dto.adminWebReleaseDate,
         adminWebCustomInfo: dto.adminWebCustomInfo,
         redundancyType: dto.redundancyType || '단일 구성',
-        managementServer: dto.serverConfig?.managementServer || 0,
-        securityGatewayServer: dto.serverConfig?.securityGatewayServer || 0,
-        integratedServer: dto.serverConfig?.integratedServer || 0,
         hrIntegrationEnabled: dto.hrIntegration?.enabled || false,
         hrDbType: dto.hrIntegration?.dbType,
         hrDbVersion: dto.hrIntegration?.dbVersion,
+        servers: dto.servers ? {
+          create: dto.servers.map(server => ({
+            serverType: server.serverType,
+            manufacturer: server.manufacturer,
+            modelName: server.modelName,
+            hostname: server.hostname,
+            osType: server.osType,
+            osVersion: server.osVersion,
+            cpuType: server.cpuType,
+            memoryCapacity: server.memoryCapacity,
+            diskCapacity: server.diskCapacity,
+            nicFiberCount: server.nicFiberCount || 0,
+            nicUtpCount: server.nicUtpCount || 0,
+            powerSupplyCount: server.powerSupplyCount || 0,
+          })),
+        } : undefined,
       },
     });
 
@@ -516,31 +544,59 @@ export class CustomersService {
     // 기존 데이터 조회
     const existing = await this.prisma.sourceManagement.findUnique({
       where: { customerId },
+      include: { servers: true },
     });
 
     if (!existing) {
       throw new NotFoundException('소스 관리 정보가 없습니다');
     }
 
-    const updated = await this.prisma.sourceManagement.update({
-      where: { customerId },
-      data: {
-        clientVersion: dto.clientVersion,
-        clientCustomInfo: dto.clientCustomInfo,
-        virtualPcOsVersion: dto.virtualPcOsVersion,
-        virtualPcBuildVersion: dto.virtualPcBuildVersion,
-        virtualPcGuestAddition: dto.virtualPcGuestAddition,
-        virtualPcImageInfo: dto.virtualPcImageInfo,
-        adminWebReleaseDate: dto.adminWebReleaseDate,
-        adminWebCustomInfo: dto.adminWebCustomInfo,
-        redundancyType: dto.redundancyType,
-        managementServer: dto.serverConfig?.managementServer,
-        securityGatewayServer: dto.serverConfig?.securityGatewayServer,
-        integratedServer: dto.serverConfig?.integratedServer,
-        hrIntegrationEnabled: dto.hrIntegration?.enabled,
-        hrDbType: dto.hrIntegration?.dbType,
-        hrDbVersion: dto.hrIntegration?.dbVersion,
-      },
+    // 트랜잭션으로 서버 정보 업데이트
+    await this.prisma.$transaction(async (tx) => {
+      // 기존 서버 정보 삭제
+      await tx.serverInfo.deleteMany({
+        where: { sourceManagementId: existing.id },
+      });
+
+      // 소스 관리 정보 업데이트
+      await tx.sourceManagement.update({
+        where: { customerId },
+        data: {
+          clientVersion: dto.clientVersion,
+          clientCustomInfo: dto.clientCustomInfo,
+          virtualPcOsVersion: dto.virtualPcOsVersion,
+          virtualPcBuildVersion: dto.virtualPcBuildVersion,
+          virtualPcGuestAddition: dto.virtualPcGuestAddition,
+          virtualPcImageInfo: dto.virtualPcImageInfo,
+          adminWebReleaseDate: dto.adminWebReleaseDate,
+          adminWebCustomInfo: dto.adminWebCustomInfo,
+          redundancyType: dto.redundancyType,
+          hrIntegrationEnabled: dto.hrIntegration?.enabled,
+          hrDbType: dto.hrIntegration?.dbType,
+          hrDbVersion: dto.hrIntegration?.dbVersion,
+        },
+      });
+
+      // 새로운 서버 정보 생성
+      if (dto.servers && dto.servers.length > 0) {
+        await tx.serverInfo.createMany({
+          data: dto.servers.map(server => ({
+            sourceManagementId: existing.id,
+            serverType: server.serverType,
+            manufacturer: server.manufacturer,
+            modelName: server.modelName,
+            hostname: server.hostname,
+            osType: server.osType,
+            osVersion: server.osVersion,
+            cpuType: server.cpuType,
+            memoryCapacity: server.memoryCapacity,
+            diskCapacity: server.diskCapacity,
+            nicFiberCount: server.nicFiberCount || 0,
+            nicUtpCount: server.nicUtpCount || 0,
+            powerSupplyCount: server.powerSupplyCount || 0,
+          })),
+        });
+      }
     });
 
     // 로그 기록
@@ -550,7 +606,7 @@ export class CustomersService {
       action: '소스 관리 수정',
       description: `고객사 ${customer.name}의 소스 관리 정보를 수정했습니다`,
       beforeValue: JSON.stringify(existing),
-      afterValue: JSON.stringify(updated),
+      afterValue: JSON.stringify(dto),
       ipAddress,
     });
 

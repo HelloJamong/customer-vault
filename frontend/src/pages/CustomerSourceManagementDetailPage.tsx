@@ -20,10 +20,20 @@ import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
 import * as XLSX from 'xlsx';
 
-interface ServerConfig {
-  managementServer: number;
-  securityGatewayServer: number;
-  integratedServer: number;
+interface ServerInfo {
+  id?: number;
+  serverType: string;
+  manufacturer?: string;
+  modelName?: string;
+  hostname?: string;
+  osType?: string;
+  osVersion?: string;
+  cpuType?: string;
+  memoryCapacity?: string;
+  diskCapacity?: string;
+  nicFiberCount?: number;
+  nicUtpCount?: number;
+  powerSupplyCount?: number;
 }
 
 interface HRIntegration {
@@ -44,7 +54,7 @@ interface SourceManagement {
   adminWebReleaseDate: string;
   adminWebCustomInfo: string;
   redundancyType: '이중화 구성' | '단일 구성';
-  serverConfig: ServerConfig;
+  servers?: ServerInfo[];
   hrIntegration: HRIntegration;
 }
 
@@ -115,7 +125,7 @@ const CustomerSourceManagementDetailPage = () => {
     const filename = `${customerName}_운영정보_${dateStr}.xlsx`;
 
     // 엑셀 데이터 준비
-    const data = [
+    const data: any[][] = [
       ['형상 관리 정보', ''],
       ['고객사명', customerName],
       ['', ''],
@@ -135,15 +145,49 @@ const CustomerSourceManagementDetailPage = () => {
       ['', ''],
       ['서버 구성', ''],
       ['이중화 구성', sourceData.redundancyType || '-'],
-      ['관리 서버', sourceData.serverConfig.managementServer + '대'],
-      ['보안 게이트웨이 서버', sourceData.serverConfig.securityGatewayServer + '대'],
-      ['통합 서버', sourceData.serverConfig.integratedServer + '대'],
       ['', ''],
-      ['인사연동', ''],
-      ['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용'],
-      ['인사 DB 종류', sourceData.hrIntegration.dbType || '-'],
-      ['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-'],
     ];
+
+    // 서버 정보 테이블 추가
+    if (sourceData.servers && sourceData.servers.length > 0) {
+      data.push(['서버 정보', '', '', '', '', '', '', '', '', '', '', '', '']);
+      data.push([
+        '구분',
+        '제조사',
+        '모델명',
+        '호스트네임',
+        'OS 종류',
+        'OS 버전',
+        'CPU 종류',
+        '메모리 용량',
+        '디스크 용량',
+        'Fiber NIC',
+        'UTP NIC',
+        '전원 수량',
+      ]);
+      sourceData.servers.forEach((server) => {
+        data.push([
+          server.serverType || '-',
+          server.manufacturer || '-',
+          server.modelName || '-',
+          server.hostname || '-',
+          server.osType || '-',
+          server.osVersion || '-',
+          server.cpuType || '-',
+          server.memoryCapacity || '-',
+          server.diskCapacity || '-',
+          server.nicFiberCount || 0,
+          server.nicUtpCount || 0,
+          server.powerSupplyCount || 0,
+        ]);
+      });
+    }
+
+    data.push(['', '']);
+    data.push(['인사연동', '']);
+    data.push(['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용']);
+    data.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
+    data.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
 
     // 워크시트 생성
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -337,35 +381,55 @@ const CustomerSourceManagementDetailPage = () => {
 
             <InfoItem label="이중화 구성 여부" value={sourceData.redundancyType} />
 
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={3}>
-                <Typography variant="body2" color="text.secondary" fontWeight="bold">
-                  서버 수량
+            {sourceData.servers && sourceData.servers.length > 0 ? (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 2 }}>
+                  서버 정보
                 </Typography>
-              </Grid>
-              <Grid item xs={12} sm={9}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="body2" color="text.secondary">
-                      관리서버
-                    </Typography>
-                    <Typography variant="body1">{sourceData.serverConfig.managementServer}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="body2" color="text.secondary">
-                      보안게이트웨이서버
-                    </Typography>
-                    <Typography variant="body1">{sourceData.serverConfig.securityGatewayServer}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="body2" color="text.secondary">
-                      통합서버
-                    </Typography>
-                    <Typography variant="body1">{sourceData.serverConfig.integratedServer}</Typography>
-                  </Grid>
-                </Grid>
-              </Grid>
-            </Grid>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>구분</TableCell>
+                        <TableCell>제조사</TableCell>
+                        <TableCell>모델명</TableCell>
+                        <TableCell>호스트네임</TableCell>
+                        <TableCell>OS 종류</TableCell>
+                        <TableCell>OS 버전</TableCell>
+                        <TableCell>CPU 종류</TableCell>
+                        <TableCell>메모리</TableCell>
+                        <TableCell>디스크</TableCell>
+                        <TableCell>Fiber NIC</TableCell>
+                        <TableCell>UTP NIC</TableCell>
+                        <TableCell>전원</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sourceData.servers.map((server, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{server.serverType}</TableCell>
+                          <TableCell>{server.manufacturer || '-'}</TableCell>
+                          <TableCell>{server.modelName || '-'}</TableCell>
+                          <TableCell>{server.hostname || '-'}</TableCell>
+                          <TableCell>{server.osType || '-'}</TableCell>
+                          <TableCell>{server.osVersion || '-'}</TableCell>
+                          <TableCell>{server.cpuType || '-'}</TableCell>
+                          <TableCell>{server.memoryCapacity || '-'}</TableCell>
+                          <TableCell>{server.diskCapacity || '-'}</TableCell>
+                          <TableCell>{server.nicFiberCount || 0}</TableCell>
+                          <TableCell>{server.nicUtpCount || 0}</TableCell>
+                          <TableCell>{server.powerSupplyCount || 0}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                등록된 서버 정보가 없습니다.
+              </Typography>
+            )}
           </Paper>
 
           {/* 인사연동 */}

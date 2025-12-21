@@ -18,15 +18,26 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  IconButton,
 } from '@mui/material';
-import { ArrowBack, Save } from '@mui/icons-material';
+import { ArrowBack, Save, Add, Delete } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 
-interface ServerConfig {
-  managementServer: number;
-  securityGatewayServer: number;
-  integratedServer: number;
+interface ServerInfo {
+  id?: number;
+  serverType: string;
+  manufacturer?: string;
+  modelName?: string;
+  hostname?: string;
+  osType?: string;
+  osVersion?: string;
+  cpuType?: string;
+  memoryCapacity?: string;
+  diskCapacity?: string;
+  nicFiberCount?: number;
+  nicUtpCount?: number;
+  powerSupplyCount?: number;
 }
 
 interface HRIntegration {
@@ -47,7 +58,7 @@ interface SourceManagement {
   adminWebReleaseDate: string;
   adminWebCustomInfo: string;
   redundancyType: '이중화 구성' | '단일 구성';
-  serverConfig: ServerConfig;
+  servers?: ServerInfo[];
   hrIntegration: HRIntegration;
 }
 
@@ -69,11 +80,7 @@ const CustomerSourceManagementEditPage = () => {
     adminWebReleaseDate: '',
     adminWebCustomInfo: '',
     redundancyType: '단일 구성',
-    serverConfig: {
-      managementServer: 0,
-      securityGatewayServer: 0,
-      integratedServer: 0,
-    },
+    servers: [],
     hrIntegration: {
       enabled: false,
       dbType: '',
@@ -148,6 +155,42 @@ const CustomerSourceManagementEditPage = () => {
     // "Release " 제거하고 숫자만 추출
     const numbers = value.replace(/\D/g, '');
     setFormData({ ...formData, adminWebReleaseDate: numbers });
+  };
+
+  const handleAddServer = () => {
+    const newServer: ServerInfo = {
+      serverType: '관리서버',
+      manufacturer: '',
+      modelName: '',
+      hostname: '',
+      osType: '',
+      osVersion: '',
+      cpuType: '',
+      memoryCapacity: '',
+      diskCapacity: '',
+      nicFiberCount: 0,
+      nicUtpCount: 0,
+      powerSupplyCount: 0,
+    };
+    setFormData({
+      ...formData,
+      servers: [...(formData.servers || []), newServer],
+    });
+  };
+
+  const handleRemoveServer = (index: number) => {
+    const updatedServers = [...(formData.servers || [])];
+    updatedServers.splice(index, 1);
+    setFormData({ ...formData, servers: updatedServers });
+  };
+
+  const handleServerChange = (index: number, field: keyof ServerInfo, value: any) => {
+    const updatedServers = [...(formData.servers || [])];
+    updatedServers[index] = {
+      ...updatedServers[index],
+      [field]: value,
+    };
+    setFormData({ ...formData, servers: updatedServers });
   };
 
   if (isLoading) {
@@ -300,88 +343,187 @@ const CustomerSourceManagementEditPage = () => {
 
       {/* 서버 구성 */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          서버 구성
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6" fontWeight="bold">
+            서버 구성
+          </Typography>
+          <Button variant="outlined" startIcon={<Add />} onClick={handleAddServer} size="small">
+            서버 추가
+          </Button>
+        </Box>
         <Divider sx={{ mb: 3 }} />
 
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <FormControl fullWidth>
-              <InputLabel>이중화 구성 여부</InputLabel>
-              <Select
-                value={formData.redundancyType}
-                label="이중화 구성 여부"
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    redundancyType: e.target.value as '이중화 구성' | '단일 구성',
-                  })
-                }
-              >
-                <MenuItem value="단일 구성">단일 구성</MenuItem>
-                <MenuItem value="이중화 구성">이중화 구성</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              type="number"
-              label="관리서버"
-              value={formData.serverConfig.managementServer}
+        <Box sx={{ mb: 3 }}>
+          <FormControl fullWidth>
+            <InputLabel>이중화 구성 여부</InputLabel>
+            <Select
+              value={formData.redundancyType}
+              label="이중화 구성 여부"
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  serverConfig: {
-                    ...formData.serverConfig,
-                    managementServer: Number(e.target.value),
-                  },
+                  redundancyType: e.target.value as '이중화 구성' | '단일 구성',
                 })
               }
-              inputProps={{ min: 0 }}
-            />
-          </Grid>
+            >
+              <MenuItem value="단일 구성">단일 구성</MenuItem>
+              <MenuItem value="이중화 구성">이중화 구성</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
 
-          <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              type="number"
-              label="보안게이트웨이서버"
-              value={formData.serverConfig.securityGatewayServer}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  serverConfig: {
-                    ...formData.serverConfig,
-                    securityGatewayServer: Number(e.target.value),
-                  },
-                })
-              }
-              inputProps={{ min: 0 }}
-            />
-          </Grid>
+        {formData.servers && formData.servers.length > 0 ? (
+          <Box>
+            <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 2 }}>
+              서버 정보
+            </Typography>
+            {formData.servers.map((server, index) => (
+              <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    서버 #{index + 1}
+                  </Typography>
+                  <IconButton size="small" color="error" onClick={() => handleRemoveServer(index)}>
+                    <Delete />
+                  </IconButton>
+                </Box>
 
-          <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              type="number"
-              label="통합서버"
-              value={formData.serverConfig.integratedServer}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  serverConfig: {
-                    ...formData.serverConfig,
-                    integratedServer: Number(e.target.value),
-                  },
-                })
-              }
-              inputProps={{ min: 0 }}
-            />
-          </Grid>
-        </Grid>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>구분</InputLabel>
+                      <Select
+                        value={server.serverType}
+                        label="구분"
+                        onChange={(e) => handleServerChange(index, 'serverType', e.target.value)}
+                      >
+                        <MenuItem value="관리서버">관리서버</MenuItem>
+                        <MenuItem value="보안게이트웨이서버">보안게이트웨이서버</MenuItem>
+                        <MenuItem value="통합서버">통합서버</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="제조사"
+                      value={server.manufacturer || ''}
+                      onChange={(e) => handleServerChange(index, 'manufacturer', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="모델명"
+                      value={server.modelName || ''}
+                      onChange={(e) => handleServerChange(index, 'modelName', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="호스트네임"
+                      value={server.hostname || ''}
+                      onChange={(e) => handleServerChange(index, 'hostname', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="OS 종류"
+                      value={server.osType || ''}
+                      onChange={(e) => handleServerChange(index, 'osType', e.target.value)}
+                      placeholder="예: Linux, Windows Server"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="OS 버전"
+                      value={server.osVersion || ''}
+                      onChange={(e) => handleServerChange(index, 'osVersion', e.target.value)}
+                      placeholder="예: Ubuntu 22.04, Windows Server 2019"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="CPU 종류"
+                      value={server.cpuType || ''}
+                      onChange={(e) => handleServerChange(index, 'cpuType', e.target.value)}
+                      placeholder="예: Intel Xeon E5-2680"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="메모리 용량"
+                      value={server.memoryCapacity || ''}
+                      onChange={(e) => handleServerChange(index, 'memoryCapacity', e.target.value)}
+                      placeholder="예: 32GB, 64GB"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="디스크 용량"
+                      value={server.diskCapacity || ''}
+                      onChange={(e) => handleServerChange(index, 'diskCapacity', e.target.value)}
+                      placeholder="예: 1TB, 2TB SSD"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Fiber NIC 수량"
+                      value={server.nicFiberCount || 0}
+                      onChange={(e) => handleServerChange(index, 'nicFiberCount', Number(e.target.value))}
+                      inputProps={{ min: 0 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="UTP NIC 수량"
+                      value={server.nicUtpCount || 0}
+                      onChange={(e) => handleServerChange(index, 'nicUtpCount', Number(e.target.value))}
+                      inputProps={{ min: 0 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="전원 수량"
+                      value={server.powerSupplyCount || 0}
+                      onChange={(e) =>
+                        handleServerChange(index, 'powerSupplyCount', Number(e.target.value))
+                      }
+                      inputProps={{ min: 0 }}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+            ))}
+          </Box>
+        ) : (
+          <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 3 }}>
+            서버를 추가해주세요.
+          </Typography>
+        )}
       </Paper>
 
       {/* 인사연동 */}
