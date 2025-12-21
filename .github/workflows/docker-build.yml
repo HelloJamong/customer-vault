@@ -52,7 +52,7 @@ jobs:
             # latest 태그 (main 브랜치 또는 태그 push 시)
             type=raw,value=latest,enable={{is_default_branch}}
             # SHA (커밋 해시)
-            type=sha,prefix={{branch}}-
+            type=sha,format=short,prefix=sha-
 
       # 5. Docker 이미지 빌드 및 푸시
       - name: Build and push Docker image
