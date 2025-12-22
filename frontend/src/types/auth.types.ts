@@ -9,11 +9,15 @@ export interface User {
   username: string;
   name: string;
   email?: string | null;
-  role: string;
+  role: UserRole;
   isActive?: boolean;
+  is_active?: boolean;
   isFirstLogin?: boolean;
   lastLogin?: string;
   createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface LoginRequest {

@@ -57,7 +57,7 @@ const ProfilePage = () => {
               계정 상태
             </Typography>
             <Typography variant="body1">
-              {user.is_active ? '활성' : '비활성'}
+              {(user.isActive ?? user.is_active) ? '활성' : '비활성'}
             </Typography>
           </Box>
 
@@ -66,7 +66,9 @@ const ProfilePage = () => {
               가입일
             </Typography>
             <Typography variant="body1">
-              {dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}
+              {user.createdAt || user.created_at
+                ? dayjs(user.createdAt ?? user.created_at).format('YYYY-MM-DD HH:mm')
+                : '-'}
             </Typography>
           </Box>
 
@@ -75,7 +77,9 @@ const ProfilePage = () => {
               최종 수정일
             </Typography>
             <Typography variant="body1">
-              {dayjs(user.updated_at).format('YYYY-MM-DD HH:mm')}
+              {user.updatedAt || user.updated_at
+                ? dayjs(user.updatedAt ?? user.updated_at).format('YYYY-MM-DD HH:mm')
+                : '-'}
             </Typography>
           </Box>
         </Box>

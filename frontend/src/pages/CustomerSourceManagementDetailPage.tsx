@@ -4,7 +4,6 @@ import {
   Typography,
   Button,
   Paper,
-  Grid,
   CircularProgress,
   Divider,
   Table,
@@ -14,6 +13,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import Grid from '@/mui-grid2';
 import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
@@ -100,12 +100,12 @@ const CustomerSourceManagementDetailPage = () => {
 
   const InfoItem = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
     <Grid container spacing={2} sx={{ mb: 2 }}>
-      <Grid item xs={12} sm={3}>
+      <Grid xs={12} sm={3}>
         <Typography variant="body2" color="text.secondary" fontWeight="bold">
           {label}
         </Typography>
       </Grid>
-      <Grid item xs={12} sm={9}>
+      <Grid xs={12} sm={9}>
         <Typography variant="body1">{value || '-'}</Typography>
       </Grid>
     </Grid>
@@ -283,12 +283,12 @@ const CustomerSourceManagementDetailPage = () => {
 
             <InfoItem label="클라이언트 버전" value={sourceData.clientVersion} />
             <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={3}>
+              <Grid xs={12} sm={3}>
                 <Typography variant="body2" color="text.secondary" fontWeight="bold">
                   클라이언트 커스텀 정보
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={9}>
+              <Grid xs={12} sm={9}>
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
                   {sourceData.clientCustomInfo || '-'}
                 </Typography>
@@ -304,26 +304,26 @@ const CustomerSourceManagementDetailPage = () => {
             <Divider sx={{ mb: 3 }} />
 
             <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={3}>
+              <Grid xs={12} sm={3}>
                 <Typography variant="body2" color="text.secondary" fontWeight="bold">
                   버전 정보
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={9}>
+              <Grid xs={12} sm={9}>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <Typography variant="body2" color="text.secondary">
                       OS 버전
                     </Typography>
                     <Typography variant="body1">{sourceData.virtualPcOsVersion || '-'}</Typography>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <Typography variant="body2" color="text.secondary">
                       빌드 버전
                     </Typography>
                     <Typography variant="body1">{sourceData.virtualPcBuildVersion || '-'}</Typography>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <Typography variant="body2" color="text.secondary">
                       GuestAddition 버전
                     </Typography>
@@ -334,12 +334,12 @@ const CustomerSourceManagementDetailPage = () => {
             </Grid>
 
             <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={3}>
+              <Grid xs={12} sm={3}>
                 <Typography variant="body2" color="text.secondary" fontWeight="bold">
                   가상PC 이미지 정보
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={9}>
+              <Grid xs={12} sm={9}>
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
                   {sourceData.virtualPcImageInfo || '-'}
                 </Typography>
@@ -359,12 +359,12 @@ const CustomerSourceManagementDetailPage = () => {
               value={formatReleaseDate(sourceData.adminWebReleaseDate)}
             />
             <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={3}>
+              <Grid xs={12} sm={3}>
                 <Typography variant="body2" color="text.secondary" fontWeight="bold">
                   관리웹 커스텀 정보
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={9}>
+              <Grid xs={12} sm={9}>
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
                   {sourceData.adminWebCustomInfo || '-'}
                 </Typography>

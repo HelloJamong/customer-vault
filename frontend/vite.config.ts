@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@mui/material/Unstable_Grid2': path.resolve(__dirname, './src/mui-grid2'),
     },
   },
   server: {

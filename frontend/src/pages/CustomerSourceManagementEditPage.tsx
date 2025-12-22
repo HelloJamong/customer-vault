@@ -4,7 +4,6 @@ import {
   Typography,
   Button,
   Paper,
-  Grid,
   CircularProgress,
   Divider,
   TextField,
@@ -12,14 +11,9 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
 } from '@mui/material';
+import Grid from '@/mui-grid2';
 import { ArrowBack, Save, Add, Delete } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
@@ -262,7 +256,7 @@ const CustomerSourceManagementEditPage = () => {
         <Divider sx={{ mb: 3 }} />
 
         <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={4}>
+          <Grid xs={12} sm={4}>
             <FormControl fullWidth>
               <InputLabel>OS 버전</InputLabel>
               <Select
@@ -277,7 +271,7 @@ const CustomerSourceManagementEditPage = () => {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid xs={12} sm={4}>
             <TextField
               fullWidth
               label="빌드 버전"
@@ -287,7 +281,7 @@ const CustomerSourceManagementEditPage = () => {
             />
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid xs={12} sm={4}>
             <TextField
               fullWidth
               label="GuestAddition 버전"
@@ -389,7 +383,7 @@ const CustomerSourceManagementEditPage = () => {
                 </Box>
 
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <FormControl fullWidth size="small">
                       <InputLabel>구분</InputLabel>
                       <Select
@@ -403,7 +397,7 @@ const CustomerSourceManagementEditPage = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -412,7 +406,7 @@ const CustomerSourceManagementEditPage = () => {
                       onChange={(e) => handleServerChange(index, 'manufacturer', e.target.value)}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -421,7 +415,7 @@ const CustomerSourceManagementEditPage = () => {
                       onChange={(e) => handleServerChange(index, 'modelName', e.target.value)}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -430,7 +424,7 @@ const CustomerSourceManagementEditPage = () => {
                       onChange={(e) => handleServerChange(index, 'hostname', e.target.value)}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -440,7 +434,7 @@ const CustomerSourceManagementEditPage = () => {
                       placeholder="예: Linux, Windows Server"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -450,7 +444,7 @@ const CustomerSourceManagementEditPage = () => {
                       placeholder="예: Ubuntu 22.04, Windows Server 2019"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -460,7 +454,7 @@ const CustomerSourceManagementEditPage = () => {
                       placeholder="예: Intel Xeon E5-2680"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -470,7 +464,7 @@ const CustomerSourceManagementEditPage = () => {
                       placeholder="예: 32GB, 64GB"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -480,7 +474,7 @@ const CustomerSourceManagementEditPage = () => {
                       placeholder="예: 1TB, 2TB SSD"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -491,7 +485,7 @@ const CustomerSourceManagementEditPage = () => {
                       inputProps={{ min: 0 }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -502,7 +496,7 @@ const CustomerSourceManagementEditPage = () => {
                       inputProps={{ min: 0 }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid xs={12} sm={4}>
                     <TextField
                       fullWidth
                       size="small"
@@ -534,7 +528,7 @@ const CustomerSourceManagementEditPage = () => {
         <Divider sx={{ mb: 3 }} />
 
         <Grid container spacing={3}>
-          <Grid item xs={12}>
+          <Grid xs={12}>
             <FormControl fullWidth>
               <InputLabel>인사연동 여부</InputLabel>
               <Select
@@ -558,7 +552,7 @@ const CustomerSourceManagementEditPage = () => {
 
           {formData.hrIntegration.enabled && (
             <>
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="인사DB 종류"
@@ -575,7 +569,7 @@ const CustomerSourceManagementEditPage = () => {
                   placeholder="예: Oracle, MySQL, MS-SQL"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="인사DB 버전"

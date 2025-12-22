@@ -7,8 +7,6 @@ import {
   Switch,
   FormControlLabel,
   Button,
-  Grid,
-  Divider,
   Alert,
   Snackbar,
   CircularProgress,
@@ -18,6 +16,7 @@ import {
   InputLabel,
   Stack,
 } from '@mui/material';
+import Grid from '@/mui-grid2';
 import { useSettings } from '../hooks/useSettings';
 import type { UpdateSettingsRequest } from '../types/settings.types';
 
@@ -122,7 +121,7 @@ const SettingsPage = () => {
             패스워드 생성 시 적용되는 복잡성 규칙을 설정합니다
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <FormControl fullWidth size="small">
                 <InputLabel>패스워드 최소 자릿수</InputLabel>
                 <Select
@@ -143,7 +142,7 @@ const SettingsPage = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid xs={12} sm={4}>
               <FormControlLabel
                 control={
                   <Switch
@@ -159,7 +158,7 @@ const SettingsPage = () => {
                 label="대문자 필수"
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid xs={12} sm={4}>
               <FormControlLabel
                 control={
                   <Switch
@@ -175,7 +174,7 @@ const SettingsPage = () => {
                 label="특수문자 필수"
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid xs={12} sm={4}>
               <FormControlLabel
                 control={
                   <Switch
@@ -203,7 +202,7 @@ const SettingsPage = () => {
             정기적인 패스워드 변경을 강제합니다
           </Typography>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <FormControlLabel
                 control={
                   <Switch
@@ -220,7 +219,7 @@ const SettingsPage = () => {
               />
             </Grid>
             {formData.passwordExpiryEnabled && (
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <FormControl fullWidth size="small">
                   <InputLabel>변경 주기</InputLabel>
                   <Select
@@ -277,7 +276,7 @@ const SettingsPage = () => {
             연속된 로그인 실패 시 계정을 일시적으로 잠금합니다
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <FormControlLabel
                 control={
                   <Switch
@@ -295,7 +294,7 @@ const SettingsPage = () => {
             </Grid>
             {formData.loginFailureLimitEnabled && (
               <>
-                <Grid item xs={12} sm={6}>
+                <Grid xs={12} sm={6}>
                   <FormControl fullWidth size="small">
                     <InputLabel>최대 실패 횟수</InputLabel>
                     <Select
@@ -316,7 +315,7 @@ const SettingsPage = () => {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid xs={12} sm={6}>
                   <FormControl fullWidth size="small">
                     <InputLabel>계정 잠금 시간</InputLabel>
                     <Select

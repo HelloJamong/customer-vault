@@ -26,7 +26,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import Grid from '@/mui-grid2';
 import {
   ArrowBack,
   Save,
@@ -954,10 +954,10 @@ const CustomerEditPage = () => {
               <Select
                 labelId="engineerId-label"
                 label="담당 엔지니어"
-                value={formData.engineerId ?? ''}
-                onChange={(e) =>
-                  handleChange('engineerId', e.target.value === '' ? null : Number(e.target.value))
-                }
+                  value={formData.engineerId != null ? String(formData.engineerId) : ''}
+                  onChange={(e) =>
+                    handleChange('engineerId', e.target.value === '' ? null : Number(e.target.value))
+                  }
               >
                 <MenuItem value="">
                   <em>선택 안 함</em>
@@ -976,10 +976,10 @@ const CustomerEditPage = () => {
               <Select
                 labelId="engineerSubId-label"
                 label="부 엔지니어"
-                value={formData.engineerSubId ?? ''}
-                onChange={(e) =>
-                  handleChange('engineerSubId', e.target.value === '' ? null : Number(e.target.value))
-                }
+                  value={formData.engineerSubId != null ? String(formData.engineerSubId) : ''}
+                  onChange={(e) =>
+                    handleChange('engineerSubId', e.target.value === '' ? null : Number(e.target.value))
+                  }
               >
                 <MenuItem value="">
                   <em>선택 안 함</em>
@@ -998,10 +998,10 @@ const CustomerEditPage = () => {
               <Select
                 labelId="salesId-label"
                 label="담당 영업"
-                value={formData.salesId ?? ''}
-                onChange={(e) =>
-                  handleChange('salesId', e.target.value === '' ? null : Number(e.target.value))
-                }
+                  value={formData.salesId != null ? String(formData.salesId) : ''}
+                  onChange={(e) =>
+                    handleChange('salesId', e.target.value === '' ? null : Number(e.target.value))
+                  }
               >
                 <MenuItem value="">
                   <em>선택 안 함</em>

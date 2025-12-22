@@ -9,7 +9,6 @@ import {
   Description,
   AdminPanelSettings,
   SupervisorAccount,
-  History,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';

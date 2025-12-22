@@ -1,11 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersAPI } from '@/api/customers.api';
-import { useAuthStore } from '@/store/authStore';
 import type { CreateCustomerDto, UpdateCustomerDto } from '@/types/customer.types';
 
 export const useCustomers = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
 
   // 고객사 목록 - 모든 역할이 전체 고객사 목록 조회
   const customersQuery = useQuery({

@@ -35,6 +35,7 @@ services:
   # NestJS 백엔드 API
   # ==========================================
   backend:
+    image: customer_backend:2.1.0
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -73,11 +74,10 @@ services:
       start_period: 40s
 
   # ==========================================
-  # React 프론트엔드 (선택적)
-  # 사용: docker compose --profile frontend up -d
+  # React 프론트엔드
   # ==========================================
   frontend:
-    profiles: ["frontend", "fullstack"]
+    image: customer_frontend:2.1.0
     build:
       context: ./frontend
       dockerfile: Dockerfile

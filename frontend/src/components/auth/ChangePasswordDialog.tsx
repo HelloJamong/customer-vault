@@ -32,6 +32,11 @@ interface PasswordRequirements {
   requireNumber: boolean;
 }
 
+interface PasswordCheck {
+  valid: boolean;
+  message: string;
+}
+
 const ChangePasswordDialog = ({
   open,
   isForced = false,
@@ -59,8 +64,8 @@ const ChangePasswordDialog = ({
     }
   };
 
-  const validatePassword = () => {
-    if (!requirements) return true;
+  const validatePassword = (): PasswordCheck[] => {
+    if (!requirements) return [];
 
     const checks = [
       {
@@ -230,7 +235,7 @@ const ChangePasswordDialog = ({
             !newPassword ||
             !confirmPassword ||
             newPassword !== confirmPassword ||
-            (requirements && passwordChecks.some((check) => !check.valid))
+            (!!requirements && passwordChecks.some((check) => !check.valid))
           }
         >
           변경

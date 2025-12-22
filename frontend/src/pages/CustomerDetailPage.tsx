@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, Grid, CircularProgress, Divider, Chip } from '@mui/material';
+import { Box, Typography, Button, Paper, CircularProgress, Divider, Chip } from '@mui/material';
+import Grid from '@/mui-grid2';
 import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
@@ -32,12 +33,12 @@ const CustomerDetailPage = () => {
 
   const InfoItem = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
     <Grid container spacing={2} sx={{ mb: 2 }}>
-      <Grid item xs={12} sm={3}>
+      <Grid xs={12} sm={3}>
         <Typography variant="body2" color="text.secondary" fontWeight="bold">
           {label}
         </Typography>
       </Grid>
-      <Grid item xs={12} sm={9}>
+      <Grid xs={12} sm={9}>
         <Typography variant="body1">
           {value || '-'}
         </Typography>
@@ -327,12 +328,12 @@ const CustomerDetailPage = () => {
         <InfoItem label="최근 점검일" value={customer.lastInspectionDate} />
         {customer.inspectionStatus && (
           <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={3}>
+            <Grid xs={12} sm={3}>
               <Typography variant="body2" color="text.secondary" fontWeight="bold">
                 점검 상태
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={9}>
+            <Grid xs={12} sm={9}>
               <Chip
                 label={customer.inspectionStatus}
                 color={
