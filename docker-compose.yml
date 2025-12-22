@@ -35,7 +35,7 @@ services:
   # NestJS 백엔드 API
   # ==========================================
   backend:
-    image: customer_backend:2.1.0
+    image: customer_backend:2.1.1
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -77,12 +77,12 @@ services:
   # React 프론트엔드
   # ==========================================
   frontend:
-    image: customer_frontend:2.1.0
+    image: customer_frontend:2.1.1
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:5005/api}
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
     container_name: customer_frontend
     restart: unless-stopped
     ports:

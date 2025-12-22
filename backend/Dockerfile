@@ -40,6 +40,8 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 # Create uploads and logs directories
 RUN mkdir -p /app/uploads /app/logs
@@ -48,4 +50,5 @@ RUN mkdir -p /app/uploads /app/logs
 EXPOSE 5000
 
 # Start application
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

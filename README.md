@@ -22,7 +22,7 @@
 
 ```bash
 git clone https://github.com/HelloJamong/customer-vault.git
-cd customer-storage
+cd customer-vault
 ```
 
 ### 2️⃣ 환경 변수 설정
@@ -32,7 +32,7 @@ cd customer-storage
 cp .env.example .env
 
 # 필요시 .env 파일 수정 (개발 환경은 기본값 사용 가능)
-nano .env
+vi .env
 ```
 
 **프로덕션 환경에서 반드시 변경해야 할 항목:**
@@ -140,11 +140,7 @@ customer-storage/
 ### 서비스 관리
 
 ```bash
-# 백엔드 시작 (DB + Backend)
 docker compose up -d
-
-# 전체 스택 시작 (DB + Backend + Frontend)
-docker compose --profile frontend up -d
 ```
 
 자세한 설정/권장 사양/로그/저장소 구조는 `docs/` 가이드를 참고하세요.

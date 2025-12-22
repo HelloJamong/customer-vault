@@ -19,9 +19,21 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5005',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port: Number(process.env.VITE_PORT) || 3003,
     host: true,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5005',
+        changeOrigin: true,
+      },
+    },
   },
 })
