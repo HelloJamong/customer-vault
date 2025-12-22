@@ -21,7 +21,7 @@
 ### 1️⃣ 프로젝트 클론
 
 ```bash
-git clone https://github.com/HelloJamong/customer-storage.git
+git clone https://github.com/HelloJamong/customer-vault.git
 cd customer-storage
 ```
 
