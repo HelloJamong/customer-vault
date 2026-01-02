@@ -34,13 +34,14 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: [
-      'Pretendard',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
       'Roboto',
       '"Helvetica Neue"',
       'Arial',
+      '"Noto Sans KR"',
+      '"Malgun Gothic"',
       'sans-serif',
     ].join(','),
   },
@@ -48,7 +49,7 @@ const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif',
         },
       },
     },

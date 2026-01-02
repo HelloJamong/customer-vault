@@ -20,6 +20,8 @@ uploads/*
 *.swp
 *.swo
 .claude/
+.claudeignore
+.claude-project-context.md
 
 # OS
 .DS_Store

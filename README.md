@@ -14,6 +14,15 @@
 - **Frontend**: React 19, Vite 7, MUI 7, React Query, Zustand, React Hook Form, Dayjs
 - **Build/Deploy**: Docker & Docker Compose
 
+### 오프라인 환경 지원
+
+이 프로젝트는 **폐쇄망(오프라인) 환경**에서도 정상 작동하도록 설계되었습니다:
+
+- ✅ **외부 CDN 제거**: 모든 리소스가 로컬에서 제공됨
+- ✅ **외부 폰트 의존성 제거**: 시스템 기본 폰트 사용 (Apple SD Gothic, Segoe UI, Roboto, Noto Sans KR, Malgun Gothic 등)
+- ✅ **Content Security Policy**: Nginx에서 외부 리소스 차단 정책 적용
+- ✅ **완전한 자체 포함**: 인터넷 연결 없이 모든 기능 사용 가능
+
 ---
 
 ## 🚀 빠른 시작

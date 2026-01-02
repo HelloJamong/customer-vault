@@ -9,6 +9,7 @@
   - `/` (정적 포함) → `frontend:80`
 - 필수 헤더: `Host`, `X-Forwarded-For`, `X-Forwarded-Proto`, `Upgrade/Connection`(WebSocket/SSE)
 - 업로드/타임아웃: `client_max_body_size 20m`, `proxy_*_timeout 60s`
+- **오프라인 환경 지원**: CSP 및 보안 헤더를 통해 외부 리소스(CDN, 폰트 등) 차단
 
 ## 1) Nginx 설정 파일 준비
 1. `proxy` 디렉토리를 루트에 생성하고, `docs/nginx.conf.example` 내용을 복사해 `proxy/nginx.conf`로 저장합니다.
@@ -54,8 +55,25 @@ networks:
 4. 프런트 접속: `http://<domain>:2082`
 5. Cloudflare 사용 시: DNS 레코드 프록시(오렌지 구름) 상태에서 2082가 허용되는지 확인. 방화벽은 2082만 개방.
 
-## 4) 트러블슈팅
+## 4) 오프라인 환경 보안 헤더
+`nginx.conf.example`에는 폐쇄망 환경을 위한 보안 헤더가 포함되어 있습니다:
+
+- **Content-Security-Policy**: 모든 외부 CDN, 폰트, 스크립트 차단
+  - `default-src 'self'` - 기본 리소스는 자신만 허용
+  - `font-src 'self' data:` - 폰트는 로컬 또는 data URI만
+  - `connect-src 'self'` - API 호출은 자신만
+
+- **추가 보안 헤더**:
+  - `X-Content-Type-Options: nosniff` - MIME 타입 스니핑 방지
+  - `X-Frame-Options: SAMEORIGIN` - 클릭재킹 방지
+  - `X-XSS-Protection: 1; mode=block` - XSS 공격 차단
+  - `Referrer-Policy: strict-origin-when-cross-origin` - Referrer 정보 제한
+
+이러한 설정으로 인터넷 연결 없이도 애플리케이션이 정상 작동합니다.
+
+## 5) 트러블슈팅
 - `/api/health`가 프런트로 리디렉트 → `location /api/` 블록이 `/`보다 앞에 있는지 확인.
 - 504/타임아웃 → `proxy_read_timeout`, `proxy_connect_timeout`, `proxy_send_timeout`을 60s 이상으로 조정. 백엔드 처리 시간도 점검.
 - `ERR_BLOCKED_BY_CLIENT` → 브라우저 광고/추적 차단 확장 가능성. Cloudflare beacon이 차단되는 경우가 있음.
 - 업로드 413 → `client_max_body_size`가 충분한지 확인(기본 20m, `MAX_UPLOAD_SIZE` 16MB 기준 여유).
+- **CSP 위반 경고** → 외부 리소스를 로드하려고 시도하는 경우. 브라우저 개발자 도구 콘솔에서 확인 가능. 모든 리소스가 로컬에서 제공되어야 함.
