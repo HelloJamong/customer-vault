@@ -7,12 +7,12 @@ import {
   Request,
   HttpCode,
   HttpStatus,
-  Ip,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, ChangePasswordDto, RefreshTokenDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('인증')
 @Controller('auth')
@@ -24,7 +24,8 @@ export class AuthController {
   @ApiOperation({ summary: '로그인' })
   @ApiResponse({ status: 200, description: '로그인 성공' })
   @ApiResponse({ status: 401, description: '인증 실패' })
-  async login(@Body() loginDto: LoginDto, @Ip() ipAddress: string) {
+  async login(@Body() loginDto: LoginDto, @Request() req) {
+    const ipAddress = getClientIp(req);
     return this.authService.login(loginDto, ipAddress);
   }
 
@@ -34,7 +35,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '로그아웃' })
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
-  async logout(@Request() req, @Ip() ipAddress: string) {
+  async logout(@Request() req) {
+    const ipAddress = getClientIp(req);
     return this.authService.logout(req.user.id, undefined, ipAddress);
   }
 
@@ -42,12 +44,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '로그아웃 (beacon/창 닫힘 대응)' })
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
-  async logoutBeacon(@Body('accessToken') accessToken?: string, @Ip() ipAddress?: string) {
+  async logoutBeacon(@Body('accessToken') accessToken?: string, @Request() req?) {
     if (!accessToken) {
       return { message: '토큰 없음' };
     }
 
     try {
+      const ipAddress = getClientIp(req);
       return await this.authService.logoutWithAccessToken(accessToken, ipAddress);
     } catch (error) {
       // 토큰 검증 실패 등은 로그만 남기고 성공 응답
@@ -62,7 +65,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '비밀번호 변경' })
   @ApiResponse({ status: 200, description: '비밀번호 변경 성공' })
-  async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto, @Ip() ipAddress: string) {
+  async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
+    const ipAddress = getClientIp(req);
     return this.authService.changePassword(req.user.id, changePasswordDto, ipAddress);
   }
 

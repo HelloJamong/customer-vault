@@ -13,6 +13,10 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+  // Trust proxy to get real client IP from X-Forwarded-For header
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', true);
+
   // Enable CORS first - before any other middleware
   app.use(cors({
     origin: (origin, callback) => {

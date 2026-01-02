@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('로그')
 @Controller('logs')
@@ -86,7 +87,7 @@ export class LogsController {
     // 로그 기록
     try {
       const user = req.user as any;
-      const userIpAddress = req.ip || req.socket?.remoteAddress;
+      const userIpAddress = getClientIp(req);
       await this.service.createServiceLog({
         userId: user.id,
         logType: '정보',
@@ -153,7 +154,7 @@ export class LogsController {
     // 로그 기록
     try {
       const user = req.user as any;
-      const userIpAddress = req.ip || req.socket?.remoteAddress;
+      const userIpAddress = getClientIp(req);
       await this.service.createServiceLog({
         userId: user.id,
         logType: '정보',
@@ -220,7 +221,7 @@ export class LogsController {
     // 로그 기록
     try {
       const user = req.user as any;
-      const userIpAddress = req.ip || req.socket?.remoteAddress;
+      const userIpAddress = getClientIp(req);
       await this.service.createServiceLog({
         userId: user.id,
         logType: '정보',
@@ -240,7 +241,7 @@ export class LogsController {
     @Req() req: Request,
   ) {
     const user = req.user as any;
-    const ipAddress = req.ip || req.socket?.remoteAddress;
+    const ipAddress = getClientIp(req);
 
     await this.service.createServiceLog({
       userId: user.id,

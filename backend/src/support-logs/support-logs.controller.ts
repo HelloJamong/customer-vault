@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('지원 로그')
 @Controller('support-logs')
@@ -42,7 +43,8 @@ export class SupportLogsController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '지원 로그 생성' })
   create(@Body() createDto: CreateSupportLogDto, @Request() req: any) {
-    return this.supportLogsService.create(createDto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.supportLogsService.create(createDto, req.user.id, ipAddress);
   }
 
   @Patch(':id')
@@ -53,13 +55,15 @@ export class SupportLogsController {
     @Body() updateDto: UpdateSupportLogDto,
     @Request() req: any,
   ) {
-    return this.supportLogsService.update(id, updateDto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.supportLogsService.update(id, updateDto, req.user.id, ipAddress);
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '지원 로그 삭제' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.supportLogsService.remove(id, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.supportLogsService.remove(id, req.user.id, ipAddress);
   }
 }

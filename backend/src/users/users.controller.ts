@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('사용자')
 @Controller('users')
@@ -64,7 +65,8 @@ export class UsersController {
   @ApiOperation({ summary: '사용자 생성' })
   @ApiResponse({ status: 201, description: '생성 성공' })
   create(@Body() createUserDto: CreateUserDto, @Request() req) {
-    return this.usersService.create(createUserDto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.usersService.create(createUserDto, req.user.id, ipAddress);
   }
 
   @Patch(':id')
@@ -72,7 +74,8 @@ export class UsersController {
   @ApiOperation({ summary: '사용자 정보 수정' })
   @ApiResponse({ status: 200, description: '수정 성공' })
   update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto, @Request() req) {
-    return this.usersService.update(id, updateUserDto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.usersService.update(id, updateUserDto, req.user.id, ipAddress);
   }
 
   @Patch(':id/toggle-active')
@@ -80,7 +83,8 @@ export class UsersController {
   @ApiOperation({ summary: '사용자 활성화/비활성화 토글' })
   @ApiResponse({ status: 200, description: '변경 성공' })
   toggleActive(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.usersService.toggleActive(id, req.user.id, req.user.role, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.usersService.toggleActive(id, req.user.id, req.user.role, ipAddress);
   }
 
   @Post(':id/reset-password')
@@ -88,7 +92,8 @@ export class UsersController {
   @ApiOperation({ summary: '비밀번호 초기화' })
   @ApiResponse({ status: 200, description: '초기화 성공' })
   resetPassword(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.usersService.resetPassword(id, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.usersService.resetPassword(id, req.user.id, ipAddress);
   }
 
   @Delete(':id')
@@ -96,6 +101,7 @@ export class UsersController {
   @ApiOperation({ summary: '사용자 삭제' })
   @ApiResponse({ status: 200, description: '삭제 성공' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.usersService.remove(id, req.user.id, req.user.role, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.usersService.remove(id, req.user.id, req.user.role, ipAddress);
   }
 }

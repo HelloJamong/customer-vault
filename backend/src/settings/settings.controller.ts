@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards, Request, Ip } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('시스템 설정')
 @Controller('settings')
@@ -24,7 +25,8 @@ export class SettingsController {
   @Patch()
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: '시스템 설정 업데이트' })
-  updateSettings(@Body() data: UpdateSettingsDto, @Request() req, @Ip() ipAddress: string) {
+  updateSettings(@Body() data: UpdateSettingsDto, @Request() req) {
+    const ipAddress = getClientIp(req);
     return this.service.updateSettings(data, req.user.id, ipAddress);
   }
 }

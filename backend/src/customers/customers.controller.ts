@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('고객사')
 @Controller('customers')
@@ -67,21 +68,24 @@ export class CustomersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '고객사 생성' })
   create(@Body() createCustomerDto: CreateCustomerDto, @Request() req: any) {
-    return this.customersService.create(createCustomerDto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.customersService.create(createCustomerDto, req.user.id, ipAddress);
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '고객사 정보 수정' })
   update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto, @Request() req: any) {
-    return this.customersService.update(id, updateCustomerDto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.customersService.update(id, updateCustomerDto, req.user.id, ipAddress);
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @ApiOperation({ summary: '고객사 삭제' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.customersService.remove(id, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.customersService.remove(id, req.user.id, ipAddress);
   }
 
   // 소스 관리
@@ -100,7 +104,8 @@ export class CustomersController {
     @Body() dto: CreateSourceManagementDto,
     @Request() req: any,
   ) {
-    return this.customersService.createSourceManagement(id, dto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.customersService.createSourceManagement(id, dto, req.user.id, ipAddress);
   }
 
   @Put(':id/source-management')
@@ -111,6 +116,7 @@ export class CustomersController {
     @Body() dto: UpdateSourceManagementDto,
     @Request() req: any,
   ) {
-    return this.customersService.updateSourceManagement(id, dto, req.user.id, req.ip);
+    const ipAddress = getClientIp(req);
+    return this.customersService.updateSourceManagement(id, dto, req.user.id, ipAddress);
   }
 }
