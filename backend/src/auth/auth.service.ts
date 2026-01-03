@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
+import { SessionEventService } from './session-event.service';
 import { cleanIpAddress } from '../common/utils/ip.util';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,10 +24,11 @@ export class AuthService {
     private configService: ConfigService,
     @Inject(forwardRef(() => LogsService))
     private logsService: LogsService,
+    private sessionEventService: SessionEventService,
   ) {}
 
   async login(loginDto: LoginDto, ipAddress: string) {
-    const { username, password } = loginDto;
+    const { username, password, forceLogin } = loginDto;
 
     // 사용자 조회
     const user = await this.prisma.user.findUnique({
@@ -61,14 +63,35 @@ export class AuthService {
       throw new ForbiddenException('비밀번호가 만료되었습니다. 비밀번호를 변경해주세요.');
     }
 
+    console.log(`[로그인] 사용자 ${user.username}(ID: ${user.id}) 로그인 시도`);
+    console.log(`[로그인] 중복 로그인 방지: ${settings.preventDuplicateLogin}, 강제 로그인: ${forceLogin}`);
+
+    // 중복 로그인 방지가 활성화된 경우 기존 세션 확인
+    if (settings.preventDuplicateLogin && !forceLogin) {
+      console.log(`[로그인] 기존 세션 확인 중...`);
+      const existingSession = await this.prisma.userSession.findFirst({
+        where: { userId: user.id },
+      });
+
+      console.log(`[로그인] 기존 세션 조회 결과:`, existingSession ? `세션 ID: ${existingSession.sessionId}` : '없음');
+
+      if (existingSession) {
+        // 기존 세션이 있으면 DUPLICATE_SESSION 에러 반환
+        console.log(`[로그인] 중복 세션 감지 - DUPLICATE_SESSION 에러 반환`);
+        throw new ForbiddenException('DUPLICATE_SESSION');
+      }
+    } else {
+      console.log(`[로그인] 중복 세션 체크 스킵 (preventDuplicateLogin: ${settings.preventDuplicateLogin}, forceLogin: ${forceLogin})`);
+    }
+
     // 로그인 성공 처리
     await this.handleSuccessfulLogin(user.id, ipAddress);
 
-    // 토큰 생성
-    const tokens = await this.generateTokens(user.id, user.username, user.role);
+    // 세션 관리 (토큰 생성 전에 세션 ID 필요)
+    const sessionId = await this.manageUserSession(user.id, ipAddress, settings, forceLogin);
 
-    // 세션 관리
-    await this.manageUserSession(user.id, ipAddress, settings);
+    // 토큰 생성 (세션 ID 포함)
+    const tokens = await this.generateTokens(user.id, user.username, user.role, sessionId);
 
     return {
       accessToken: tokens.accessToken,
@@ -195,11 +218,21 @@ export class AuthService {
         throw new UnauthorizedException('유효하지 않은 토큰입니다.');
       }
 
+      // refreshToken에서 sessionId 추출 (없으면 세션 조회)
+      let sessionId = payload.sessionId;
+      if (!sessionId) {
+        const session = await this.prisma.userSession.findFirst({
+          where: { userId: user.id },
+        });
+        sessionId = session?.sessionId;
+      }
+
       const accessToken = this.jwtService.sign(
         {
           sub: user.id,
           username: user.username,
           role: user.role,
+          sessionId,
         },
         {
           secret: this.configService.get<string>('JWT_SECRET'),
@@ -248,9 +281,53 @@ export class AuthService {
     };
   }
 
+  async validateSession(userId: number, sessionId?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+
+    console.log(`[세션검증 API] 사용자 ${user?.username}(ID: ${userId}) 세션 검증 요청 (세션ID: ${sessionId})`);
+
+    // 시스템 설정 확인
+    const settings = await this.getSystemSettings();
+    console.log(`[세션검증 API] 중복 로그인 방지 설정: ${settings.preventDuplicateLogin}`);
+
+    // 중복 로그인 방지가 비활성화되어 있으면 세션 검증 스킵
+    if (!settings.preventDuplicateLogin) {
+      console.log(`[세션검증 API] 중복 로그인 방지 비활성화 - 세션 검증 스킵`);
+      return { valid: true, sessionCheckDisabled: true };
+    }
+
+    // sessionId가 있으면 해당 세션만 확인, 없으면 userId로 확인 (하위 호환성)
+    const whereClause = sessionId
+      ? { userId, sessionId }
+      : { userId };
+
+    const session = await this.prisma.userSession.findFirst({
+      where: whereClause,
+    });
+
+    console.log(`[세션검증 API] 세션 조회 결과:`, session ? `세션 ID: ${session.sessionId}` : '세션 없음');
+
+    if (!session) {
+      console.warn(`[세션검증 API] 세션 없음 - 401 에러 반환`);
+      throw new UnauthorizedException('세션이 만료되었습니다.');
+    }
+
+    // 세션 활성 시간 업데이트
+    await this.prisma.userSession.update({
+      where: { id: session.id },
+      data: { lastActivity: new Date() },
+    });
+
+    console.log(`[세션검증 API] 세션 유효 - lastActivity 업데이트 완료`);
+    return { valid: true };
+  }
+
   // Helper Methods
-  private async generateTokens(userId: number, username: string, role: string) {
-    const payload = { sub: userId, username, role };
+  private async generateTokens(userId: number, username: string, role: string, sessionId: string) {
+    const payload = { sub: userId, username, role, sessionId };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
@@ -388,12 +465,51 @@ export class AuthService {
     });
   }
 
-  private async manageUserSession(userId: number, ipAddress: string, settings: any) {
-    // 중복 로그인 방지
-    if (settings.preventDuplicateLogin) {
-      await this.prisma.userSession.deleteMany({
-        where: { userId },
-      });
+  private async manageUserSession(userId: number, ipAddress: string, settings: any, forceLogin?: boolean) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true }
+    });
+
+    console.log(`[세션관리] 사용자 ${user?.username}(ID: ${userId}) 세션 관리 시작`);
+    console.log(`[세션관리] 중복 로그인 방지: ${settings.preventDuplicateLogin}, 강제 로그인: ${forceLogin}`);
+
+    // 기존 세션 조회 (SSE 이벤트 전송용)
+    const existingSessions = await this.prisma.userSession.findMany({
+      where: { userId },
+      select: { sessionId: true },
+    });
+
+    // 항상 기존 세션을 삭제하고 새 세션을 생성
+    // (중복 로그인 체크는 이미 login 메서드에서 완료됨)
+    const deletedCount = await this.prisma.userSession.deleteMany({
+      where: { userId },
+    });
+
+    if (deletedCount.count > 0) {
+      console.log(`[세션관리] 기존 세션 ${deletedCount.count}개 삭제 완료`);
+
+      // 강제 로그인인 경우 SSE 이벤트 전송 및 로그 기록
+      if (forceLogin && settings.preventDuplicateLogin) {
+        // 기존 세션들에 로그아웃 이벤트 전송 (즉시 로그아웃)
+        existingSessions.forEach((session) => {
+          console.log(`[세션관리] SSE 로그아웃 이벤트 전송 - 세션 ID: ${session.sessionId}`);
+          this.sessionEventService.emitLogoutEvent(
+            userId,
+            session.sessionId,
+            '다른 위치에서 로그인되어 현재 세션이 종료되었습니다.',
+          );
+        });
+
+        const userFull = await this.prisma.user.findUnique({ where: { id: userId } });
+        await this.logsService.createServiceLog({
+          userId,
+          logType: '경고',
+          action: '중복 로그인 - 기존 세션 강제 종료',
+          description: `${userFull.name}(${userFull.username}) 사용자가 다른 위치에서 로그인하여 기존 세션이 강제 종료되었습니다.`,
+          ipAddress: cleanIpAddress(ipAddress),
+        });
+      }
     }
 
     // 새 세션 생성
@@ -406,6 +522,7 @@ export class AuthService {
       },
     });
 
+    console.log(`[세션관리] 새 세션 생성 완료 - 세션 ID: ${sessionId}`);
     return sessionId;
   }
 

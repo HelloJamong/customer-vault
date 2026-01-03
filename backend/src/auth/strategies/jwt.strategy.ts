@@ -8,6 +8,7 @@ export interface JwtPayload {
   sub: number;
   username: string;
   role: string;
+  sessionId?: string;
 }
 
 @Injectable()
@@ -37,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: user.username,
       name: user.name,
       role: user.role,
+      sessionId: payload.sessionId, // JWT에서 sessionId 전달
     };
   }
 }

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({ example: 'admin', description: '사용자명' })
@@ -11,6 +11,15 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @ApiProperty({
+    example: false,
+    description: '강제 로그인 여부 (기존 세션 삭제)',
+    required: false
+  })
+  @IsOptional()
+  @IsBoolean()
+  forceLogin?: boolean;
 }
 
 export class ChangePasswordDto {

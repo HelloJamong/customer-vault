@@ -92,27 +92,11 @@ CORS_ORIGIN=https://yourdomain.com,https://app.yourdomain.com
 docker compose up -d
 ```
 
-**전체 스택 실행 (Frontend 포함):**
-```bash
-docker compose --profile frontend up -d
-```
-
-**특정 서비스만 실행:**
-```bash
-# DB + Backend만
-docker compose up -d db backend
-
-# Frontend만 재시작
-docker compose restart frontend
-```
-
 ### 4️⃣ 접속 정보
 
-**기본 로그인 계정:**
+**최초 로그인 계정:**
 - ID: `admin`
 - PW: `1111`
-
-⚠️ **보안**: 프로덕션 환경에서는 반드시 비밀번호를 변경하세요!
 
 ---
 
@@ -141,18 +125,6 @@ customer-storage/
 ├── .env.example                  # 환경 변수 템플릿
 └── README.md
 ```
-
----
-
-## 🐳 Docker 명령어
-
-### 서비스 관리
-
-```bash
-docker compose up -d
-```
-
-자세한 설정/권장 사양/로그/저장소 구조는 `docs/` 가이드를 참고하세요.
 
 ---
 

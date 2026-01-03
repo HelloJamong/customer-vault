@@ -7,17 +7,24 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, ChangePasswordDto, RefreshTokenDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { getClientIp } from '../common/utils/ip.util';
+import { SessionEventService } from './session-event.service';
+import { Observable, map } from 'rxjs';
 
 @ApiTags('인증')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly sessionEventService: SessionEventService,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -92,5 +99,54 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '조회 성공' })
   async getPasswordRequirements() {
     return this.authService.getPasswordRequirements();
+  }
+
+  @Get('validate-session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '세션 유효성 검증' })
+  @ApiResponse({ status: 200, description: '세션 유효' })
+  @ApiResponse({ status: 401, description: '세션 만료' })
+  async validateSession(@Request() req) {
+    // JWT 토큰에서 sessionId 추출
+    const sessionId = req.user.sessionId;
+    return this.authService.validateSession(req.user.id, sessionId);
+  }
+
+  @Sse('session-events')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '세션 이벤트 스트림 (SSE)' })
+  @ApiResponse({ status: 200, description: 'SSE 연결 성공' })
+  sessionEvents(@Request() req): Observable<MessageEvent> {
+    const userId = req.user.id;
+    const sessionId = req.user.sessionId;
+
+    console.log(`[SSE] 새 연결 - 사용자: ${userId}, 세션: ${sessionId}`);
+
+    // 사용자의 이벤트 스트림 가져오기
+    const eventStream = this.sessionEventService.getEventStream(userId);
+
+    // SSE MessageEvent 형식으로 변환
+    return eventStream.pipe(
+      map((event) => {
+        // 현재 세션 ID와 이벤트의 세션 ID가 같은 경우 로그아웃 처리
+        // (다른 곳에서 로그인하여 이 세션이 강제 종료됨)
+        if (event.sessionId === sessionId && event.type === 'logout') {
+          console.log(`[SSE] 로그아웃 이벤트 전송 - 사용자: ${userId}, 종료 대상 세션: ${sessionId}`);
+          return {
+            data: {
+              type: event.type,
+              message: event.message,
+            },
+          } as MessageEvent;
+        }
+
+        // keepalive 이벤트
+        return {
+          data: { type: 'keepalive' },
+        } as MessageEvent;
+      }),
+    );
   }
 }

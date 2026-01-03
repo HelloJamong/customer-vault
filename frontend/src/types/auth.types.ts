@@ -23,6 +23,7 @@ export interface User {
 export interface LoginRequest {
   username: string;
   password: string;
+  forceLogin?: boolean;
 }
 
 export interface LoginResponse {

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { router } from './routes';
 import { useAutoLogoutOnClose } from '@/hooks/useAutoLogoutOnClose';
+import { useSessionEvents } from '@/hooks/useSessionEvents';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,7 @@ const theme = createTheme({
 
 function App() {
   useAutoLogoutOnClose();
+  useSessionEvents(); // SSE 기반 실시간 세션 이벤트
 
   return (
     <ThemeProvider theme={theme}>

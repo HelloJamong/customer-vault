@@ -9,6 +9,10 @@ interface LogoutOptions {
   skipRequest?: boolean;
 }
 
+interface LoginOptions {
+  onDuplicateSession?: () => void;
+}
+
 export const useAuth = () => {
   const navigate = useNavigate();
   const { login: setAuth, logout: clearAuth, user } = useAuthStore();
@@ -20,9 +24,18 @@ export const useAuth = () => {
       setAuth(data.accessToken, data.refreshToken, data.user);
       navigate('/dashboard');
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables, context: any) => {
       console.error('Login failed:', error);
       const message = error.response?.data?.message || '로그인에 실패했습니다.';
+
+      // 중복 세션 에러인 경우
+      if (message === 'DUPLICATE_SESSION') {
+        if (context?.onDuplicateSession) {
+          context.onDuplicateSession();
+        }
+        return;
+      }
+
       alert(message);
     },
   });
@@ -46,10 +59,30 @@ export const useAuth = () => {
     },
   });
 
+  const login = (credentials: LoginRequest, options?: LoginOptions) => {
+    loginMutation.mutate(credentials, {
+      onError: (error: any) => {
+        console.error('Login failed:', error);
+
+        const message = error.response?.data?.message || '로그인에 실패했습니다.';
+
+        // 중복 세션 에러인 경우
+        if (message === 'DUPLICATE_SESSION') {
+          if (options?.onDuplicateSession) {
+            options.onDuplicateSession();
+          }
+          return;
+        }
+
+        alert(message);
+      },
+    });
+  };
+
   return {
     user,
     isAuthenticated: !!user,
-    login: loginMutation.mutate,
+    login,
     logout: logoutMutation.mutate,
     isLoginLoading: loginMutation.isPending,
   };

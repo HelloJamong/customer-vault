@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { isAuthenticated } from '@/store/authStore';
 import { Navigate, useLocation } from 'react-router-dom';
@@ -13,6 +14,7 @@ import {
   Alert,
 } from '@mui/material';
 import symbolLogo from '@/assets/images/symbol.svg';
+import DuplicateLoginDialog from '@/components/auth/DuplicateLoginDialog';
 
 const loginSchema = z.object({
   username: z.string().min(1, '아이디를 입력해주세요'),
@@ -26,6 +28,9 @@ const LoginPage = () => {
   const { login, isLoginLoading } = useAuth();
   const location = useLocation();
   const passwordChanged = (location.state as { passwordChanged?: boolean } | null)?.passwordChanged;
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [pendingCredentials, setPendingCredentials] = useState<LoginForm | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -40,7 +45,27 @@ const LoginPage = () => {
   }
 
   const onSubmit = (data: LoginForm) => {
-    login(data);
+    login(data, {
+      onDuplicateSession: () => {
+        // 중복 세션이 감지되면 다이얼로그 표시
+        setPendingCredentials(data);
+        setShowDuplicateDialog(true);
+      },
+    });
+  };
+
+  const handleForceLogin = () => {
+    if (pendingCredentials) {
+      // 강제 로그인 플래그를 추가하여 재시도
+      login({ ...pendingCredentials, forceLogin: true });
+      setShowDuplicateDialog(false);
+      setPendingCredentials(null);
+    }
+  };
+
+  const handleCancelLogin = () => {
+    setShowDuplicateDialog(false);
+    setPendingCredentials(null);
   };
 
   return (
@@ -253,6 +278,13 @@ const LoginPage = () => {
           </Typography>
         </Box>
       </Box>
+
+      {/* 중복 로그인 확인 다이얼로그 */}
+      <DuplicateLoginDialog
+        open={showDuplicateDialog}
+        onConfirm={handleForceLogin}
+        onCancel={handleCancelLogin}
+      />
     </Box>
   );
 };
