@@ -303,16 +303,74 @@ rsync -avz --progress customer_vault_2.1.2_package.tar.gz user@offline-server:/t
 
 ### 3단계: 오프라인 서버에서 배포
 
+#### 시나리오 A: 기존 운영 환경이 있는 경우 (권장)
+
+기존에 운영 중인 `customer-vault` 폴더가 있는 경우:
+
+```bash
+# 현재 디렉토리 구조:
+# /path/to/
+# ├── customer-vault/              # 기존 운영 중인 서비스
+# └── customer_vault_2.1.2_package.tar.gz
+
+# 1. 패키지 압축 해제 (같은 레벨에)
+tar -xzf customer_vault_2.1.2_package.tar.gz
+
+# 디렉토리 구조:
+# /path/to/
+# ├── customer-vault/              # 기존 서비스 (계속 실행 중)
+# └── customer_vault_2.1.2_package/  # 새 패키지
+
+# 2. 기존 .env 파일 복사
+cp customer-vault/.env customer_vault_2.1.2_package/
+
+# 3. 기존 데이터 디렉토리 복사 (중요!)
+# DB 데이터, 업로드 파일, 로그를 새 패키지로 이동
+cp -r customer-vault/data customer_vault_2.1.2_package/
+cp -r customer-vault/uploads customer_vault_2.1.2_package/
+cp -r customer-vault/logs customer_vault_2.1.2_package/
+
+# 4. 기존 컨테이너 완전히 제거 (중요!)
+# 중지만 하면 컨테이너가 남아있어 이름 충돌 발생
+cd customer-vault
+docker compose down
+cd ..
+
+# 5. 새 패키지 디렉토리로 이동
+cd customer_vault_2.1.2_package
+
+# 6. 배포 스크립트 실행
+./import-package.sh
+
+# 스크립트가 자동으로:
+# - 기존 customer-vault의 컨테이너 중지
+# - 새 이미지로 교체
+# - DB 마이그레이션 적용
+# - 서비스 재시작
+```
+
+**주의사항**:
+- **반드시 기존 데이터를 복사해야 합니다**:
+  - `data/mariadb/` - DB 데이터 파일
+  - `uploads/` - 업로드된 문서 파일
+  - `logs/` - 애플리케이션 로그
+- **기존 컨테이너를 완전히 제거**해야 합니다 (`docker compose down`)
+  - `docker compose stop`만 하면 컨테이너가 남아있어 이름 충돌 발생
+  - `docker compose down`으로 컨테이너와 네트워크까지 제거
+- 배포 완료 후 `customer_vault_2.1.2_package/`가 새로운 운영 디렉토리가 됩니다
+
+#### 시나리오 B: 신규 설치
+
+처음 설치하는 경우:
+
 ```bash
 # 패키지 압축 해제
 tar -xzf customer_vault_2.1.2_package.tar.gz
 cd customer_vault_2.1.2_package
 
-# 기존 환경의 .env 파일 복사
-cp /existing/customer-vault/.env .
-
-# 또는 기존 운영 서버에서 직접 배포하는 경우
-# (같은 디렉토리에서 압축 해제했다면 .env는 이미 존재)
+# .env 파일 생성 (새로 작성)
+cp .env.example .env
+vi .env  # 환경에 맞게 수정
 
 # 자동 배포 실행
 ./import-package.sh
@@ -327,8 +385,9 @@ cp /existing/customer-vault/.env .
    - Docker 및 Docker Compose 설치 확인
 
 3. **기존 서비스 확인**
-   - 실행 중인 서비스 감지
-   - 사용자 확인 후 중지
+   - 실행 중인 서비스 감지 (`customer_backend`, `customer_frontend` 등)
+   - 기존 서비스 자동 중지 (사용자 확인 후)
+   - **중요**: 컨테이너 이름이 같아서 자동으로 교체됨
 
 4. **이미지 로드**
    - `images.tar`에서 Docker 이미지 추출
@@ -338,6 +397,7 @@ cp /existing/customer-vault/.env .
 
 6. **디렉토리 준비**
    - `data/`, `uploads/`, `logs/` 생성
+   - **기존 data/ 디렉토리는 유지** (DB 데이터 보존)
 
 7. **서비스 시작**
    - `docker compose up -d`
@@ -712,6 +772,297 @@ cat .env
 ```
 
 ---
+
+### 컨테이너 이름 충돌
+
+#### 문제: 컨테이너 이름 중복 오류
+
+**증상**:
+```
+Error response from daemon: Conflict. The container name "/customer_db" is already in use
+```
+
+**원인**:
+- 기존 `customer-vault` 디렉토리의 컨테이너가 중지만 되고 제거되지 않음
+- `docker compose stop`은 컨테이너를 중지만 하고 제거하지 않음
+
+**해결 방법**:
+
+1. **기존 컨테이너 완전히 제거**:
+```bash
+# 기존 디렉토리로 이동
+cd /path/to/customer-vault
+
+# 컨테이너와 네트워크 제거
+docker compose down
+
+# 확인
+docker ps -a | grep customer
+```
+
+2. **또는 직접 제거**:
+```bash
+# 특정 컨테이너만 제거
+docker rm -f customer_db customer_backend customer_frontend customer_proxy
+
+# 모든 중지된 컨테이너 제거
+docker container prune
+```
+
+3. **새 패키지 재시도**:
+```bash
+cd /path/to/customer_vault_2.1.2_package
+./import-package.sh
+```
+
+**예방**:
+배포 전 항상 기존 컨테이너를 `docker compose down`으로 완전히 제거하세요.
+
+---
+
+### 포트 충돌 (DB 포트 이미 사용 중)
+
+#### 문제: DB 포트가 이미 할당됨
+
+**증상**:
+```
+Error response from daemon: driver failed programming external connectivity on endpoint customer_db: 
+Bind for 0.0.0.0:3306 failed: port is already allocated
+```
+
+**원인**:
+- 다른 DB 서비스가 이미 3306 포트를 사용 중
+- 예: 기존 MariaDB, MySQL, Oracle 등
+
+**해결 방법 1: 포트 변경 (권장)**
+
+1. **사용 중인 포트 확인**:
+```bash
+docker ps | grep 3306
+# 또는
+sudo netstat -tulpn | grep 3306
+```
+
+출력 예시:
+```bash
+maria-10.11   Up 5 weeks   0.0.0.0:3306->3306/tcp
+```
+
+2. **.env 파일에서 DB 포트 변경**:
+```bash
+vi .env
+
+# 다음 라인 수정 (또는 추가)
+DB_PORT=3307  # 3306 → 3307로 변경
+```
+
+3. **서비스 재시작**:
+```bash
+docker compose up -d
+```
+
+4. **접속 정보 변경**:
+이제 DB에 접속할 때 3307 포트 사용:
+```bash
+mysql -h localhost -P 3307 -u customer_user -p
+```
+
+**해결 방법 2: 기존 DB 서비스 중지 (주의)**
+
+기존 DB를 사용하지 않는 경우:
+```bash
+# 기존 DB 컨테이너 중지
+docker stop maria-10.11
+
+# 또는 제거 (주의: 데이터 손실 가능)
+docker rm -f maria-10.11
+
+# Customer Vault 재시작
+docker compose up -d
+```
+
+**주의**: 기존 DB를 사용 중이라면 포트 변경 방법을 사용하세요!
+
+**docker-compose.yml에서 포트 매핑 확인**:
+```yaml
+db:
+  image: mariadb:10.11
+  ports:
+    - "${DB_PORT:-3306}:3306"  # .env의 DB_PORT 사용
+```
+
+---
+
+## 실전 예시
+
+### 기존 운영 환경 업데이트 (실제 시나리오)
+
+```bash
+# 현재 상황:
+# - /opt/customer-vault/ 에서 v2.1.1 운영 중
+# - v2.1.2 패키지를 USB로 받음
+
+# 1. 운영 디렉토리로 이동
+cd /opt
+
+# 현재 구조:
+# /opt/
+# ├── customer-vault/              # 실행 중
+# └── customer_vault_2.1.2_package.tar.gz
+
+# 2. 새 패키지 압축 해제
+tar -xzf customer_vault_2.1.2_package.tar.gz
+
+# 결과:
+# /opt/
+# ├── customer-vault/              # 기존 (계속 실행 중)
+# └── customer_vault_2.1.2_package/  # 새 패키지
+
+# 3. 기존 데이터 복사 (DB, 업로드 파일, 로그)
+echo "기존 데이터 복사 중..."
+cp -r customer-vault/data customer_vault_2.1.2_package/
+cp -r customer-vault/uploads customer_vault_2.1.2_package/
+cp -r customer-vault/logs customer_vault_2.1.2_package/
+echo "데이터 복사 완료"
+
+# 5. 새 패키지로 이동
+cd customer_vault_2.1.2_package
+
+# 6. 새 패키지로 이동
+cd customer_vault_2.1.2_package
+
+# 5. 배포 실행
+./import-package.sh
+
+# 출력:
+# [INFO] 3단계: 기존 서비스 확인
+# [WARN] 기존 서비스가 실행 중입니다.
+# 기존 서비스를 중지하시겠습니까? (y/N): y
+# [INFO] 서비스 중지 중...
+# [SUCCESS] 서비스 중지 완료
+# 
+# [INFO] 9단계: DB 마이그레이션 확인
+# [WARN] DB 스키마 변경이 감지되었습니다!
+# [INFO] ⚠️  마이그레이션 적용 전 자동 DB 백업 시작...
+# [SUCCESS] ✓ DB 백업 완료: backup_before_migration_20260105_143025.sql (2.3M)
+# [SUCCESS] ✓ DB 마이그레이션 완료!
+# 
+# [SUCCESS] 배포 완료!
+
+# 6. 확인
+docker compose ps
+# NAME               STATUS
+# customer_backend   Up (새 버전 2.1.2)
+# customer_frontend  Up (새 버전 2.1.2)
+# customer_db        Up (데이터 유지)
+
+# 7. 정리 (선택사항)
+# 새 버전이 안정적으로 동작하면 기존 디렉토리 백업 후 삭제
+cd /opt
+mv customer-vault customer-vault.backup.2.1.1
+mv customer_vault_2.1.2_package customer-vault
+
+# 최종 구조:
+# /opt/데이터는 복사하여 유지됩니다!
+
+```bash
+# 중요: 데이터는 컨테이너가 아닌 호스트의 디렉토리에 저장됩니다
+# docker-compose.yml 설정:
+volumes:
+  - ./data/mariadb:/var/lib/mysql    # DB 데이터
+  - ./uploads:/app/uploads            # 업로드 파일
+  - ./logs:/app/logs                  # 로그 파일
+
+# 배포 프로세스:
+# 1. 기존 customer-vault/data/mariadb/ 에 실제 DB 데이터가 있음
+# 2. cp -r customer-vault/data customer_vault_2.1.2_package/
+#    → 모든 DB 데이터를 새 디렉토리로 복사
+# 3. cp -r customer-vault/uploads customer_vault_2.1.2_package/
+#    → 업로드된 모든 파일 복사
+# 4. cp -r customer-vault/logs customer_vault_2.1.2_package/
+#    → 기존 로그 복사
+# 5. 새 컨테이너가 복사된 데이터를 마운트
+# 6. 마이그레이션으로 스키마만 업데이트
+# 7. 모든 데이터 보존 완료!
+
+# 주의: cp 대신 mv를 사용하면 원본이 삭제됩니다
+# 안전을 위해 cp로 복사 후, 배포 성공 확인 후 원본 삭제 권장
+```
+
+### 데이터 복사 vs 이동
+
+**복사 (권장)**:
+```bash
+# 안전: 원본 유지
+cp -r customer-vault/data customer_vault_2.1.2_package/
+cp -r customer-vault/uploads customer_vault_2.1.2_package/
+cp -r customer-vault/logs customer_vault_2.1.2_package/
+
+# 장점: 문제 발생 시 기존 데이터로 즉시 롤백 가능
+# 단점: 디스크 공간 2배 필요 (일시적)
+```
+
+**이동 (디스크 공간 부족 시)**:
+```bash
+# 주의: 원본 삭제됨
+mv customer-vault/data customer_vault_2.1.2_package/
+mv customer-vault/uploads customer_vault_2.1.2_package/
+mv customer-vault/logs customer_vault_2.1.2_package/
+
+# 장점: 디스크 공간 절약
+# 단점: 문제 발생 시 복구 어려움
+# 권장: 반드시 DB 백업 후 진행
+```
+
+### 디스크 공간 확인
+
+```bash
+# 현재 데이터 크기 확인
+du -sh customer-vault/data
+du -sh customer-vault/uploads
+du -sh customer-vault/logs
+
+# 사용 가능한 디스크 공간 확인
+df -h .
+
+# 예시 출력:
+# customer-vault/data: 2.5G
+# customer-vault/uploads: 500M
+# customer-vault/logs: 100M
+# 사용 가능: 10G → 복사 가능
+# 기존 customer-vault/data/mariadb/ 에 실제 DB 데이터 파일이 있음
+# 새 패키지를 실행해도:
+# 1. 기존 DB 컨테이너는 중지되지만
+# 2. 호스트의 data/ 디렉토리는 그대로 유지
+# 3. 새 DB 컨테이너가 같은 데이터를 마운트
+# 4. 마이그레이션으로 스키마만 업데이트
+# 5. 모든 데이터는 보존됨!
+```
+
+### 롤백이 필요한 경우
+
+```bash
+# 배포 후 문제가 발생한 경우
+cd /opt/customer_vault_2.1.2_package
+
+# 1. 현재 서비스 중지
+docker compose stop backend frontend
+
+# 2. DB 복원
+docker exec -i customer_db mysql -u root -p"PASSWORD" customer_db < backup_before_migration_20260105_143025.sql
+
+# 3. 이전 버전 디렉토리로 이동
+cd /opt/customer-vault.backup.2.1.1
+
+# 4. 이전 버전 재시작
+docker compose up -d
+
+# 완료! 이전 버전으로 롤백됨
+```
+
+---
+
+## 
 
 ## 베스트 프랙티스
 
