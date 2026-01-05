@@ -24,20 +24,6 @@ export const useAuth = () => {
       setAuth(data.accessToken, data.refreshToken, data.user);
       navigate('/dashboard');
     },
-    onError: (error: any, _variables, context: any) => {
-      console.error('Login failed:', error);
-      const message = error.response?.data?.message || '로그인에 실패했습니다.';
-
-      // 중복 세션 에러인 경우
-      if (message === 'DUPLICATE_SESSION') {
-        if (context?.onDuplicateSession) {
-          context.onDuplicateSession();
-        }
-        return;
-      }
-
-      alert(message);
-    },
   });
 
   // 로그아웃 뮤테이션

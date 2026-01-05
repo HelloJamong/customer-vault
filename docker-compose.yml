@@ -35,7 +35,7 @@ services:
   # NestJS 백엔드 API
   # ==========================================
   backend:
-    image: customer_backend:2.1.1
+    image: customer_backend:2.1.2
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -77,7 +77,7 @@ services:
   # React 프론트엔드
   # ==========================================
   frontend:
-    image: customer_frontend:2.1.1
+    image: customer_frontend:2.1.2
     build:
       context: ./frontend
       dockerfile: Dockerfile
