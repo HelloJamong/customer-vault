@@ -1,0 +1,136 @@
+# 폐쇄망(오프라인) 환경 테스트용 Docker Compose 설정
+#
+# 사용법:
+#   docker compose -f docker-compose.offline.yml up -d
+#
+# 특징:
+#   - 모든 컨테이너의 외부 인터넷 접속 차단
+#   - 컨테이너 간 내부 통신만 허용
+#   - 실제 폐쇄망 환경과 동일한 네트워크 제약 재현
+
+services:
+  # ==========================================
+  # MariaDB 데이터베이스
+  # ==========================================
+  db:
+    image: mariadb:10.11
+    container_name: customer_db_offline
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-customer_db}
+      MYSQL_USER: ${DB_USER:-customer_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-customerpass}
+    volumes:
+      - ./data/mariadb_offline:/var/lib/mysql
+    ports:
+      - "3307:3306"  # 기존 DB와 충돌 방지
+    networks:
+      customer_network_offline:
+        # 외부 인터넷 접속 차단 (DNS 포함)
+    dns:
+      - 127.0.0.1  # 로컬호스트만 허용 (외부 DNS 차단)
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ==========================================
+  # NestJS 백엔드 API
+  # ==========================================
+  backend:
+    image: customer_backend:2.1.2
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: customer_backend_offline
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:-customerpass}@db:3306/${DB_NAME:-customer_db}
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret-key-in-production-environment}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-1h}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-16777216}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}  # 디버깅을 위해 debug 레벨
+      LOG_DIR: /app/logs
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    volumes:
+      - ./uploads_offline:/app/uploads
+      - ./logs_offline:/app/logs
+      - /sys:/host/sys:ro
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+    ports:
+      - "5006:5000"  # 기존 백엔드와 충돌 방지
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      customer_network_offline:
+    dns:
+      - 127.0.0.1  # 외부 DNS 차단
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # React 프론트엔드
+  # ==========================================
+  frontend:
+    image: customer_frontend:2.1.2
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+    container_name: customer_frontend_offline
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      customer_network_offline:
+    dns:
+      - 127.0.0.1  # 외부 DNS 차단
+
+  # ==========================================
+  # Nginx 리버스 프록시
+  # ==========================================
+  proxy:
+    image: nginx:alpine
+    container_name: customer_proxy_offline
+    restart: unless-stopped
+    ports:
+      - "2083:80"  # 기존 프록시와 충돌 방지 (2082 -> 2083)
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      customer_network_offline:
+    dns:
+      - 127.0.0.1  # 외부 DNS 차단
+
+networks:
+  customer_network_offline:
+    driver: bridge
+    # internal: true  # 주석 처리 - 로컬 네트워크 접근 허용
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16  # 내부 Docker 네트워크
+    driver_opts:
+      com.docker.network.bridge.name: br-offline
+
+volumes:
+  mariadb_data_offline:
+    driver: local

@@ -31,6 +31,11 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // 로그인 요청인 경우 토큰 갱신 시도하지 않음
+    if (originalRequest.url?.includes('/auth/login')) {
+      return Promise.reject(error);
+    }
+
     // 401 에러 && 재시도 아닌 경우
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;

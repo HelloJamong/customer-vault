@@ -90,11 +90,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     );
 
     // 프로덕션 환경에서는 간단한 에러 메시지만 반환
+    // 단, DUPLICATE_SESSION과 같은 특정 메시지는 프론트엔드에서 필요하므로 그대로 전달
     const isProduction = process.env.NODE_ENV === 'production';
+    const allowedMessages = ['DUPLICATE_SESSION']; // 프로덕션에서도 전달할 메시지 목록
+    const shouldUseOriginalMessage = !isProduction || allowedMessages.includes(message);
 
     response.status(status).json({
       statusCode: status,
-      message: isProduction ? this.getGenericErrorMessage(status) : message,
+      message: shouldUseOriginalMessage ? message : this.getGenericErrorMessage(status),
       timestamp: new Date().toISOString(),
       path: request.url,
       // 개발 환경에서만 상세 정보 제공
