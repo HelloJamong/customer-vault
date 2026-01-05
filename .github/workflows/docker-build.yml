@@ -42,7 +42,9 @@ jobs:
         with:
           images: ${{ env.BACKEND_IMAGE_NAME }}
           tags: |
-            # 태그 버전만 생성 (예: v2.1.2 -> 2.1.2)
+            # main 브랜치 푸시 시 latest 태그
+            type=raw,value=latest,enable={{is_default_branch}}
+            # 태그 푸시 시 버전 태그 (예: v2.1.2 -> 2.1.2)
             type=semver,pattern={{version}}
 
       # 5. Backend Docker 이미지 빌드 및 푸시
@@ -90,7 +92,9 @@ jobs:
         with:
           images: ${{ env.FRONTEND_IMAGE_NAME }}
           tags: |
-            # 태그 버전만 생성 (예: v2.1.2 -> 2.1.2)
+            # main 브랜치 푸시 시 latest 태그
+            type=raw,value=latest,enable={{is_default_branch}}
+            # 태그 푸시 시 버전 태그 (예: v2.1.2 -> 2.1.2)
             type=semver,pattern={{version}}
 
       # 5. Frontend Docker 이미지 빌드 및 푸시
