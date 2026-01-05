@@ -50,11 +50,10 @@ backend/prisma/migrations/
 backend/generated/prisma
 
 # Offline test environment (로컬 폐쇄망 테스트 환경)
-*offline*
-!docker-compose.offline.yml
-!scripts/setup-offline-network.sh
-!scripts/cleanup-offline-network.sh
-!docs/*offline*.md
+docker-compose.offline.yml
+scripts/setup-offline-network.sh
+scripts/cleanup-offline-network.sh
+docs/OFFLINE_TEST_GUIDE.md
 data_offline/
 logs_offline/
 uploads_offline/
