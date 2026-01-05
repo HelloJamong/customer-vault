@@ -32,9 +32,21 @@ export interface DashboardStats {
   };
 }
 
+export interface IncompleteInspection {
+  id: number;
+  name: string;
+  primaryEngineer: string;
+  subEngineer: string;
+}
+
 export const dashboardApi = {
   getStats: async (): Promise<DashboardStats> => {
     const response = await apiClient.get<DashboardStats>('/dashboard/stats');
+    return response.data;
+  },
+
+  getIncompleteInspections: async (): Promise<IncompleteInspection[]> => {
+    const response = await apiClient.get<IncompleteInspection[]>('/dashboard/incomplete-inspections');
     return response.data;
   },
 };

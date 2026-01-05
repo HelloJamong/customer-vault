@@ -10,9 +10,11 @@ import {
   Computer,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useDashboard } from '@/hooks/useDashboard';
 import { customersAPI } from '@/api/customers.api';
+import IncompleteInspectionsDialog from '@/components/dashboard/IncompleteInspectionsDialog';
 
 const DashboardPage = () => {
   const user = useAuthStore((state) => state.user);
@@ -41,6 +43,19 @@ type DashboardContentProps = {
 
 const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false }: DashboardContentProps) => {
   const { stats, isLoading, error } = useDashboard();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const user = useAuthStore((state) => state.user);
+
+  const handleOpenDialog = () => {
+    setDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+  };
+
+  // super_admin 또는 admin만 대상 조회 버튼 표시
+  const canViewIncompleteInspections = user?.role === 'super_admin' || user?.role === 'admin';
 
   if (error) {
     return (
@@ -264,15 +279,42 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 borderRadius: 2,
               }}
             >
-              <Typography
+              <Box
                 sx={{
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#64748b',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                미완료
-              </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#64748b',
+                  }}
+                >
+                  미완료
+                </Typography>
+                {canViewIncompleteInspections && stats.inspection.incomplete > 0 && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleOpenDialog}
+                    sx={{
+                      fontSize: '0.75rem',
+                      textTransform: 'none',
+                      borderColor: '#f59e0b',
+                      color: '#f59e0b',
+                      '&:hover': {
+                        borderColor: '#d97706',
+                        bgcolor: '#fef3c7',
+                      },
+                    }}
+                  >
+                    대상 조회
+                  </Button>
+                )}
+              </Box>
               <Typography
                 sx={{
                   fontSize: '1.875rem',
@@ -644,6 +686,9 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           </Box>
         </Box>
       )}
+
+      {/* 점검 미완료 고객사 팝업 모달 */}
+      <IncompleteInspectionsDialog open={dialogOpen} onClose={handleCloseDialog} />
     </Box>
   );
 };

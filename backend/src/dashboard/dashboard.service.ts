@@ -366,4 +366,62 @@ export class DashboardService {
 
     return false;
   }
+
+  // 점검 미완료 고객사 목록 조회 (super_admin, admin만 사용)
+  async getIncompleteInspections() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // 모든 고객사 조회 (사내 담당자 정보 포함)
+    const allCustomers = await this.prisma.customer.findMany({
+      include: {
+        inspectionTargets: { select: { id: true } },
+        documents: {
+          select: {
+            id: true,
+            inspectionDate: true,
+            inspectionTargetId: true,
+          },
+        },
+        engineer: { select: { name: true } },      // 정 엔지니어
+        engineerSub: { select: { name: true } },   // 부 엔지니어
+      },
+    });
+
+    // 이번 달 점검 대상 고객사 필터링
+    const inspectionTargets = allCustomers.filter((customer) =>
+      this.isInspectionNeededThisMonth(customer)
+    );
+
+    // 점검 미완료 고객사만 필터링
+    const incompleteCustomers = inspectionTargets.filter((customer) => {
+      const targetIds = customer.inspectionTargets?.map((t) => t.id) || [];
+      if (targetIds.length === 0) return true; // 점검 대상 항목이 없으면 미완료
+
+      const completedTargetIds = new Set(
+        customer.documents
+          ?.filter((doc) => {
+            const inspectionDate = new Date(doc.inspectionDate);
+            return (
+              doc.inspectionTargetId &&
+              inspectionDate >= startOfMonth &&
+              inspectionDate <= endOfMonth
+            );
+          })
+          .map((doc) => doc.inspectionTargetId) || []
+      );
+
+      // 모든 점검 대상이 완료되지 않은 경우만 반환
+      return !targetIds.every((id) => completedTargetIds.has(id));
+    });
+
+    // 필요한 정보만 추출하여 반환 (사내 담당 엔지니어 정보)
+    return incompleteCustomers.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      primaryEngineer: customer.engineer?.name || '-',     // 정 엔지니어
+      subEngineer: customer.engineerSub?.name || '-',      // 부 엔지니어
+    }));
+  }
 }
