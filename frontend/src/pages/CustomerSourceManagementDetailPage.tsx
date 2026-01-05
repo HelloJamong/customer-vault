@@ -386,39 +386,39 @@ const CustomerSourceManagementDetailPage = () => {
                 <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 2 }}>
                   서버 정보
                 </Typography>
-                <TableContainer>
-                  <Table size="small">
+                <TableContainer sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 1200 }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell>구분</TableCell>
-                        <TableCell>제조사</TableCell>
-                        <TableCell>모델명</TableCell>
-                        <TableCell>호스트네임</TableCell>
-                        <TableCell>OS 종류</TableCell>
-                        <TableCell>OS 버전</TableCell>
-                        <TableCell>CPU 종류</TableCell>
-                        <TableCell>메모리</TableCell>
-                        <TableCell>디스크</TableCell>
-                        <TableCell>Fiber NIC</TableCell>
-                        <TableCell>UTP NIC</TableCell>
-                        <TableCell>전원</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>구분</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>제조사</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>모델명</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>호스트네임</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>OS 종류</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>OS 버전</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>CPU 종류</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>메모리</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>디스크</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>Fiber NIC</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>UTP NIC</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>전원</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {sourceData.servers.map((server, index) => (
                         <TableRow key={index}>
-                          <TableCell>{server.serverType}</TableCell>
-                          <TableCell>{server.manufacturer || '-'}</TableCell>
-                          <TableCell>{server.modelName || '-'}</TableCell>
-                          <TableCell>{server.hostname || '-'}</TableCell>
-                          <TableCell>{server.osType || '-'}</TableCell>
-                          <TableCell>{server.osVersion || '-'}</TableCell>
-                          <TableCell>{server.cpuType || '-'}</TableCell>
-                          <TableCell>{server.memoryCapacity || '-'}</TableCell>
-                          <TableCell>{server.diskCapacity || '-'}</TableCell>
-                          <TableCell>{server.nicFiberCount || 0}</TableCell>
-                          <TableCell>{server.nicUtpCount || 0}</TableCell>
-                          <TableCell>{server.powerSupplyCount || 0}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.serverType}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.manufacturer || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.modelName || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.hostname || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.osType || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.osVersion || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.cpuType || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.memoryCapacity || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.diskCapacity || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.nicFiberCount || 0}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.nicUtpCount || 0}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.powerSupplyCount || 0}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
