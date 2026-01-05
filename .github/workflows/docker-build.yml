@@ -12,10 +12,11 @@ on:
 
 env:
   # Docker Hub 이미지 이름
-  IMAGE_NAME: igor0670/customer-storage
+  BACKEND_IMAGE_NAME: igor0670/customer-storage-backend
+  FRONTEND_IMAGE_NAME: igor0670/customer-storage-frontend
 
 jobs:
-  build-and-push:
+  build-and-push-backend:
     runs-on: ubuntu-latest
 
     steps:
@@ -39,23 +40,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ env.BACKEND_IMAGE_NAME }}
           tags: |
-            # 브랜치 이름 (예: main)
-            type=ref,event=branch
-            # 태그 버전 (예: v1.0.0 -> 1.0.0)
+            # 태그 버전만 생성 (예: v2.1.2 -> 2.1.2)
             type=semver,pattern={{version}}
-            # 메이저.마이너 버전 (예: v1.0.0 -> 1.0)
-            type=semver,pattern={{major}}.{{minor}}
-            # 메이저 버전 (예: v1.0.0 -> 1)
-            type=semver,pattern={{major}}
-            # latest 태그 (main 브랜치 또는 태그 push 시)
-            type=raw,value=latest,enable={{is_default_branch}}
-            # SHA (커밋 해시)
-            type=sha,format=short,prefix=sha-
 
-      # 5. Docker 이미지 빌드 및 푸시
-      - name: Build and push Docker image
+      # 5. Backend Docker 이미지 빌드 및 푸시
+      - name: Build and push Backend Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./backend
@@ -66,11 +57,59 @@ jobs:
           # 멀티 플랫폼 지원 (AMD64, ARM64)
           platforms: linux/amd64,linux/arm64
           # 빌드 캐시 사용으로 빌드 시간 단축
-          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.BACKEND_IMAGE_NAME }}:buildcache,mode=max
 
       # 6. 빌드 결과 출력
-      - name: Image digest
+      - name: Backend image digest
+        run: echo "${{ steps.meta.outputs.tags }}"
+
+  build-and-push-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Docker Buildx 설정 (멀티 플랫폼 빌드 지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Docker Hub 로그인
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 4. 메타데이터 추출 (태그 및 레이블)
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.FRONTEND_IMAGE_NAME }}
+          tags: |
+            # 태그 버전만 생성 (예: v2.1.2 -> 2.1.2)
+            type=semver,pattern={{version}}
+
+      # 5. Frontend Docker 이미지 빌드 및 푸시
+      - name: Build and push Frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 멀티 플랫폼 지원 (AMD64, ARM64)
+          platforms: linux/amd64,linux/arm64
+          # 빌드 캐시 사용으로 빌드 시간 단축
+          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.FRONTEND_IMAGE_NAME }}:buildcache,mode=max
+
+      # 6. 빌드 결과 출력
+      - name: Frontend image digest
         run: echo "${{ steps.meta.outputs.tags }}"
 
       # 7. 슬랙 알림 (선택사항, SLACK_WEBHOOK_URL 시크릿 설정 필요)
