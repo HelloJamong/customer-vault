@@ -54,8 +54,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # 멀티 플랫폼 지원 (AMD64, ARM64)
-          platforms: linux/amd64,linux/arm64
+          # AMD64 플랫폼만 지원 (ARM64는 QEMU 이슈로 제외)
+          platforms: linux/amd64
           # 빌드 캐시 사용으로 빌드 시간 단축
           cache-from: type=registry,ref=${{ env.BACKEND_IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.BACKEND_IMAGE_NAME }}:buildcache,mode=max
@@ -102,8 +102,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # 멀티 플랫폼 지원 (AMD64, ARM64)
-          platforms: linux/amd64,linux/arm64
+          # AMD64 플랫폼만 지원 (ARM64는 QEMU 이슈로 제외)
+          platforms: linux/amd64
           # 빌드 캐시 사용으로 빌드 시간 단축
           cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.FRONTEND_IMAGE_NAME }}:buildcache,mode=max
