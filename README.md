@@ -130,7 +130,8 @@ customer-storage/
 
 ## 📚 추가 가이드
 
-- Docker 설정/권장 사양: `docs/docker_setup_guide.md`
-- 로그 위치/정책: `docs/logs_information.md`
-- DB 테이블 역할: `docs/db_information.md`
-- 점검서 저장 경로: `docs/documents_storage.md`
+- [Docker 설정/권장 사양](docs/docker_setup_guide.md)
+- [로그 위치/정책](docs/logs_information.md)
+- [DB 테이블 역할](docs/db_information.md)
+- [점검서 저장 경로](docs/documents_storage.md)
+- [DB 마이그레이션 및 배포](docs/migration_guide.md)
