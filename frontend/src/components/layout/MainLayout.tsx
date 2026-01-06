@@ -15,6 +15,7 @@ const MainLayout = () => {
 
   const [accountAnchor, setAccountAnchor] = useState<null | HTMLElement>(null);
   const [logAnchor, setLogAnchor] = useState<null | HTMLElement>(null);
+  const [workStatusAnchor, setWorkStatusAnchor] = useState<null | HTMLElement>(null);
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
@@ -208,6 +209,64 @@ const MainLayout = () => {
               >
                 고객사 관리
               </Button>
+            )}
+
+            {/* 업무 현황 Dropdown */}
+            {isAdmin && (
+              <>
+                <Button
+                  onClick={(e) => setWorkStatusAnchor(e.currentTarget)}
+                  endIcon={<KeyboardArrowDown sx={{ fontSize: '0.75rem' }} />}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: location.pathname.startsWith('/work-status') ? '#2563eb' : '#64748b',
+                    textTransform: 'none',
+                    '&:hover': {
+                      color: '#0f172a',
+                    },
+                  }}
+                >
+                  업무 현황
+                </Button>
+                <Menu
+                  anchorEl={workStatusAnchor}
+                  open={Boolean(workStatusAnchor)}
+                  onClose={() => setWorkStatusAnchor(null)}
+                  sx={{
+                    '& .MuiPaper-root': {
+                      mt: 1,
+                      minWidth: 192,
+                      borderRadius: 2,
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+                    },
+                  }}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setWorkStatusAnchor(null);
+                      navigate('/work-status/inspections');
+                    }}
+                    selected={location.pathname === '/work-status/inspections'}
+                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                  >
+                    점검 현황
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setWorkStatusAnchor(null);
+                      navigate('/work-status/assignments');
+                    }}
+                    selected={location.pathname === '/work-status/assignments'}
+                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                  >
+                    고객사 담당 현황
+                  </MenuItem>
+                </Menu>
+              </>
             )}
 
             {/* 점검서 업로드 (사용자 전용) */}

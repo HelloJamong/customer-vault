@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   Paper,
-  TextField,
   Button,
   MenuItem,
   FormControl,
@@ -12,6 +11,11 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import 'dayjs/locale/ko';
 import { Upload as UploadIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersAPI } from '@/api/customers.api';
@@ -19,6 +23,8 @@ import { documentsAPI } from '@/api/documents.api';
 import type { Customer } from '@/types/customer.types';
 import type { InspectionTarget, UploadInspectionDocumentDto } from '@/api/documents.api';
 import { useAuthStore } from '@/store/authStore';
+
+dayjs.locale('ko');
 
 const DocumentsPage = () => {
   const queryClient = useQueryClient();
@@ -40,8 +46,8 @@ const DocumentsPage = () => {
     customerId: '',
     inspectionTargetId: '',
     inspectionType: '',
-    inspectionDate: new Date().toISOString().split('T')[0],
   });
+  const [inspectionDate, setInspectionDate] = useState<Dayjs>(dayjs());
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
@@ -79,8 +85,8 @@ const DocumentsPage = () => {
         customerId: '',
         inspectionTargetId: '',
         inspectionType: '',
-        inspectionDate: new Date().toISOString().split('T')[0],
       });
+      setInspectionDate(dayjs());
       setSelectedFile(null);
       // 파일 입력 초기화
       const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -124,7 +130,7 @@ const DocumentsPage = () => {
     uploadMutation.mutate({
       customerId: parseInt(formData.customerId),
       inspectionTargetId: parseInt(formData.inspectionTargetId),
-      inspectionDate: formData.inspectionDate,
+      inspectionDate: inspectionDate.format('YYYY-MM-DD'),
       inspectionType: formData.inspectionType,
       file: selectedFile,
     });
@@ -152,7 +158,8 @@ const DocumentsPage = () => {
       )}
 
       <Paper sx={{ p: 3 }}>
-        <Box component="form" onSubmit={handleSubmit}>
+        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
+          <Box component="form" onSubmit={handleSubmit}>
           {/* 고객사 선택 */}
           <FormControl fullWidth margin="normal" required>
             <InputLabel>고객사</InputLabel>
@@ -208,16 +215,25 @@ const DocumentsPage = () => {
           </FormControl>
 
           {/* 점검일 */}
-          <TextField
-            fullWidth
-            margin="normal"
-            label="점검일"
-            type="date"
-            required
-            value={formData.inspectionDate}
-            onChange={(e) => setFormData({ ...formData, inspectionDate: e.target.value })}
-            InputLabelProps={{ shrink: true }}
-          />
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <DatePicker
+              label="점검일"
+              value={inspectionDate}
+              onChange={(newValue) => {
+                if (newValue) {
+                  setInspectionDate(newValue);
+                }
+              }}
+              format="YYYY-MM-DD"
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  required: true,
+                  helperText: '누락된 점검서를 업로드할 경우 실제 점검일을 선택해주세요',
+                },
+              }}
+            />
+          </Box>
 
           {/* 파일 선택 (PDF만) */}
           <Box mt={2}>
@@ -256,7 +272,8 @@ const DocumentsPage = () => {
           >
             {uploadMutation.isPending ? '업로드 중...' : '업로드'}
           </Button>
-        </Box>
+          </Box>
+        </LocalizationProvider>
       </Paper>
     </Box>
   );

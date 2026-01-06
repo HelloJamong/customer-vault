@@ -26,6 +26,8 @@ import UnauthorizedPage from '@/pages/UnauthorizedPage';
 import SystemLogsPage from '@/pages/SystemLogsPage';
 import UploadLogsPage from '@/pages/UploadLogsPage';
 import LoginLogsPage from '@/pages/LoginLogsPage';
+import { InspectionStatusPage } from '@/pages/InspectionStatusPage';
+import { AssignmentStatusPage } from '@/pages/AssignmentStatusPage';
 
 export const router = createBrowserRouter([
   {
@@ -169,6 +171,22 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
             <LoginLogsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'work-status/inspections',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <InspectionStatusPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'work-status/assignments',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+            <AssignmentStatusPage />
           </RoleRoute>
         ),
       },

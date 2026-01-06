@@ -53,6 +53,14 @@ export class UsersController {
     return this.usersService.findAllActiveUsersByDepartment();
   }
 
+  @Get('assignment-status')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: '기술팀 담당 현황 조회' })
+  @ApiResponse({ status: 200, description: '조회 성공' })
+  getAssignmentStatus() {
+    return this.usersService.getAssignmentStatus();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '사용자 상세 조회' })
   @ApiResponse({ status: 200, description: '조회 성공' })
@@ -76,6 +84,19 @@ export class UsersController {
   update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto, @Request() req) {
     const ipAddress = getClientIp(req);
     return this.usersService.update(id, updateUserDto, req.user.id, ipAddress);
+  }
+
+  @Patch(':id/description')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: '사용자 비고 수정' })
+  @ApiResponse({ status: 200, description: '수정 성공' })
+  updateDescription(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('description') description: string,
+    @Request() req,
+  ) {
+    const ipAddress = getClientIp(req);
+    return this.usersService.updateDescription(id, description, req.user.id, ipAddress);
   }
 
   @Patch(':id/toggle-active')

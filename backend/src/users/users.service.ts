@@ -360,6 +360,77 @@ export class UsersService {
     };
   }
 
+  async getAssignmentStatus() {
+    // 기술팀 소속 사용자 조회
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        department: '기술팀',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // 각 사용자의 정/부 담당 고객사 수 집계
+    const usersWithCounts = await Promise.all(
+      users.map(async (user) => {
+        const primaryCount = await this.prisma.customer.count({
+          where: { engineerId: user.id },
+        });
+
+        const secondaryCount = await this.prisma.customer.count({
+          where: { engineerSubId: user.id },
+        });
+
+        return {
+          id: user.id,
+          name: user.name,
+          primaryCustomerCount: primaryCount,
+          secondaryCustomerCount: secondaryCount,
+          description: user.description || '',
+        };
+      }),
+    );
+
+    return { users: usersWithCounts };
+  }
+
+  async updateDescription(
+    id: number,
+    description: string,
+    currentUserId: number,
+    ipAddress?: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { username: true, name: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { description },
+    });
+
+    // 로그 기록
+    await this.logsService.createServiceLog({
+      userId: currentUserId,
+      logType: '정보',
+      action: '사용자 비고 수정',
+      description: `사용자 "${user.username} (${user.name})"의 비고를 수정했습니다.`,
+      ipAddress,
+    });
+
+    return { message: '비고가 수정되었습니다.' };
+  }
+
   async remove(id: number, currentUserId: number, currentUserRole: string, ipAddress?: string) {
     // 본인 계정 삭제 방지
     if (id === currentUserId) {
