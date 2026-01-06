@@ -1,19 +1,57 @@
 import { useState } from 'react';
-import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
+import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { Add, Visibility, Info, Code, SupportAgent, Download } from '@mui/icons-material';
+import { Add, Visibility, Info, Code, SupportAgent, Download, Summarize, Search, FilterAlt } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
 import * as XLSX from 'xlsx';
+import CustomerSummaryDialog from '@/components/CustomerSummaryDialog';
 
 const CustomersPage = () => {
   const navigate = useNavigate();
-  const { customers, isLoading, createCustomer } = useCustomers();
+
+  // 검색 및 필터 상태
+  const [searchText, setSearchText] = useState('');
+  const [versionFilter, setVersionFilter] = useState('');
+  const [inspectionCycleFilter, setInspectionCycleFilter] = useState('');
+  const [inspectionStatusFilter, setInspectionStatusFilter] = useState('');
+  const [contractTypeFilter, setContractTypeFilter] = useState('');
+  const [filters, setFilters] = useState<{
+    search?: string;
+    version?: string;
+    inspectionCycleType?: string;
+    inspectionStatus?: string;
+    contractType?: string;
+  }>({});
+
+  const { customers, isLoading, createCustomer } = useCustomers(filters);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
+  const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
+  const [summaryCustomers, setSummaryCustomers] = useState<any[]>([]);
+
+  // 검색 및 필터 핸들러
+  const handleSearch = () => {
+    setFilters({
+      search: searchText.trim() || undefined,
+      version: versionFilter || undefined,
+      inspectionCycleType: inspectionCycleFilter || undefined,
+      inspectionStatus: inspectionStatusFilter || undefined,
+      contractType: contractTypeFilter || undefined,
+    });
+  };
+
+  const handleResetFilters = () => {
+    setSearchText('');
+    setVersionFilter('');
+    setInspectionCycleFilter('');
+    setInspectionStatusFilter('');
+    setContractTypeFilter('');
+    setFilters({});
+  };
 
   const handleAddCustomer = async () => {
     if (!newCustomerName.trim()) {
@@ -27,6 +65,17 @@ const CustomersPage = () => {
       setNewCustomerName('');
     } catch (error) {
       console.error('고객사 추가 실패:', error);
+    }
+  };
+
+  const handleOpenSummary = async () => {
+    try {
+      const response = await apiClient.get('/customers/summary');
+      setSummaryCustomers(response.data);
+      setOpenSummaryDialog(true);
+    } catch (error) {
+      console.error('전체 고객사 요약 조회 실패:', error);
+      alert('전체 고객사 요약을 불러오는데 실패했습니다.');
     }
   };
 
@@ -435,13 +484,130 @@ const CustomersPage = () => {
             전체 고객사 목록을 관리합니다
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setOpenAddDialog(true)}
-        >
-          고객사 추가
-        </Button>
+        <Box display="flex" gap={2}>
+          <Button
+            variant="outlined"
+            startIcon={<Summarize />}
+            onClick={handleOpenSummary}
+          >
+            전체 고객사 요약
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setOpenAddDialog(true)}
+          >
+            고객사 추가
+          </Button>
+        </Box>
+      </Box>
+
+      {/* 검색 및 필터 섹션 */}
+      <Box sx={{ mb: 2, p: 2, bgcolor: 'white', borderRadius: 1 }}>
+        <Box display="flex" gap={2} alignItems="center" justifyContent="space-between">
+          <Box display="flex" gap={2} alignItems="center" flex={1}>
+            {/* 고객사명 검색 */}
+            <TextField
+              size="small"
+              placeholder="고객사명 검색"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
+                }
+              }}
+              sx={{ flex: 1, maxWidth: 250 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            {/* 버전 필터 */}
+            <FormControl size="small" sx={{ flex: 1, maxWidth: 150 }}>
+              <InputLabel>버전</InputLabel>
+              <Select
+                value={versionFilter}
+                label="버전"
+                onChange={(e) => setVersionFilter(e.target.value)}
+              >
+                <MenuItem value="">전체</MenuItem>
+                <MenuItem value="4.2">4.2</MenuItem>
+                <MenuItem value="6.1">6.1</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 점검주기 필터 */}
+            <FormControl size="small" sx={{ flex: 1, maxWidth: 150 }}>
+              <InputLabel>점검주기</InputLabel>
+              <Select
+                value={inspectionCycleFilter}
+                label="점검주기"
+                onChange={(e) => setInspectionCycleFilter(e.target.value)}
+              >
+                <MenuItem value="">전체</MenuItem>
+                <MenuItem value="매월">매월</MenuItem>
+                <MenuItem value="분기">분기</MenuItem>
+                <MenuItem value="반기">반기</MenuItem>
+                <MenuItem value="연1회">연1회</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 점검 상태 필터 */}
+            <FormControl size="small" sx={{ flex: 1, maxWidth: 150 }}>
+              <InputLabel>상태</InputLabel>
+              <Select
+                value={inspectionStatusFilter}
+                label="상태"
+                onChange={(e) => setInspectionStatusFilter(e.target.value)}
+              >
+                <MenuItem value="">전체</MenuItem>
+                <MenuItem value="점검 완료">점검 완료</MenuItem>
+                <MenuItem value="미완료">미완료</MenuItem>
+                <MenuItem value="대상아님">대상아님</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 계약 상태 필터 */}
+            <FormControl size="small" sx={{ flex: 1, maxWidth: 150 }}>
+              <InputLabel>계약 상태</InputLabel>
+              <Select
+                value={contractTypeFilter}
+                label="계약 상태"
+                onChange={(e) => setContractTypeFilter(e.target.value)}
+              >
+                <MenuItem value="">전체</MenuItem>
+                <MenuItem value="유상">유상</MenuItem>
+                <MenuItem value="무상">무상</MenuItem>
+                <MenuItem value="만료">만료</MenuItem>
+                <MenuItem value="미계약">미계약</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Box display="flex" gap={1}>
+            {/* 검색 버튼 */}
+            <Button
+              variant="contained"
+              startIcon={<FilterAlt />}
+              onClick={handleSearch}
+            >
+              검색
+            </Button>
+
+            {/* 초기화 버튼 */}
+            <Button
+              variant="outlined"
+              onClick={handleResetFilters}
+            >
+              초기화
+            </Button>
+          </Box>
+        </Box>
       </Box>
 
       <Box sx={{ height: 600, width: '100%', bgcolor: 'white', borderRadius: 1 }}>
@@ -489,6 +655,13 @@ const CustomersPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 전체 고객사 요약 다이얼로그 */}
+      <CustomerSummaryDialog
+        open={openSummaryDialog}
+        onClose={() => setOpenSummaryDialog(false)}
+        customers={summaryCustomers}
+      />
     </Box>
   );
 };

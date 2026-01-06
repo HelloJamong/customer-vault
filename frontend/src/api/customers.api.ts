@@ -2,11 +2,34 @@ import axios, { AxiosError } from 'axios';
 import apiClient from './axios';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types/customer.types';
 
+interface CustomerFilters {
+  search?: string;
+  contractType?: string;
+  inspectionCycleType?: string;
+  version?: string;
+  inspectionStatus?: string;
+}
+
 export const customersAPI = {
   // 고객사 목록 조회
-  getAll: async (): Promise<Customer[]> => {
-    const { data } = await apiClient.get('/customers');
-    return data;
+  getAll: async (filters?: CustomerFilters): Promise<Customer[]> => {
+    const params = new URLSearchParams();
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.contractType) params.append('contractType', filters.contractType);
+    if (filters?.inspectionCycleType) params.append('inspectionCycleType', filters.inspectionCycleType);
+
+    const { data } = await apiClient.get('/customers', { params });
+
+    // 클라이언트 측 필터링 (계산된 값)
+    let filtered = data;
+    if (filters?.version) {
+      filtered = filtered.filter((c: Customer) => c.version === filters.version);
+    }
+    if (filters?.inspectionStatus) {
+      filtered = filtered.filter((c: Customer) => c.inspectionStatus === filters.inspectionStatus);
+    }
+
+    return filtered;
   },
 
   // 고객사 상세 조회

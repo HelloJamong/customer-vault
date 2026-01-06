@@ -52,6 +52,12 @@ export class CustomersController {
     });
   }
 
+  @Get('summary')
+  @ApiOperation({ summary: '전체 고객사 요약 조회' })
+  getSummary() {
+    return this.customersService.getSummary();
+  }
+
   @Get('my')
   @ApiOperation({ summary: '내 담당 고객사 목록 조회' })
   findMyCustomers(@Request() req: any) {

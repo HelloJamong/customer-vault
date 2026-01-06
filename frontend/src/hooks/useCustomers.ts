@@ -2,13 +2,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersAPI } from '@/api/customers.api';
 import type { CreateCustomerDto, UpdateCustomerDto } from '@/types/customer.types';
 
-export const useCustomers = () => {
+interface CustomerFilters {
+  search?: string;
+  contractType?: string;
+  inspectionCycleType?: string;
+  version?: string;
+  inspectionStatus?: string;
+}
+
+export const useCustomers = (filters?: CustomerFilters) => {
   const queryClient = useQueryClient();
 
   // 고객사 목록 - 모든 역할이 전체 고객사 목록 조회
   const customersQuery = useQuery({
-    queryKey: ['customers'],
-    queryFn: customersAPI.getAll,
+    queryKey: ['customers', filters],
+    queryFn: () => customersAPI.getAll(filters),
     staleTime: 0, // 항상 데이터를 stale로 간주하여 재조회 가능하게 함
     gcTime: 5 * 60 * 1000, // 5분간 캐시 유지
   });

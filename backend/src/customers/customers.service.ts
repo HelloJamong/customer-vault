@@ -73,6 +73,34 @@ export class CustomersService {
     });
   }
 
+  async getSummary() {
+    const customers = await this.prisma.customer.findMany({
+      include: {
+        engineer: { select: { id: true, name: true } },
+        engineerSub: { select: { id: true, name: true } },
+        sales: { select: { id: true, name: true } },
+        sourceManagement: {
+          select: {
+            adminWebReleaseDate: true,
+            clientVersion: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return customers.map((customer) => {
+      const version = this.getVersion(customer.sourceManagement?.adminWebReleaseDate);
+      const { sourceManagement, ...customerData } = customer;
+
+      return {
+        ...customerData,
+        version,
+        clientVersion: sourceManagement?.clientVersion || null,
+      };
+    });
+  }
+
   async findMyCustomers(userId: number) {
     const customers = await this.prisma.customer.findMany({
       where: {
