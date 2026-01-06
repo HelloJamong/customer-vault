@@ -50,18 +50,25 @@ export class CustomersService {
             inspectionTargetId: true,
           },
         },
+        sourceManagement: {
+          select: {
+            adminWebReleaseDate: true,
+          },
+        },
       },
       orderBy: { name: 'asc' },
     });
 
-    // 각 고객사의 점검 상태 계산
+    // 각 고객사의 점검 상태 및 버전 계산
     return customers.map((customer) => {
       const inspectionStatus = this.getInspectionStatus(customer);
-      const { inspectionTargets, documents, ...customerData } = customer;
+      const version = this.getVersion(customer.sourceManagement?.adminWebReleaseDate);
+      const { inspectionTargets, documents, sourceManagement, ...customerData } = customer;
 
       return {
         ...customerData,
         inspectionStatus,
+        version,
       };
     });
   }
@@ -87,18 +94,25 @@ export class CustomersService {
             inspectionTargetId: true,
           },
         },
+        sourceManagement: {
+          select: {
+            adminWebReleaseDate: true,
+          },
+        },
       },
       orderBy: { name: 'asc' },
     });
 
-    // 각 고객사의 점검 상태 계산
+    // 각 고객사의 점검 상태 및 버전 계산
     return customers.map((customer) => {
       const inspectionStatus = this.getInspectionStatus(customer);
-      const { inspectionTargets, documents, ...customerData } = customer;
+      const version = this.getVersion(customer.sourceManagement?.adminWebReleaseDate);
+      const { inspectionTargets, documents, sourceManagement, ...customerData } = customer;
 
       return {
         ...customerData,
         inspectionStatus,
+        version,
       };
     });
   }
@@ -319,6 +333,12 @@ export class CustomersService {
     // 모든 점검 대상이 완료되었는지 확인
     const allCompleted = targetIds.every((id: number) => completedTargetIds.has(id));
     return allCompleted ? '점검 완료' : '미완료';
+  }
+
+  // 버전 계산 (관리웹 소스 릴리즈 날짜 기반)
+  getVersion(adminWebReleaseDate: string | null | undefined): string {
+    // 관리웹 소스 릴리즈 날짜가 존재하면 6.1, 없으면 4.2
+    return adminWebReleaseDate ? '6.1' : '4.2';
   }
 
   // 이번 달 점검 대상 여부 확인

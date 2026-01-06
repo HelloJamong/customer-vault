@@ -313,6 +313,12 @@ const CustomersPage = () => {
       flex: 1,
     },
     {
+      field: 'version',
+      headerName: '버전',
+      width: 100,
+      renderCell: (params) => params.value || '-',
+    },
+    {
       field: 'inspectionCycleType',
       headerName: '점검주기',
       width: 150,
