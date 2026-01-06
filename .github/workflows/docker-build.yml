@@ -10,6 +10,11 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:  # 수동 실행 허용
 
+# GitHub Actions 권한 설정
+permissions:
+  contents: write  # Release 생성을 위한 권한
+  packages: write  # 패키지 업로드 권한 (선택)
+
 env:
   # Docker Hub 이미지 이름
   BACKEND_IMAGE_NAME: igor0670/customer-storage-backend
