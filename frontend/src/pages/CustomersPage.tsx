@@ -63,8 +63,12 @@ const CustomersPage = () => {
       await createCustomer({ name: newCustomerName.trim() });
       setOpenAddDialog(false);
       setNewCustomerName('');
-    } catch (error) {
+      alert('고객사가 추가되었습니다.');
+    } catch (error: any) {
       console.error('고객사 추가 실패:', error);
+      // 에러 메시지 추출
+      const errorMessage = error.response?.data?.message || error.message || '고객사 추가에 실패했습니다.';
+      alert(errorMessage);
     }
   };
 
@@ -105,78 +109,85 @@ const CustomersPage = () => {
       const sourceResponse = await apiClient.get(`/customers/${customer.id}/source-management`);
       const sourceData = sourceResponse.data;
 
-      const sourceSheetData: any[][] = [
-        ['형상 관리 정보', ''],
-        ['고객사명', customer.name],
-        ['', ''],
-        ['클라이언트 정보', ''],
-        ['클라이언트 버전', sourceData.clientVersion || '-'],
-        ['클라이언트 커스텀 정보', sourceData.clientCustomInfo || '-'],
-        ['', ''],
-        ['가상PC 정보', ''],
-        ['OS 버전', sourceData.virtualPcOsVersion || '-'],
-        ['빌드 버전', sourceData.virtualPcBuildVersion || '-'],
-        ['GuestAddition 버전', sourceData.virtualPcGuestAddition || '-'],
-        ['가상PC 이미지 정보', sourceData.virtualPcImageInfo || '-'],
-        ['', ''],
-        ['관리웹 정보', ''],
-        ['관리웹 소스 릴리즈 날짜', sourceData.adminWebReleaseDate ? `Release ${sourceData.adminWebReleaseDate}` : '-'],
-        ['관리웹 커스텀 정보', sourceData.adminWebCustomInfo || '-'],
-        ['', ''],
-        ['서버 구성', ''],
-        ['이중화 구성', sourceData.redundancyType || '-'],
-        ['', ''],
-      ];
+      // 소스 관리 정보가 등록되지 않은 경우 (id가 null)
+      if (!sourceData.id) {
+        const emptySourceData = [['형상 관리 정보'], ['고객사명', customer.name], [''], ['등록된 형상 관리 정보가 없습니다.']];
+        const emptySourceWs = XLSX.utils.aoa_to_sheet(emptySourceData);
+        XLSX.utils.book_append_sheet(wb, emptySourceWs, '형상관리');
+      } else {
+        const sourceSheetData: any[][] = [
+          ['형상 관리 정보', ''],
+          ['고객사명', customer.name],
+          ['', ''],
+          ['클라이언트 정보', ''],
+          ['클라이언트 버전', sourceData.clientVersion || '-'],
+          ['클라이언트 커스텀 정보', sourceData.clientCustomInfo || '-'],
+          ['', ''],
+          ['가상PC 정보', ''],
+          ['OS 버전', sourceData.virtualPcOsVersion || '-'],
+          ['빌드 버전', sourceData.virtualPcBuildVersion || '-'],
+          ['GuestAddition 버전', sourceData.virtualPcGuestAddition || '-'],
+          ['가상PC 이미지 정보', sourceData.virtualPcImageInfo || '-'],
+          ['', ''],
+          ['관리웹 정보', ''],
+          ['관리웹 소스 릴리즈 날짜', sourceData.adminWebReleaseDate ? `Release ${sourceData.adminWebReleaseDate}` : '-'],
+          ['관리웹 커스텀 정보', sourceData.adminWebCustomInfo || '-'],
+          ['', ''],
+          ['서버 구성', ''],
+          ['이중화 구성', sourceData.redundancyType || '-'],
+          ['', ''],
+        ];
 
-      // 서버 정보 테이블 추가
-      if (sourceData.servers && sourceData.servers.length > 0) {
-        sourceSheetData.push(['서버 정보', '', '', '', '', '', '', '', '', '', '', '']);
-        sourceSheetData.push([
-          '구분',
-          '제조사',
-          '모델명',
-          '호스트네임',
-          'OS 종류',
-          'OS 버전',
-          'CPU 종류',
-          '메모리 용량',
-          '디스크 용량',
-          'Fiber NIC',
-          'UTP NIC',
-          '전원 수량',
-        ]);
-        sourceData.servers.forEach((server: any) => {
+        // 서버 정보 테이블 추가
+        if (sourceData.servers && sourceData.servers.length > 0) {
+          sourceSheetData.push(['서버 정보', '', '', '', '', '', '', '', '', '', '', '']);
           sourceSheetData.push([
-            server.serverType || '-',
-            server.manufacturer || '-',
-            server.modelName || '-',
-            server.hostname || '-',
-            server.osType || '-',
-            server.osVersion || '-',
-            server.cpuType || '-',
-            server.memoryCapacity || '-',
-            server.diskCapacity || '-',
-            server.nicFiberCount || 0,
-            server.nicUtpCount || 0,
-            server.powerSupplyCount || 0,
+            '구분',
+            '제조사',
+            '모델명',
+            '호스트네임',
+            'OS 종류',
+            'OS 버전',
+            'CPU 종류',
+            '메모리 용량',
+            '디스크 용량',
+            'Fiber NIC',
+            'UTP NIC',
+            '전원 수량',
           ]);
-        });
+          sourceData.servers.forEach((server: any) => {
+            sourceSheetData.push([
+              server.serverType || '-',
+              server.manufacturer || '-',
+              server.modelName || '-',
+              server.hostname || '-',
+              server.osType || '-',
+              server.osVersion || '-',
+              server.cpuType || '-',
+              server.memoryCapacity || '-',
+              server.diskCapacity || '-',
+              server.nicFiberCount || 0,
+              server.nicUtpCount || 0,
+              server.powerSupplyCount || 0,
+            ]);
+          });
+        }
+
+        sourceSheetData.push(['', '']);
+        sourceSheetData.push(['인사연동', '']);
+        sourceSheetData.push(['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용']);
+        sourceSheetData.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
+        sourceSheetData.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
+
+        const sourceWs = XLSX.utils.aoa_to_sheet(sourceSheetData);
+        sourceWs['!cols'] = [{ wch: 25 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(wb, sourceWs, '형상관리');
       }
-
-      sourceSheetData.push(['', '']);
-      sourceSheetData.push(['인사연동', '']);
-      sourceSheetData.push(['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용']);
-      sourceSheetData.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
-      sourceSheetData.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
-
-      const sourceWs = XLSX.utils.aoa_to_sheet(sourceSheetData);
-      sourceWs['!cols'] = [{ wch: 25 }, { wch: 50 }];
-      XLSX.utils.book_append_sheet(wb, sourceWs, '형상관리');
     } catch (error) {
-      // 형상관리 데이터가 없는 경우 빈 시트 추가
-      const emptySourceData = [['형상 관리 정보'], [''], ['등록된 형상 관리 정보가 없습니다.']];
-      const emptySourceWs = XLSX.utils.aoa_to_sheet(emptySourceData);
-      XLSX.utils.book_append_sheet(wb, emptySourceWs, '형상관리');
+      // API 호출 실패 시 에러 시트 추가
+      const errorSourceData = [['형상 관리 정보'], [''], ['형상 관리 정보를 불러오는데 실패했습니다.']];
+      const errorSourceWs = XLSX.utils.aoa_to_sheet(errorSourceData);
+      XLSX.utils.book_append_sheet(wb, errorSourceWs, '형상관리');
     }
 
     // === 2. 지원목록 시트 ===

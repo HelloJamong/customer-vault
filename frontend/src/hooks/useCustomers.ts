@@ -49,9 +49,9 @@ export const useCustomers = (filters?: CustomerFilters) => {
   return {
     customers: customersQuery.data || [],
     isLoading: customersQuery.isLoading,
-    createCustomer: createMutation.mutate,
-    updateCustomer: updateMutation.mutate,
-    deleteCustomer: deleteMutation.mutate,
+    createCustomer: createMutation.mutateAsync,
+    updateCustomer: updateMutation.mutateAsync,
+    deleteCustomer: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,

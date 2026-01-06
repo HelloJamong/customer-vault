@@ -53,9 +53,9 @@ log_info "패키지 디렉토리 생성 중: ${PACKAGE_DIR}"
 rm -rf "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR"
 
-# 1. Docker 이미지 빌드
+# 1. Docker 이미지 빌드 및 태그 변환
 log_info "=========================================="
-log_info "1단계: Docker 이미지 빌드 시작"
+log_info "1단계: Docker 이미지 빌드 및 태그 변환"
 log_info "=========================================="
 
 log_info "Backend 이미지 빌드 중..."
@@ -65,6 +65,15 @@ log_success "Backend 이미지 빌드 완료"
 log_info "Frontend 이미지 빌드 중..."
 docker build -t customer_frontend:${VERSION} ./frontend
 log_success "Frontend 이미지 빌드 완료"
+
+# Docker Hub 이미지가 있다면 로컬 태그로도 생성
+log_info "Docker Hub 이미지 확인 중..."
+if docker images | grep -q "igor0670/customer-storage-backend"; then
+    log_info "Docker Hub 이미지를 로컬 태그로 변환 중..."
+    docker tag igor0670/customer-storage-backend:${VERSION} customer_backend:${VERSION} 2>/dev/null || true
+    docker tag igor0670/customer-storage-frontend:${VERSION} customer_frontend:${VERSION} 2>/dev/null || true
+    log_success "이미지 태그 변환 완료"
+fi
 
 # 2. Docker 이미지 저장
 log_info "=========================================="
@@ -86,10 +95,10 @@ log_info "=========================================="
 log_info "3단계: 설정 파일 복사"
 log_info "=========================================="
 
-# docker-compose.yml 복사 (버전 업데이트)
-log_info "docker-compose.yml 복사 및 버전 업데이트..."
-sed "s/customer_backend:[0-9.]\+/customer_backend:${VERSION}/g; s/customer_frontend:[0-9.]\+/customer_frontend:${VERSION}/g" \
-    docker-compose.yml > "${PACKAGE_DIR}/docker-compose.yml"
+# docker-compose.offline.yml 복사 (버전 업데이트)
+log_info "오프라인용 docker-compose.yml 생성 중..."
+sed "s/VERSION_PLACEHOLDER/${VERSION}/g" docker-compose.offline.yml > "${PACKAGE_DIR}/docker-compose.yml"
+log_success "docker-compose.yml 생성 완료 (버전: ${VERSION})"
 
 # 기타 설정 파일 복사
 log_info "설정 파일 복사 중..."

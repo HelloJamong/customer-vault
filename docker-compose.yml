@@ -36,6 +36,8 @@ services:
   # ==========================================
   backend:
     image: igor0670/customer-storage-backend:${VERSION:-latest}
+    #오프라인 상태일 때 사용
+    #image: customer_backend:2.1.6
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -78,6 +80,8 @@ services:
   # ==========================================
   frontend:
     image: igor0670/customer-storage-frontend:${VERSION:-latest}
+    #오프라인 상태일 때 사용
+    #image: customer_frontend:2.1.6
     build:
       context: ./frontend
       dockerfile: Dockerfile

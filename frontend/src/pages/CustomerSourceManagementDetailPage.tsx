@@ -73,18 +73,12 @@ const CustomerSourceManagementDetailPage = () => {
         setCustomerName(customerResponse.data.name);
 
         // 소스 관리 정보 조회
-        try {
-          const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management`);
-          if (sourceResponse.data) {
-            setSourceData(sourceResponse.data);
-          }
-        } catch (error: any) {
-          // 404인 경우 데이터 없음
-          if (error.response?.status === 404) {
-            setSourceData(null);
-          } else {
-            throw error;
-          }
+        const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management`);
+        // id가 null이면 아직 등록되지 않은 상태
+        if (sourceResponse.data && sourceResponse.data.id) {
+          setSourceData(sourceResponse.data);
+        } else {
+          setSourceData(null);
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
@@ -188,6 +188,16 @@ export class CustomersService {
 
   async create(createCustomerDto: CreateCustomerDto, userId: number, ipAddress?: string) {
     console.log('[CustomersService] create 메서드 호출됨:', { userId, ipAddress });
+
+    // 고객사명 중복 체크
+    const existingCustomer = await this.prisma.customer.findUnique({
+      where: { name: createCustomerDto.name },
+    });
+
+    if (existingCustomer) {
+      throw new ConflictException('이미 존재하는 고객사입니다.');
+    }
+
     const customer = await this.prisma.customer.create({
       data: {
         ...createCustomerDto,
@@ -234,6 +244,17 @@ export class CustomersService {
 
     if (!beforeCustomer) {
       throw new NotFoundException('고객사를 찾을 수 없습니다.');
+    }
+
+    // 고객사명이 변경되는 경우 중복 체크
+    if (updateCustomerDto.name && updateCustomerDto.name !== beforeCustomer.name) {
+      const existingCustomer = await this.prisma.customer.findUnique({
+        where: { name: updateCustomerDto.name },
+      });
+
+      if (existingCustomer) {
+        throw new ConflictException('이미 존재하는 고객사입니다.');
+      }
     }
 
     // null 값 처리를 위한 데이터 준비
@@ -473,7 +494,26 @@ export class CustomersService {
     });
 
     if (!sourceManagement) {
-      throw new NotFoundException('소스 관리 정보를 찾을 수 없습니다');
+      // 소스 관리 정보가 없는 경우 빈 구조 반환 (아직 작성되지 않은 상태)
+      return {
+        id: null,
+        customerId,
+        clientVersion: null,
+        clientCustomInfo: null,
+        virtualPcOsVersion: null,
+        virtualPcBuildVersion: null,
+        virtualPcGuestAddition: null,
+        virtualPcImageInfo: null,
+        adminWebReleaseDate: null,
+        adminWebCustomInfo: null,
+        redundancyType: null,
+        servers: [],
+        hrIntegration: {
+          enabled: false,
+          dbType: null,
+          dbVersion: null,
+        },
+      };
     }
 
     // 프론트엔드 형식에 맞게 변환
@@ -528,7 +568,7 @@ export class CustomersService {
     });
 
     if (existing) {
-      throw new Error('이미 소스 관리 정보가 존재합니다');
+      throw new ConflictException('이미 소스 관리 정보가 존재합니다');
     }
 
     const sourceManagement = await this.prisma.sourceManagement.create({

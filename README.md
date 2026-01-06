@@ -87,10 +87,29 @@ CORS_ORIGIN=https://yourdomain.com,https://app.yourdomain.com
 
 ### 3️⃣ 서비스 실행
 
-**백엔드만 실행 (기본):**
+**기본 실행 (항상 최신 버전 사용):**
 ```bash
+# Docker Hub에서 최신 이미지 다운로드
+docker compose pull
+
+# 서비스 실행
 docker compose up -d
 ```
+
+**특정 버전 고정이 필요한 경우:**
+```bash
+# .env 파일에 버전 추가
+echo "VERSION=2.1.6" >> .env
+
+# 지정한 버전으로 실행
+docker compose pull
+docker compose up -d
+```
+
+**버전 관리 방식:**
+- 기본: `latest` 태그 사용 (항상 최신 버전)
+- Git 태그 push 시: `latest` + 버전별 태그 생성 (예: `v2.1.7` → `2.1.7` 태그)
+- 특정 버전 필요 시: `.env`에 `VERSION=2.1.6` 설정
 
 ### 4️⃣ 접속 정보
 
