@@ -137,6 +137,8 @@ const CustomerSourceManagementEditPage = () => {
   };
 
   const formatReleaseDate = (value: string) => {
+    // null, undefined 체크
+    if (!value) return '';
     // 숫자만 추출
     const numbers = value.replace(/\D/g, '');
     // Release 접두사 추가
