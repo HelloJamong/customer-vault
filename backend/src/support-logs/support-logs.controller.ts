@@ -27,6 +27,12 @@ import { getClientIp } from '../common/utils/ip.util';
 export class SupportLogsController {
   constructor(private readonly supportLogsService: SupportLogsService) {}
 
+  @Get('pending-notifications')
+  @ApiOperation({ summary: '진행 중인 지원 현황 알림 조회 (권한별)' })
+  getPendingNotifications(@Request() req: any) {
+    return this.supportLogsService.getPendingNotifications(req.user.id, req.user.role);
+  }
+
   @Get('customer/:customerId')
   @ApiOperation({ summary: '고객사별 지원 로그 목록 조회' })
   findAllByCustomer(@Param('customerId', ParseIntPipe) customerId: number) {

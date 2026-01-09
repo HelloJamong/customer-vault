@@ -1,7 +1,19 @@
 import apiClient from './axios';
 import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/types/support-log.types';
 
+export interface PendingNotification {
+  customerId: number;
+  customerName: string;
+  count: number;
+}
+
 export const supportLogsAPI = {
+  // 진행 중인 지원 현황 알림 조회
+  getPendingNotifications: async (): Promise<PendingNotification[]> => {
+    const { data } = await apiClient.get('/support-logs/pending-notifications');
+    return data;
+  },
+
   // 고객사별 지원 로그 목록 조회
   getAllByCustomer: async (customerId: number): Promise<SupportLog[]> => {
     const { data } = await apiClient.get(`/support-logs/customer/${customerId}`);

@@ -11,6 +11,71 @@ export class SupportLogsService {
     private logsService: LogsService,
   ) {}
 
+  async getPendingNotifications(userId: number, userRole: string) {
+    const role = userRole.toLowerCase();
+
+    // 진행 중인 지원 로그 조회 조건
+    const whereCondition: any = {
+      actionStatus: '진행 중',
+    };
+
+    // 일반 사용자(user)는 본인이 담당하는 고객사만 조회
+    // super_admin, admin은 모든 고객사 조회
+    if (role === 'user') {
+      // 사내 담당자로 지정된 고객사 조회 (정 담당자, 부 담당자, 영업 담당자)
+      const assignedCustomers = await this.prisma.customer.findMany({
+        where: {
+          OR: [
+            { engineerId: userId },      // 정 담당자
+            { engineerSubId: userId },   // 부 담당자
+            { salesId: userId },         // 영업 담당자
+          ],
+        },
+        select: { id: true },
+      });
+
+      const customerIds = assignedCustomers.map((c) => c.id);
+
+      // 담당 고객사가 없으면 빈 배열 반환
+      if (customerIds.length === 0) {
+        return [];
+      }
+
+      // 담당 고객사만 필터링
+      whereCondition.customerId = { in: customerIds };
+    }
+
+    // 진행 중인 지원 로그를 고객사별로 그룹화하여 카운트
+    const pendingLogs = await this.prisma.supportLog.groupBy({
+      by: ['customerId'],
+      where: whereCondition,
+      _count: {
+        id: true,
+      },
+    });
+
+    // 고객사 정보와 함께 반환
+    const notifications = await Promise.all(
+      pendingLogs.map(async (log) => {
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: log.customerId },
+          select: {
+            id: true,
+            name: true,
+          },
+        });
+
+        return {
+          customerId: log.customerId,
+          customerName: customer?.name || '알 수 없음',
+          count: log._count.id,
+        };
+      }),
+    );
+
+    return notifications;
+  }
+
   async findAllByCustomer(customerId: number) {
     return this.prisma.supportLog.findMany({
       where: { customerId },

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
+import NotificationBell from '@/components/layout/NotificationBell';
 import headerLogo from '@/assets/images/logo.svg';
 
 const MainLayout = () => {
@@ -382,8 +383,12 @@ const MainLayout = () => {
           </Box>
         </Box>
 
-        {/* Right: User Profile Dropdown */}
-        <Box>
+        {/* Right: Notification Bell + User Profile Dropdown */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Notification Bell */}
+          <NotificationBell />
+
+          {/* User Profile Dropdown */}
           <Button
             onClick={(e) => setUserAnchor(e.currentTarget)}
             endIcon={<KeyboardArrowDown sx={{ fontSize: '0.75rem', color: '#64748b' }} />}
