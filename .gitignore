@@ -39,6 +39,10 @@ backup_*/
 node_modules/
 frontend/node_modules/
 
+# Root package files (Docker 환경에서 불필요)
+/package.json
+/package-lock.json
+
 # Build outputs
 frontend/dist/
 frontend/.vite/
