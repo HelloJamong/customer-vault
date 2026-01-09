@@ -484,7 +484,7 @@ const CustomerSupportLogsPage = () => {
             startIcon={<ArrowBack />}
             onClick={() => navigate('/customers')}
           >
-            뒤로가기
+            목록으로
           </Button>
           <Box flex={1}>
             <Typography variant="h4" fontWeight="bold" gutterBottom>

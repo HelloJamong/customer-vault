@@ -40,18 +40,14 @@ export const useAutoLogoutOnClose = () => {
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        sendLogout();
-      }
-    };
-
+    // beforeunload와 pagehide 이벤트만 사용
+    // visibilitychange는 탭 전환 시에도 발생하므로 제거
+    window.addEventListener('beforeunload', sendLogout);
     window.addEventListener('pagehide', sendLogout);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      window.removeEventListener('beforeunload', sendLogout);
       window.removeEventListener('pagehide', sendLogout);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 };

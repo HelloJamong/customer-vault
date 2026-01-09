@@ -196,6 +196,7 @@ const CustomerDetailPage = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box display="flex" alignItems="center" gap={2}>
           <Button
+            variant="outlined"
             startIcon={<ArrowBack />}
             onClick={() => navigate('/customers')}
           >

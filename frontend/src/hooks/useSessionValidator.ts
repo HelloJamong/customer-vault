@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import apiClient from '@/api/axios';
 
 const SESSION_CHECK_INTERVAL = 5000; // 5초마다 체크 (즉각적인 로그아웃을 위해)
+const isDevelopment = import.meta.env.DEV;
 
 export const useSessionValidator = () => {
   const { user } = useAuthStore();
@@ -12,7 +13,7 @@ export const useSessionValidator = () => {
   useEffect(() => {
     // 로그인 상태가 아니면 체크하지 않음
     if (!user) {
-      console.log('[세션검증] 로그인 상태 아님 - 세션 검증 중지');
+      if (isDevelopment) console.log('[세션검증] 로그인 상태 아님 - 세션 검증 중지');
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -20,29 +21,29 @@ export const useSessionValidator = () => {
       return;
     }
 
-    console.log('[세션검증] 세션 검증 시작 - 사용자:', user.username);
+    if (isDevelopment) console.log('[세션검증] 세션 검증 시작 - 사용자:', user.username);
 
     // 세션 유효성 검증 함수
     const validateSession = async () => {
       // 이미 검증 중이거나 로그인 상태가 아니면 스킵
       if (isValidatingRef.current || !useAuthStore.getState().user) {
-        console.log('[세션검증] 스킵 - 검증 중이거나 로그인 상태 아님');
+        if (isDevelopment) console.log('[세션검증] 스킵 - 검증 중이거나 로그인 상태 아님');
         return;
       }
 
       isValidatingRef.current = true;
-      console.log('[세션검증] 세션 유효성 검증 API 호출 중...');
+      if (isDevelopment) console.log('[세션검증] 세션 유효성 검증 API 호출 중...');
 
       try {
         const response = await apiClient.get('/auth/validate-session');
-        console.log('[세션검증] 세션 유효함:', response.data);
+        if (isDevelopment) console.log('[세션검증] 세션 유효함:', response.data);
       } catch (error: any) {
-        console.log('[세션검증] 에러 발생:', error.response?.status, error.message);
+        if (isDevelopment) console.log('[세션검증] 에러 발생:', error.response?.status, error.message);
 
         // 세션이 만료되었거나 유효하지 않은 경우만 처리
         // (네트워크 오류 등은 무시)
         if (error.response?.status === 401) {
-          console.warn('[세션검증] 세션 만료! 강제 로그아웃 처리');
+          if (isDevelopment) console.warn('[세션검증] 세션 만료! 강제 로그아웃 처리');
 
           // 인터벌 중지
           if (intervalRef.current) {
@@ -65,7 +66,7 @@ export const useSessionValidator = () => {
     };
 
     // 로그인 직후가 아닌 일정 시간 후부터 검증 시작 (5초 후)
-    console.log('[세션검증] 5초 후 첫 검증 예약, 이후 5초마다 검증');
+    if (isDevelopment) console.log('[세션검증] 5초 후 첫 검증 예약, 이후 5초마다 검증');
     const initialTimeout = setTimeout(() => {
       validateSession();
     }, 5000);
@@ -75,7 +76,7 @@ export const useSessionValidator = () => {
 
     // 클린업
     return () => {
-      console.log('[세션검증] 클린업 - 검증 중지');
+      if (isDevelopment) console.log('[세션검증] 클린업 - 검증 중지');
       clearTimeout(initialTimeout);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

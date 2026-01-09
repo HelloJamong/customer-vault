@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import { Add, Visibility, Info, Code, SupportAgent, Download, Summarize, Search, FilterAlt } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
@@ -9,23 +9,44 @@ import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
 import * as XLSX from 'xlsx';
 import CustomerSummaryDialog from '@/components/CustomerSummaryDialog';
+import { useCustomersPageStore } from '@/store/customersPageStore';
 
 const CustomersPage = () => {
   const navigate = useNavigate();
 
-  // 검색 및 필터 상태
-  const [searchText, setSearchText] = useState('');
-  const [versionFilter, setVersionFilter] = useState('');
-  const [inspectionCycleFilter, setInspectionCycleFilter] = useState('');
-  const [inspectionStatusFilter, setInspectionStatusFilter] = useState('');
-  const [contractTypeFilter, setContractTypeFilter] = useState('');
+  // Zustand 스토어에서 상태 가져오기
+  const {
+    searchText,
+    versionFilter,
+    inspectionCycleFilter,
+    inspectionStatusFilter,
+    contractTypeFilter,
+    pageSize,
+    page,
+    scrollPosition,
+    setSearchText: setStoreSearchText,
+    setVersionFilter: setStoreVersionFilter,
+    setInspectionCycleFilter: setStoreInspectionCycleFilter,
+    setInspectionStatusFilter: setStoreInspectionStatusFilter,
+    setContractTypeFilter: setStoreContractTypeFilter,
+    setPageSize: setStorePageSize,
+    setPage: setStorePage,
+    setScrollPosition: setStoreScrollPosition,
+  } = useCustomersPageStore();
+
   const [filters, setFilters] = useState<{
     search?: string;
     version?: string;
     inspectionCycleType?: string;
     inspectionStatus?: string;
     contractType?: string;
-  }>({});
+  }>({
+    search: searchText || undefined,
+    version: versionFilter || undefined,
+    inspectionCycleType: inspectionCycleFilter || undefined,
+    inspectionStatus: inspectionStatusFilter || undefined,
+    contractType: contractTypeFilter || undefined,
+  });
 
   const { customers, isLoading, createCustomer } = useCustomers(filters);
   const [openAddDialog, setOpenAddDialog] = useState(false);
@@ -33,23 +54,57 @@ const CustomersPage = () => {
   const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
   const [summaryCustomers, setSummaryCustomers] = useState<any[]>([]);
 
+  // 컴포넌트 마운트 시 스크롤 위치 복원
+  useEffect(() => {
+    if (scrollPosition > 0) {
+      const timer = setTimeout(() => {
+        const virtualScroller = document.querySelector('.MuiDataGrid-virtualScroller');
+        if (virtualScroller) {
+          virtualScroller.scrollTop = scrollPosition;
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollPosition, isLoading]);
+
+  // 언마운트 시 스크롤 위치 저장
+  useEffect(() => {
+    const handleScroll = () => {
+      const virtualScroller = document.querySelector('.MuiDataGrid-virtualScroller');
+      if (virtualScroller) {
+        setStoreScrollPosition(virtualScroller.scrollTop);
+      }
+    };
+
+    const virtualScroller = document.querySelector('.MuiDataGrid-virtualScroller');
+    if (virtualScroller) {
+      virtualScroller.addEventListener('scroll', handleScroll);
+      return () => {
+        virtualScroller.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [setStoreScrollPosition, isLoading]);
+
   // 검색 및 필터 핸들러
   const handleSearch = () => {
-    setFilters({
+    const newFilters = {
       search: searchText.trim() || undefined,
       version: versionFilter || undefined,
       inspectionCycleType: inspectionCycleFilter || undefined,
       inspectionStatus: inspectionStatusFilter || undefined,
       contractType: contractTypeFilter || undefined,
-    });
+    };
+    setFilters(newFilters);
+    setStorePage(0); // 검색 시 첫 페이지로
   };
 
   const handleResetFilters = () => {
-    setSearchText('');
-    setVersionFilter('');
-    setInspectionCycleFilter('');
-    setInspectionStatusFilter('');
-    setContractTypeFilter('');
+    setStoreSearchText('');
+    setStoreVersionFilter('');
+    setStoreInspectionCycleFilter('');
+    setStoreInspectionStatusFilter('');
+    setStoreContractTypeFilter('');
+    setStorePage(0);
     setFilters({});
   };
 
@@ -522,19 +577,21 @@ const CustomersPage = () => {
               size="small"
               placeholder="고객사명 검색"
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onKeyPress={(e) => {
+              onChange={(e) => setStoreSearchText(e.target.value)}
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSearch();
                 }
               }}
               sx={{ flex: 1, maxWidth: 250 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search fontSize="small" />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
               }}
             />
 
@@ -544,7 +601,7 @@ const CustomersPage = () => {
               <Select
                 value={versionFilter}
                 label="버전"
-                onChange={(e) => setVersionFilter(e.target.value)}
+                onChange={(e) => setStoreVersionFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
                 <MenuItem value="4.2">4.2</MenuItem>
@@ -558,7 +615,7 @@ const CustomersPage = () => {
               <Select
                 value={inspectionCycleFilter}
                 label="점검주기"
-                onChange={(e) => setInspectionCycleFilter(e.target.value)}
+                onChange={(e) => setStoreInspectionCycleFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
                 <MenuItem value="매월">매월</MenuItem>
@@ -574,7 +631,7 @@ const CustomersPage = () => {
               <Select
                 value={inspectionStatusFilter}
                 label="상태"
-                onChange={(e) => setInspectionStatusFilter(e.target.value)}
+                onChange={(e) => setStoreInspectionStatusFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
                 <MenuItem value="점검 완료">점검 완료</MenuItem>
@@ -589,7 +646,7 @@ const CustomersPage = () => {
               <Select
                 value={contractTypeFilter}
                 label="계약 상태"
-                onChange={(e) => setContractTypeFilter(e.target.value)}
+                onChange={(e) => setStoreContractTypeFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
                 <MenuItem value="유상">유상</MenuItem>
@@ -627,8 +684,10 @@ const CustomersPage = () => {
           columns={columns}
           loading={isLoading}
           pageSizeOptions={[10, 25, 50, 100]}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
+          paginationModel={{ page, pageSize }}
+          onPaginationModelChange={(model: GridPaginationModel) => {
+            setStorePage(model.page);
+            setStorePageSize(model.pageSize);
           }}
           disableRowSelectionOnClick
           sx={{
@@ -652,7 +711,7 @@ const CustomersPage = () => {
             required
             value={newCustomerName}
             onChange={(e) => setNewCustomerName(e.target.value)}
-            onKeyPress={(e) => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 handleAddCustomer();
               }
