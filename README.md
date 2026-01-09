@@ -6,13 +6,34 @@
 
 고객창고는 고객사 정보와 유지보수 점검 이력을 효율적으로 관리하기 위한 웹 애플리케이션입니다. Docker 기반으로 손쉽게 배포하고 운영할 수 있도록 설계되었습니다.
 
+## 🖼️ Preview
 
-### 기술 스택
+![Preview](docs/preview.png)
 
-- **Backend**: NestJS 11 (TypeScript), Swagger/OpenAPI, JWT(Access/Refresh)
-- **Database**: MariaDB 10.11, Prisma
-- **Frontend**: React 19, Vite 7, MUI 7, React Query, Zustand, React Hook Form, Dayjs
-- **Build/Deploy**: Docker & Docker Compose
+## 🛠️ 기술 스택
+
+### Backend
+![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
+![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
+
+### Database
+![MariaDB](https://img.shields.io/badge/MariaDB-003545?style=for-the-badge&logo=mariadb&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)
+
+### Frontend
+![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![MUI](https://img.shields.io/badge/MUI-007FFF?style=for-the-badge&logo=mui&logoColor=white)
+![React Query](https://img.shields.io/badge/React_Query-FF4154?style=for-the-badge&logo=reactquery&logoColor=white)
+![Zustand](https://img.shields.io/badge/Zustand-443E38?style=for-the-badge)
+![React Hook Form](https://img.shields.io/badge/React_Hook_Form-EC5990?style=for-the-badge&logo=reacthookform&logoColor=white)
+![Day.js](https://img.shields.io/badge/Day.js-FF5F4C?style=for-the-badge)
+
+### Build/Deploy
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 ### 오프라인 환경 지원
 
@@ -44,7 +65,7 @@ cp .env.example .env
 vi .env
 ```
 
-**프로덕션 환경에서 반드시 변경해야 할 항목:**
+**서비스 환경에서 반드시 변경해야 할 항목:**
 
 1. **NODE_ENV**를 production으로 변경
 ```env
@@ -120,31 +141,31 @@ docker compose up -d
 ---
 
 ## 🏗️ 프로젝트 구조
-
 ```
-customer-storage/
-├── backend/                      # NestJS 백엔드
-│   ├── src/                      # auth/users/customers/documents/logs/settings 등 도메인 모듈
-│   ├── prisma/                   # Prisma 스키마 및 마이그레이션
-│   ├── Dockerfile
-│   └── package.json
+customer-vault/
+├── backend/                      # Backend 소스 (Docker 이미지로 빌드됨)
+├── frontend/                     # Frontend 소스 (Docker 이미지로 빌드됨)
 │
-├── frontend/                     # React 프론트엔드
-│   ├── src/
-│   ├── Dockerfile
-│   └── package.json
+├── proxy/                        # Nginx 리버스 프록시 설정
+│   └── nginx.conf                # Nginx 설정 파일
 │
-├── docs/                         # 운영/구성 가이드 (로그, DB, Docker, 문서 저장 등)
-├── data/                         # MariaDB 데이터 볼륨
-├── uploads/                      # 업로드 파일 저장소
-├── logs/                         # 애플리케이션 로그
+├── docs/                         # 운영/구성 가이드 문서
+│   └── nginx.conf.example        # 외부 Nginx 설정 예시
 │
-├── docker-compose.yml            # 통합 Docker Compose 설정
-├── .env                          # 환경 변수 (gitignore)
-├── .env.example                  # 환경 변수 템플릿
-└── README.md
+├── data/                         # MariaDB 데이터 볼륨 (영구 저장)
+├── uploads/                      # 업로드된 점검서 파일 저장소 (영구 저장)
+├── logs/                         # 애플리케이션 로그 파일 (영구 저장)
+│
+├── docker-compose.yml            # Docker Compose 설정 파일
+├── .env                          # 환경 변수 설정
+└── .env.example                  # 환경 변수 샘플
 ```
 
+**주요 디렉토리 설명:**
+- `proxy/`: Nginx 컨테이너에서 사용하는 리버스 프록시 설정
+- `data/`: MariaDB 데이터베이스 파일이 저장되는 볼륨 (백업 필수)
+- `uploads/`: 사용자가 업로드한 점검서 파일이 저장됨 (백업 필수)
+- `logs/`: 애플리케이션 로그 파일 (문제 발생 시 확인)
 ---
 
 ## 📚 추가 가이드
