@@ -39,6 +39,7 @@ export interface Customer {
   contractType: string;
   contractStartDate: string | null;
   contractEndDate: string | null;
+  hardwareIncluded: boolean;
 
   // 점검 정보
   inspectionCycleType: string;
@@ -116,6 +117,7 @@ export interface CreateCustomerDto {
   contractType?: string;
   contractStartDate?: string;
   contractEndDate?: string;
+  hardwareIncluded?: boolean;
 
   // 점검 정보
   inspectionCycleType?: string;

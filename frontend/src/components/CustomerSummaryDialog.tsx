@@ -18,6 +18,9 @@ interface CustomerSummary {
   inspectionCycleType: string;
   inspectionCycleMonth: number | null;
   contractType: string;
+  contractStartDate: string | null;
+  contractEndDate: string | null;
+  hardwareIncluded: boolean;
   clientVersion: string | null;
   engineer?: { id: number; name: string } | null;
   engineerSub?: { id: number; name: string } | null;
@@ -31,12 +34,24 @@ interface CustomerSummaryDialogProps {
 }
 
 const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDialogProps) => {
+  const formatDate = (dateString: string | null): string => {
+    if (!dateString) return '-';
+    return dateString.split('T')[0];
+  };
+
   const getInspectionCycleText = (customer: CustomerSummary) => {
     if (customer.inspectionCycleType === '매월') return '매월';
     if (customer.inspectionCycleType === '분기') return `분기(${customer.inspectionCycleMonth}월)`;
     if (customer.inspectionCycleType === '반기') return `반기(${customer.inspectionCycleMonth}월)`;
     if (customer.inspectionCycleType === '연1회') return `연1회(${customer.inspectionCycleMonth}월)`;
     return customer.inspectionCycleType || '-';
+  };
+
+  const getContractPeriodText = (customer: CustomerSummary) => {
+    if (!customer.contractStartDate && !customer.contractEndDate) return '-';
+    const start = formatDate(customer.contractStartDate);
+    const end = formatDate(customer.contractEndDate);
+    return `${start} ~ ${end}`;
   };
 
   const handleExportExcel = () => {
@@ -50,6 +65,8 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
         '버전',
         '점검주기',
         '계약 상태',
+        '계약 기간',
+        '하드웨어 포함',
         '클라이언트 버전',
         '정 담당자',
         '부 담당자',
@@ -63,6 +80,8 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
         customer.version || '-',
         getInspectionCycleText(customer),
         customer.contractType || '-',
+        getContractPeriodText(customer),
+        customer.hardwareIncluded ? '포함' : '미포함',
         customer.clientVersion || '-',
         customer.engineer?.name || '-',
         customer.engineerSub?.name || '-',
@@ -77,6 +96,8 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
       { wch: 10 },
       { wch: 15 },
       { wch: 12 },
+      { wch: 25 },
+      { wch: 14 },
       { wch: 20 },
       { wch: 12 },
       { wch: 12 },
@@ -97,6 +118,7 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
       field: 'version',
       headerName: '버전',
       width: 100,
+      valueGetter: (value: string | undefined) => value || '',
       renderCell: (params) => params.value || '-',
     },
     {
@@ -109,31 +131,49 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
       field: 'contractType',
       headerName: '계약 상태',
       width: 120,
+      valueGetter: (value: string | undefined) => value || '',
       renderCell: (params) => params.value || '-',
+    },
+    {
+      field: 'contractStartDate',
+      headerName: '계약 기간',
+      width: 200,
+      valueGetter: (value: string | null) => value || '',
+      renderCell: (params) => getContractPeriodText(params.row),
+    },
+    {
+      field: 'hardwareIncluded',
+      headerName: '하드웨어 포함',
+      width: 120,
+      renderCell: (params) => params.value ? '포함' : '미포함',
     },
     {
       field: 'clientVersion',
       headerName: '클라이언트 버전',
       width: 180,
+      valueGetter: (value: string | null) => value || '',
       renderCell: (params) => params.value || '-',
     },
     {
       field: 'engineer',
       headerName: '정 담당자',
       width: 120,
-      renderCell: (params) => params.value?.name || '-',
+      valueGetter: (_value: { id: number; name: string } | null | undefined, row: CustomerSummary) => row.engineer?.name || '',
+      renderCell: (params) => params.row.engineer?.name || '-',
     },
     {
       field: 'engineerSub',
       headerName: '부 담당자',
       width: 120,
-      renderCell: (params) => params.value?.name || '-',
+      valueGetter: (_value: { id: number; name: string } | null | undefined, row: CustomerSummary) => row.engineerSub?.name || '',
+      renderCell: (params) => params.row.engineerSub?.name || '-',
     },
     {
       field: 'sales',
       headerName: '영업 담당자',
       width: 120,
-      renderCell: (params) => params.value?.name || '-',
+      valueGetter: (_value: { id: number; name: string } | null | undefined, row: CustomerSummary) => row.sales?.name || '',
+      renderCell: (params) => params.row.sales?.name || '-',
     },
   ];
 

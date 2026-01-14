@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsInt, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsDateString, IsBoolean } from 'class-validator';
 
 export class CreateCustomerDto {
   @ApiProperty({ example: '고객사A', description: '고객사명' })
@@ -57,6 +57,11 @@ export class CreateCustomerDto {
   @IsDateString()
   @IsOptional()
   contractEndDate?: string;
+
+  @ApiProperty({ example: true, description: '하드웨어 포함 여부', required: false })
+  @IsBoolean()
+  @IsOptional()
+  hardwareIncluded?: boolean;
 
   // 점검 정보
   @ApiProperty({ example: '매월', description: '점검 주기', required: false })
@@ -246,6 +251,11 @@ export class UpdateCustomerDto {
   @IsDateString()
   @IsOptional()
   contractEndDate?: string;
+
+  @ApiProperty({ description: '하드웨어 포함 여부', required: false })
+  @IsBoolean()
+  @IsOptional()
+  hardwareIncluded?: boolean;
 
   // 점검 정보
   @ApiProperty({ required: false })

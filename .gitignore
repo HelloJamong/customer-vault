@@ -61,3 +61,6 @@ docs/OFFLINE_TEST_GUIDE.md
 data_offline/
 logs_offline/
 uploads_offline/
+
+# Export archives (배포용 압축 파일)
+*.tar.gz

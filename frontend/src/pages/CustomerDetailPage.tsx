@@ -1,5 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, CircularProgress, Divider, Chip } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Button,
+  Paper,
+  CircularProgress,
+  Divider,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from '@mui/material';
 import Grid from '@/mui-grid2';
 import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -144,11 +158,24 @@ const CustomerDetailPage = () => {
       data.push([]);
     }
 
+    // 점검 대상 제품
+    data.push(['[점검 대상 제품]']);
+    if (customer.inspectionTargets && customer.inspectionTargets.length > 0) {
+      data.push(['유형', '제품명']);
+      customer.inspectionTargets.forEach((target) => {
+        data.push([target.targetType, target.productName || '']);
+      });
+    } else {
+      data.push(['등록된 점검 대상 제품이 없습니다.']);
+    }
+    data.push([]);
+
     // 계약 정보
     data.push(['[계약 정보]']);
     data.push(['계약 상태', customer.contractType || '']);
     data.push(['계약 시작일', customer.contractStartDate || '']);
     data.push(['계약 종료일', customer.contractEndDate || '']);
+    data.push(['하드웨어 포함', customer.hardwareIncluded ? '포함' : '미포함']);
     data.push([]);
 
     // 점검 정보
@@ -306,6 +333,39 @@ const CustomerDetailPage = () => {
         </Paper>
       )}
 
+      {/* 점검 대상 제품 */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>
+          점검 대상 제품
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+
+        {!customer.inspectionTargets || customer.inspectionTargets.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" textAlign="center" py={3}>
+            등록된 점검 대상 제품이 없습니다.
+          </Typography>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>유형</TableCell>
+                  <TableCell>제품명</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {customer.inspectionTargets.map((target) => (
+                  <TableRow key={target.id}>
+                    <TableCell>{target.targetType}</TableCell>
+                    <TableCell>{target.productName || '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+
       {/* 계약 정보 */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -316,6 +376,7 @@ const CustomerDetailPage = () => {
         <InfoItem label="계약 상태" value={customer.contractType} />
         <InfoItem label="계약 시작일" value={customer.contractStartDate} />
         <InfoItem label="계약 종료일" value={customer.contractEndDate} />
+        <InfoItem label="하드웨어 포함" value={customer.hardwareIncluded ? '포함' : '미포함'} />
       </Paper>
 
       {/* 점검 정보 */}

@@ -126,6 +126,7 @@ const CustomerEditPage = () => {
         contractType: data.contractType || '미계약',
         contractStartDate: data.contractStartDate || '',
         contractEndDate: data.contractEndDate || '',
+        hardwareIncluded: data.hardwareIncluded ?? true,
         inspectionCycleType: data.inspectionCycleType || '매월',
         inspectionCycleMonth: data.inspectionCycleMonth || null,
         lastInspectionDate: data.lastInspectionDate || '',
@@ -787,7 +788,7 @@ const CustomerEditPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
-          <Grid xs={12} md={4}>
+          <Grid xs={12} md={3}>
             <FormControl fullWidth>
               <InputLabel>계약 상태</InputLabel>
               <Select
@@ -802,7 +803,7 @@ const CustomerEditPage = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid xs={12} md={4}>
+          <Grid xs={12} md={3}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
               <DatePicker
                 label="계약 시작일"
@@ -819,7 +820,7 @@ const CustomerEditPage = () => {
               />
             </LocalizationProvider>
           </Grid>
-          <Grid xs={12} md={4}>
+          <Grid xs={12} md={3}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
               <DatePicker
                 label="계약 종료일"
@@ -835,6 +836,20 @@ const CustomerEditPage = () => {
                 }}
               />
             </LocalizationProvider>
+          </Grid>
+          <Grid xs={12} md={3}>
+            <FormControl fullWidth>
+              <InputLabel shrink>하드웨어 포함</InputLabel>
+              <Select
+                value={formData.hardwareIncluded ?? true ? 'true' : 'false'}
+                label="하드웨어 포함"
+                notched
+                onChange={(e) => handleChange('hardwareIncluded', e.target.value === 'true')}
+              >
+                <MenuItem value="true">포함</MenuItem>
+                <MenuItem value="false">미포함</MenuItem>
+              </Select>
+            </FormControl>
           </Grid>
         </Grid>
       </Paper>

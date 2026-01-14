@@ -95,6 +95,7 @@ model Customer {
   contractType            String    @default("미계약") @map("contract_type") @db.VarChar(20)
   contractStartDate       DateTime? @map("contract_start_date") @db.Date
   contractEndDate         DateTime? @map("contract_end_date") @db.Date
+  hardwareIncluded        Boolean   @default(true) @map("hardware_included")
 
   // 점검 정보
   inspectionCycleType     String    @default("매월") @map("inspection_cycle_type") @db.VarChar(20)
