@@ -40,10 +40,6 @@ import type { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
-import {
-  inspectionReportsApi,
-  type InspectionReport,
-} from '@/api/inspection-reports.api';
 import { documentsAPI, type InspectionTarget } from '@/api/documents.api';
 
 interface Document {
@@ -76,7 +72,6 @@ const CustomerDocumentsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [inspectionReports, setInspectionReports] = useState<InspectionReport[]>([]);
   const [inspectionTargets, setInspectionTargets] = useState<InspectionTarget[]>([]);
 
   // 날짜 필터 상태
@@ -115,16 +110,6 @@ const CustomerDocumentsPage = () => {
     }
   };
 
-  const fetchInspectionReports = async () => {
-    if (!customerId) return;
-    try {
-      const reports = await inspectionReportsApi.getAll(parseInt(customerId));
-      setInspectionReports(reports);
-    } catch (error) {
-      console.error('점검서 목록 로드 실패:', error);
-    }
-  };
-
   const fetchInspectionTargets = async () => {
     if (!customerId) return;
     try {
@@ -146,8 +131,8 @@ const CustomerDocumentsPage = () => {
         setDocuments(docsResponse.data);
         setCustomer(customerResponse.data);
 
-        // 점검서 목록과 점검 항목 불러오기
-        await Promise.all([fetchInspectionReports(), fetchInspectionTargets()]);
+        // 점검 항목 불러오기
+        await fetchInspectionTargets();
       } catch (error) {
         console.error('데이터 로드 실패:', error);
       } finally {
@@ -273,6 +258,9 @@ const CustomerDocumentsPage = () => {
         severity: 'success',
       });
 
+      // 점검 항목 목록 새로고침
+      await fetchInspectionTargets();
+
       handleCloseUploadDialog();
     } catch (error: any) {
       console.error('점검서 양식 업로드 실패:', error);
@@ -284,24 +272,41 @@ const CustomerDocumentsPage = () => {
     }
   };
 
-  const handleDownloadReport = async (reportId: number) => {
+  const handleDownloadTemplate = async (targetId: number) => {
     try {
-      const report = inspectionReports.find((r) => r.id === reportId);
-      if (!report) return;
+      const response = await apiClient.get(`/inspection-targets/${targetId}/template/download`, {
+        responseType: 'blob',
+      });
 
-      const filename = `점검서_${report.customerName}_${report.inspectionYear}년${report.inspectionMonth}월.docx`;
-      await inspectionReportsApi.downloadWord(reportId, filename);
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = '점검서_양식.pdf';
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*?=['"]?([^'";\n]+)['"]?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = decodeURIComponent(filenameMatch[1]);
+        }
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
 
       setSnackbar({
         open: true,
-        message: '점검서 다운로드를 시작합니다.',
+        message: '점검서 양식 다운로드를 시작합니다.',
         severity: 'success',
       });
     } catch (error) {
-      console.error('점검서 다운로드 실패:', error);
+      console.error('점검서 양식 다운로드 실패:', error);
       setSnackbar({
         open: true,
-        message: '점검서 다운로드에 실패했습니다.',
+        message: '점검서 양식 다운로드에 실패했습니다.',
         severity: 'error',
       });
     }
@@ -343,7 +348,7 @@ const CustomerDocumentsPage = () => {
             startIcon={<Download />}
             endIcon={<ArrowDropDown />}
             onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
-            disabled={inspectionReports.length === 0}
+            disabled={inspectionTargets.filter(t => t.templatePath).length === 0}
           >
             점검서 다운로드
           </Button>
@@ -352,14 +357,16 @@ const CustomerDocumentsPage = () => {
             open={Boolean(downloadAnchorEl)}
             onClose={() => setDownloadAnchorEl(null)}
           >
-            {inspectionReports.map((report) => (
-              <MenuItem
-                key={report.id}
-                onClick={() => handleDownloadReport(report.id)}
-              >
-                {report.templateType} - {report.inspectionYear}년 {report.inspectionMonth}월
-              </MenuItem>
-            ))}
+            {inspectionTargets
+              .filter((target) => target.templatePath)
+              .map((target) => (
+                <MenuItem
+                  key={target.id}
+                  onClick={() => handleDownloadTemplate(target.id)}
+                >
+                  {target.customName || target.productName} - 점검서 양식
+                </MenuItem>
+              ))}
           </Menu>
         </Box>
       </Box>

@@ -12,7 +12,6 @@ import { SettingsModule } from './settings/settings.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SupportLogsModule } from './support-logs/support-logs.module';
 import { InspectionStatusModule } from './inspection-status/inspection-status.module';
-import { InspectionReportsModule } from './inspection-reports/inspection-reports.module';
 
 @Module({
   imports: [
@@ -32,7 +31,6 @@ import { InspectionReportsModule } from './inspection-reports/inspection-reports
     DashboardModule,
     SupportLogsModule,
     InspectionStatusModule,
-    InspectionReportsModule,
   ],
 })
 export class AppModule {}

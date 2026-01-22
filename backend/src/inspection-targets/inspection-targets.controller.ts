@@ -11,7 +11,10 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { InspectionTargetsService, CreateInspectionTargetDto, UpdateInspectionTargetDto } from './inspection-targets.service';
@@ -47,6 +50,21 @@ export class InspectionTargetsController {
   @Get(':id/template')
   checkTemplateExists(@Param('id', ParseIntPipe) id: number) {
     return this.service.checkTemplateExists(id);
+  }
+
+  @Get(':id/template/download')
+  async downloadTemplate(
+    @Param('id', ParseIntPipe) id: number,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { file, filename, mimetype } = await this.service.downloadTemplate(id);
+
+    res.set({
+      'Content-Type': mimetype,
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+    });
+
+    return new StreamableFile(file);
   }
 
   @Post('template/upload')

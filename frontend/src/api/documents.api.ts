@@ -7,6 +7,7 @@ export interface InspectionTarget {
   customName?: string;
   productName?: string;
   displayOrder: number;
+  templatePath?: string;
   createdAt: string;
 }
 

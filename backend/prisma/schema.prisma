@@ -49,7 +49,6 @@ model User {
   customersAsSales      Customer[] @relation("Sales")
   updatedSettings       SystemSettings[]
   createdSupportLogs    SupportLog[] @relation("SupportLogCreator")
-  createdInspectionReports InspectionReport[] @relation("InspectionReportCreator")
 
   @@map("users")
 }
@@ -124,7 +123,6 @@ model Customer {
   inspectionTargets       InspectionTarget[]
   sourceManagement        SourceManagement?
   supportLogs             SupportLog[]
-  inspectionReports       InspectionReport[]
 
   @@map("customers")
 }
@@ -352,56 +350,3 @@ model SupportLog {
   @@map("support_logs")
 }
 
-// 점검서 (사전 입력 정보)
-model InspectionReport {
-  id                    Int       @id @default(autoincrement())
-  customerId            Int       @map("customer_id")
-
-  // 템플릿 유형 (MGVS: 통합서버, VMMG: 관리서버, VMVS: 보안게이트웨이)
-  templateType          String    @map("template_type") @db.VarChar(20)
-
-  // 점검 기본 정보
-  inspectionYear        Int       @map("inspection_year")
-  inspectionMonth       Int       @map("inspection_month")
-  inspectionDate        DateTime  @map("inspection_date") @db.Date
-  inspectionLocation    String?   @map("inspection_location") @db.VarChar(200)
-  inspectionCycle       String?   @map("inspection_cycle") @db.VarChar(50)
-
-  // 고객사 담당자 정보 (Customer 테이블과 별도로 점검서 작성 시점의 스냅샷)
-  customerName          String    @map("customer_name") @db.VarChar(200)
-  customerDepartment    String?   @map("customer_department") @db.VarChar(100)
-  customerContact       String?   @map("customer_contact") @db.VarChar(100)
-  customerPhone         String?   @map("customer_phone") @db.VarChar(50)
-
-  // 점검자 정보
-  inspectorName         String    @map("inspector_name") @db.VarChar(100)
-  inspectorPhone        String?   @map("inspector_phone") @db.VarChar(50)
-
-  // 장비 정보 (JSON 배열: 여러 서버 정보)
-  // [{ systemType, hostname, model, serialNumber, os, serverIp }]
-  equipmentInfo         String    @map("equipment_info") @db.Text
-
-  // 하드웨어 스펙 정보 (JSON)
-  // { cpuModel, cpuCores, memoryCapacity }
-  hardwareSpecs         String?   @map("hardware_specs") @db.Text
-
-  // 계정연동 사용 여부
-  hrIntegrationEnabled  Boolean   @default(false) @map("hr_integration_enabled")
-
-  // 이중화 사용 여부
-  redundancyEnabled     Boolean   @default(false) @map("redundancy_enabled")
-
-  // 고객사 요청사항
-  customerRequest       String?   @map("customer_request") @db.Text
-
-  // 작성자 및 생성 정보
-  createdBy             Int       @map("created_by")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  creator               User      @relation("InspectionReportCreator", fields: [createdBy], references: [id])
-
-  @@map("inspection_reports")
-}

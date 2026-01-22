@@ -3,6 +3,7 @@ import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../common/prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as mime from 'mime-types';
 
 export class CreateInspectionTargetDto {
   @IsNumber()
@@ -143,5 +144,32 @@ export class InspectionTargetsService {
       message: '점검서 양식이 업로드되었습니다.',
       path: filePath,
     };
+  }
+
+  async downloadTemplate(
+    targetId: number,
+  ): Promise<{ file: Buffer; filename: string; mimetype: string }> {
+    const target = await this.prisma.inspectionTarget.findUnique({
+      where: { id: targetId },
+      include: { customer: true },
+    });
+
+    if (!target) {
+      throw new NotFoundException('점검 항목을 찾을 수 없습니다.');
+    }
+
+    if (!target.templatePath) {
+      throw new NotFoundException('업로드된 점검서 양식이 없습니다.');
+    }
+
+    if (!fs.existsSync(target.templatePath)) {
+      throw new NotFoundException('점검서 양식 파일을 찾을 수 없습니다.');
+    }
+
+    const file = fs.readFileSync(target.templatePath);
+    const filename = path.basename(target.templatePath);
+    const mimetype = mime.lookup(target.templatePath) || 'application/octet-stream';
+
+    return { file, filename, mimetype };
   }
 }
