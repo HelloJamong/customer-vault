@@ -49,6 +49,7 @@ model User {
   customersAsSales      Customer[] @relation("Sales")
   updatedSettings       SystemSettings[]
   createdSupportLogs    SupportLog[] @relation("SupportLogCreator")
+  createdNotices        Notice[] @relation("NoticeCreator")
 
   @@map("users")
 }
@@ -348,5 +349,19 @@ model SupportLog {
   creator         User?     @relation("SupportLogCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@map("support_logs")
+}
+
+// 공지사항
+model Notice {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.VarChar(200)
+  content     String    @db.Text
+  createdBy   Int       @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  creator     User      @relation("NoticeCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("notices")
 }
 

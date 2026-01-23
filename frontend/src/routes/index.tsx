@@ -28,6 +28,7 @@ import UploadLogsPage from '@/pages/UploadLogsPage';
 import LoginLogsPage from '@/pages/LoginLogsPage';
 import { InspectionStatusPage } from '@/pages/InspectionStatusPage';
 import { AssignmentStatusPage } from '@/pages/AssignmentStatusPage';
+import NoticesPage from '@/pages/NoticesPage';
 
 export const router = createBrowserRouter([
   {
@@ -189,6 +190,10 @@ export const router = createBrowserRouter([
             <AssignmentStatusPage />
           </RoleRoute>
         ),
+      },
+      {
+        path: 'notices',
+        element: <NoticesPage />,
       },
     ],
   },

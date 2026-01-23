@@ -8,7 +8,7 @@ ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 # 의존성 설치
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 
 # 소스 복사 및 빌드

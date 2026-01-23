@@ -270,6 +270,27 @@ const MainLayout = () => {
               </>
             )}
 
+            {/* 공지사항 */}
+            <Button
+              onClick={() => navigate('/notices')}
+              sx={{
+                px: 2,
+                py: 1,
+                fontSize: '0.875rem',
+                fontWeight: isActive('/notices') ? 600 : 500,
+                color: isActive('/notices') ? '#2563eb' : '#64748b',
+                bgcolor: isActive('/notices') ? '#eff6ff' : 'transparent',
+                borderRadius: 1.5,
+                textTransform: 'none',
+                '&:hover': {
+                  bgcolor: isActive('/notices') ? '#eff6ff' : '#f8fafc',
+                  color: '#0f172a',
+                },
+              }}
+            >
+              공지사항
+            </Button>
+
             {/* 점검서 업로드 (사용자 전용) */}
             {userRole === 'user' && (
               <Button
