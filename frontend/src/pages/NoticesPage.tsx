@@ -47,7 +47,7 @@ const NoticesPage = () => {
 
   // React Quill 모듈 설정
   const quillModules = {
-    toolbar: [['bold', 'italic', 'underline']],
+    toolbar: [['bold', 'underline']],
   };
 
   useEffect(() => {
@@ -116,7 +116,7 @@ const NoticesPage = () => {
 
   const handleCloseViewDialog = () => {
     setViewDialogOpen(false);
-    setSelectedNotice(null);
+    // selectedNotice는 여기서 null로 설정하지 않음 (수정/삭제 버튼에서 사용)
   };
 
   // 수정 다이얼로그
@@ -133,8 +133,8 @@ const NoticesPage = () => {
 
   const handleCloseEditDialog = () => {
     setEditDialogOpen(false);
-    setSelectedNotice(null);
     setFormData({ title: '', content: '' });
+    setSelectedNotice(null);
   };
 
   const handleUpdate = async () => {
@@ -172,6 +172,7 @@ const NoticesPage = () => {
       await noticesApi.delete(selectedNotice.id);
       alert('공지사항이 삭제되었습니다.');
       handleMenuClose();
+      setSelectedNotice(null);
       fetchNotices();
     } catch (error) {
       console.error('공지사항 삭제 실패:', error);
@@ -315,7 +316,7 @@ const NoticesPage = () => {
             <>
               <Button
                 onClick={() => {
-                  handleCloseViewDialog();
+                  setViewDialogOpen(false);
                   handleOpenEditDialog();
                 }}
               >
@@ -324,7 +325,7 @@ const NoticesPage = () => {
               <Button
                 color="error"
                 onClick={() => {
-                  handleCloseViewDialog();
+                  setViewDialogOpen(false);
                   handleDelete();
                 }}
               >
@@ -332,7 +333,10 @@ const NoticesPage = () => {
               </Button>
             </>
           )}
-          <Button onClick={handleCloseViewDialog}>닫기</Button>
+          <Button onClick={() => {
+            setViewDialogOpen(false);
+            setSelectedNotice(null);
+          }}>닫기</Button>
         </DialogActions>
       </Dialog>
 
