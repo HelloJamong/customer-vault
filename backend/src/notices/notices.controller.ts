@@ -33,6 +33,12 @@ export class NoticesController {
     return this.noticesService.findAll();
   }
 
+  @Get('unread/list')
+  @ApiOperation({ summary: '읽지 않은 공지사항 조회 (슈퍼 관리자 제외)' })
+  getUnreadNotices(@Request() req: any) {
+    return this.noticesService.getUnreadNotices(req.user.id, req.user.role);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '공지사항 상세 조회 (모든 사용자)' })
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -61,6 +67,16 @@ export class NoticesController {
   ) {
     const ipAddress = getClientIp(req);
     return this.noticesService.update(id, updateNoticeDto, req.user.id, ipAddress);
+  }
+
+  @Post(':id/mark-read')
+  @ApiOperation({ summary: '공지사항 읽음으로 표시' })
+  markAsRead(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { dontShowAgain: boolean },
+    @Request() req: any,
+  ) {
+    return this.noticesService.markAsRead(req.user.id, id, body.dontShowAgain);
   }
 
   @Delete(':id')

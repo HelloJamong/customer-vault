@@ -144,4 +144,82 @@ export class NoticesService {
 
     return { message: '공지사항이 삭제되었습니다.' };
   }
+
+  /**
+   * 사용자가 읽지 않은 공지사항 조회
+   * - 슈퍼 관리자는 제외
+   * - "다시 보지 않기"를 선택한 공지사항은 제외
+   * - 아직 보지 않은 공지사항만 반환
+   */
+  async getUnreadNotices(userId: number, userRole: string) {
+    // 슈퍼 관리자는 공지사항 팝업을 보지 않음
+    if (userRole.toLowerCase() === 'super_admin') {
+      return [];
+    }
+
+    // 사용자가 이미 본 공지사항 ID 목록 조회
+    const viewedNotices = await this.prisma.userNoticeView.findMany({
+      where: { userId },
+      select: { noticeId: true },
+    });
+
+    const viewedNoticeIds = viewedNotices.map((v) => v.noticeId);
+
+    // 아직 보지 않은 공지사항 조회
+    const unreadNotices = await this.prisma.notice.findMany({
+      where: {
+        id: {
+          notIn: viewedNoticeIds.length > 0 ? viewedNoticeIds : undefined,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    return unreadNotices;
+  }
+
+  /**
+   * 공지사항을 읽음으로 표시
+   * @param userId 사용자 ID
+   * @param noticeId 공지사항 ID
+   * @param dontShowAgain "다시 보지 않기" 체크 여부
+   */
+  async markAsRead(
+    userId: number,
+    noticeId: number,
+    dontShowAgain: boolean,
+  ) {
+    // 공지사항 존재 여부 확인
+    await this.findOne(noticeId);
+
+    // UserNoticeView 레코드 생성 또는 업데이트
+    await this.prisma.userNoticeView.upsert({
+      where: {
+        userId_noticeId: {
+          userId,
+          noticeId,
+        },
+      },
+      create: {
+        userId,
+        noticeId,
+        dontShowAgain,
+      },
+      update: {
+        dontShowAgain,
+        viewedAt: new Date(),
+      },
+    });
+
+    return { message: '공지사항을 읽음으로 표시했습니다.' };
+  }
 }

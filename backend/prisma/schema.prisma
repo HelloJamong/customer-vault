@@ -50,6 +50,7 @@ model User {
   updatedSettings       SystemSettings[]
   createdSupportLogs    SupportLog[] @relation("SupportLogCreator")
   createdNotices        Notice[] @relation("NoticeCreator")
+  noticeViews           UserNoticeView[] @relation("UserNoticeViews")
 
   @@map("users")
 }
@@ -361,7 +362,22 @@ model Notice {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   creator     User      @relation("NoticeCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  views       UserNoticeView[]
 
   @@map("notices")
+}
+
+// 사용자 공지 조회 기록
+model UserNoticeView {
+  userId         Int       @map("user_id")
+  noticeId       Int       @map("notice_id")
+  dontShowAgain  Boolean   @default(false) @map("dont_show_again")
+  viewedAt       DateTime  @default(now()) @map("viewed_at")
+
+  user           User      @relation("UserNoticeViews", fields: [userId], references: [id], onDelete: Cascade)
+  notice         Notice    @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noticeId])
+  @@map("user_notice_views")
 }
 

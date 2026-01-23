@@ -6,6 +6,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
 import NotificationBell from '@/components/layout/NotificationBell';
+import { NoticePopup } from '@/components/NoticePopup';
+import { noticesApi, type Notice } from '@/api/notices.api';
 import headerLogo from '@/assets/images/logo.svg';
 
 const MainLayout = () => {
@@ -21,12 +23,53 @@ const MainLayout = () => {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
 
+  // 공지사항 팝업 관련 상태
+  const [unreadNotices, setUnreadNotices] = useState<Notice[]>([]);
+  const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
+  const [noticePopupOpen, setNoticePopupOpen] = useState(false);
+
+  // 최초 로그인 시 비밀번호 변경 강제
   useEffect(() => {
     if (user?.isFirstLogin) {
       setIsForcedPasswordChange(true);
       setPasswordDialogOpen(true);
     }
   }, [user?.isFirstLogin]);
+
+  // 읽지 않은 공지사항 조회 (슈퍼 관리자 제외)
+  useEffect(() => {
+    const fetchUnreadNotices = async () => {
+      if (!user) return;
+
+      const userRole = user.role?.toLowerCase();
+      // 슈퍼 관리자는 공지사항 팝업을 보지 않음
+      if (userRole === 'super_admin') return;
+
+      try {
+        const notices = await noticesApi.getUnreadNotices();
+        if (notices.length > 0) {
+          // 가장 최신 공지사항 1개만 표시
+          setUnreadNotices([notices[0]]);
+          setCurrentNoticeIndex(0);
+          // 비밀번호 변경 다이얼로그가 열려있지 않을 때만 공지사항 팝업 표시
+          if (!passwordDialogOpen) {
+            setNoticePopupOpen(true);
+          }
+        }
+      } catch (error) {
+        console.error('읽지 않은 공지사항 조회 실패:', error);
+      }
+    };
+
+    fetchUnreadNotices();
+  }, [user, passwordDialogOpen]);
+
+  // 비밀번호 변경 후 공지사항 팝업이 있으면 표시
+  useEffect(() => {
+    if (!passwordDialogOpen && unreadNotices.length > 0 && !noticePopupOpen) {
+      setNoticePopupOpen(true);
+    }
+  }, [passwordDialogOpen, unreadNotices.length]);
 
   const handleLogout = () => {
     setUserAnchor(null);
@@ -50,6 +93,26 @@ const MainLayout = () => {
     alert('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
     setPasswordDialogOpen(false);
     logout({ redirectState: { passwordChanged: true } });
+  };
+
+  const handleNoticePopupClose = async (dontShowAgain: boolean) => {
+    const currentNotice = unreadNotices[currentNoticeIndex];
+    if (!currentNotice) return;
+
+    try {
+      // "다시 보지 않기"를 체크한 경우에만 읽음으로 표시
+      if (dontShowAgain) {
+        await noticesApi.markAsRead(currentNotice.id, dontShowAgain);
+      }
+
+      // 팝업 닫기
+      setNoticePopupOpen(false);
+      setUnreadNotices([]);
+      setCurrentNoticeIndex(0);
+    } catch (error) {
+      console.error('공지사항 읽음 처리 실패:', error);
+      setNoticePopupOpen(false);
+    }
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -485,6 +548,15 @@ const MainLayout = () => {
         onClose={handlePasswordDialogClose}
         onSuccess={handlePasswordChangeSuccess}
       />
+
+      {/* 공지사항 팝업 */}
+      {unreadNotices.length > 0 && (
+        <NoticePopup
+          notice={unreadNotices[currentNoticeIndex]}
+          open={noticePopupOpen}
+          onClose={handleNoticePopupClose}
+        />
+      )}
     </Box>
   );
 };

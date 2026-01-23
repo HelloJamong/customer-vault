@@ -48,4 +48,15 @@ export const noticesApi = {
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/notices/${id}`);
   },
+
+  // 읽지 않은 공지사항 조회
+  getUnreadNotices: async (): Promise<Notice[]> => {
+    const { data } = await apiClient.get('/notices/unread/list');
+    return data;
+  },
+
+  // 공지사항 읽음으로 표시
+  markAsRead: async (id: number, dontShowAgain: boolean): Promise<void> => {
+    await apiClient.post(`/notices/${id}/mark-read`, { dontShowAgain });
+  },
 };
