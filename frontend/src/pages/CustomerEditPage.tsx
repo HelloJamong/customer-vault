@@ -212,8 +212,13 @@ const CustomerEditPage = () => {
 
     setIsSaving(true);
     try {
-      const normalizeId = (value: any) =>
-        value === '' || value === undefined || value === null ? undefined : value;
+      // 빈 문자열, undefined, null을 null로 변환
+      const normalizeId = (value: any) => {
+        if (value === '' || value === undefined || value === null) {
+          return null;
+        }
+        return value;
+      };
 
       // 빈 문자열을 null로 변환 (날짜 필드)
       const cleanedData: UpdateCustomerDto = {
@@ -797,6 +802,7 @@ const CustomerEditPage = () => {
                 onChange={(e) => handleChange('contractType', e.target.value)}
               >
                 <MenuItem value="미계약">미계약</MenuItem>
+                <MenuItem value="POC">POC</MenuItem>
                 <MenuItem value="유상">유상</MenuItem>
                 <MenuItem value="무상">무상</MenuItem>
                 <MenuItem value="만료">만료</MenuItem>
@@ -860,7 +866,7 @@ const CustomerEditPage = () => {
           점검 정보
         </Typography>
         <Divider sx={{ mb: 3 }} />
-        {['미계약', '만료'].includes(formData.contractType || '') ? (
+        {['미계약', 'POC', '만료'].includes(formData.contractType || '') ? (
           <Typography variant="body2" color="text.secondary" textAlign="center" py={3}>
             계약 상태가 '{formData.contractType}'인 경우 점검 정보를 설정할 수 없습니다.
           </Typography>

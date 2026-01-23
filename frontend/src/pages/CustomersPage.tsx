@@ -139,6 +139,10 @@ const CustomersPage = () => {
   };
 
   const getInspectionCycleText = (customer: Customer) => {
+    // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
+    if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+      return '-';
+    }
     if (customer.inspectionCycleType === '매월') return '매월';
     if (customer.inspectionCycleType === '분기') return `분기(${customer.inspectionCycleMonth}월)`;
     if (customer.inspectionCycleType === '반기') return `반기(${customer.inspectionCycleMonth}월)`;
@@ -304,6 +308,10 @@ const CustomersPage = () => {
 
     // === 3. 세부사항 시트 ===
     const getInspectionCycleText = () => {
+      // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
+      if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+        return '-';
+      }
       if (customer.inspectionCycleType === '매월') return '매월';
       if (customer.inspectionCycleType === '분기') return `분기 (${customer.inspectionCycleMonth}월)`;
       if (customer.inspectionCycleType === '반기') return `반기 (${customer.inspectionCycleMonth}월)`;
@@ -649,10 +657,11 @@ const CustomersPage = () => {
                 onChange={(e) => setStoreContractTypeFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
+                <MenuItem value="미계약">미계약</MenuItem>
+                <MenuItem value="POC">POC</MenuItem>
                 <MenuItem value="유상">유상</MenuItem>
                 <MenuItem value="무상">무상</MenuItem>
                 <MenuItem value="만료">만료</MenuItem>
-                <MenuItem value="미계약">미계약</MenuItem>
               </Select>
             </FormControl>
           </Box>

@@ -86,6 +86,10 @@ const CustomerDetailPage = () => {
   }
 
   const getInspectionCycleText = () => {
+    // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
+    if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+      return '-';
+    }
     if (customer.inspectionCycleType === '매월') return '매월';
     if (customer.inspectionCycleType === '분기') return `분기 (${customer.inspectionCycleMonth}월)`;
     if (customer.inspectionCycleType === '반기') return `반기 (${customer.inspectionCycleMonth}월)`;

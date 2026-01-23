@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsInt, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsDateString, IsBoolean, ValidateIf } from 'class-validator';
 
 export class CreateCustomerDto {
   @ApiProperty({ example: '고객사A', description: '고객사명' })
@@ -274,20 +274,23 @@ export class UpdateCustomerDto {
   lastInspectionDate?: string;
 
   // 사내 담당자
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, nullable: true })
+  @ValidateIf((o) => o.engineerId !== null)
   @IsInt()
   @IsOptional()
-  engineerId?: number;
+  engineerId?: number | null;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, nullable: true })
+  @ValidateIf((o) => o.engineerSubId !== null)
   @IsInt()
   @IsOptional()
-  engineerSubId?: number;
+  engineerSubId?: number | null;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, nullable: true })
+  @ValidateIf((o) => o.salesId !== null)
   @IsInt()
   @IsOptional()
-  salesId?: number;
+  salesId?: number | null;
 
   // 비고
   @ApiProperty({ required: false })

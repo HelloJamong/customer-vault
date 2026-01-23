@@ -277,6 +277,17 @@ export class CustomersService {
         : null;
     }
 
+    // 사내 담당자 필드 처리 (undefined를 null로 변환)
+    if (updateCustomerDto.engineerId === undefined || updateCustomerDto.engineerId === null) {
+      updateData.engineerId = null;
+    }
+    if (updateCustomerDto.engineerSubId === undefined || updateCustomerDto.engineerSubId === null) {
+      updateData.engineerSubId = null;
+    }
+    if (updateCustomerDto.salesId === undefined || updateCustomerDto.salesId === null) {
+      updateData.salesId = null;
+    }
+
     const customer = await this.prisma.customer.update({
       where: { id },
       data: updateData,
