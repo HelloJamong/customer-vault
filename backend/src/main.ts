@@ -10,7 +10,7 @@ import * as cors from 'cors';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
-    bodyParser: false,
+    bodyParser: true, // NestJS 기본 body parser 사용 (쿠키 처리 개선)
   });
 
   // Trust proxy to get real client IP from X-Forwarded-For header
@@ -28,10 +28,6 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
     exposedHeaders: ['Content-Disposition'],
   }));
-
-  // JSON body parser with relaxed settings for special characters
-  app.use(express.json({ limit: '10mb', strict: false }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // 커스텀 로거 설정
   const customLogger = new CustomLoggerService();
