@@ -47,7 +47,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // 오프라인 환경 호환성을 위해 false로 변경
       transform: true,
     }),
   );
