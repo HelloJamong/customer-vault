@@ -113,7 +113,7 @@ if [ -d "backend/prisma/migrations" ]; then
     cp backend/prisma/schema.prisma "${PACKAGE_DIR}/prisma/"
     
     # 마이그레이션 개수 확인
-    MIGRATION_COUNT=$(find backend/prisma/migrations -type d -mindepth 1 | wc -l)
+    MIGRATION_COUNT=$(find backend/prisma/migrations -mindepth 1 -type d | wc -l)
     log_success "Prisma 마이그레이션 ${MIGRATION_COUNT}개 복사 완료"
     
     # 마이그레이션 요약 생성
@@ -126,7 +126,7 @@ if [ -d "backend/prisma/migrations" ]; then
 MIGRATIONS_EOF
     
     # 각 마이그레이션 디렉토리 나열
-    find backend/prisma/migrations -type d -mindepth 1 -maxdepth 1 | sort | while read -r migration_dir; do
+    find backend/prisma/migrations -mindepth 1 -maxdepth 1 -type d | sort | while read -r migration_dir; do
         migration_name=$(basename "$migration_dir")
         echo "- $migration_name" >> "${PACKAGE_DIR}/MIGRATIONS.md"
         if [ -f "$migration_dir/migration.sql" ]; then
