@@ -52,6 +52,9 @@ export class SupportLogsService {
       _count: {
         id: true,
       },
+      _max: {
+        supportDate: true,
+      },
     });
 
     // 고객사 정보와 함께 반환
@@ -69,9 +72,17 @@ export class SupportLogsService {
           customerId: log.customerId,
           customerName: customer?.name || '알 수 없음',
           count: log._count.id,
+          latestSupportDate: log._max.supportDate,
         };
       }),
     );
+
+    // 최신 지원 날짜 기준으로 내림차순 정렬 (최신 이슈가 상단에 표시)
+    notifications.sort((a, b) => {
+      const dateA = a.latestSupportDate ? new Date(a.latestSupportDate).getTime() : 0;
+      const dateB = b.latestSupportDate ? new Date(b.latestSupportDate).getTime() : 0;
+      return dateB - dateA;
+    });
 
     return notifications;
   }

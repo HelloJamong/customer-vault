@@ -5,6 +5,7 @@ export interface PendingNotification {
   customerId: number;
   customerName: string;
   count: number;
+  latestSupportDate: Date | null;
 }
 
 export const supportLogsAPI = {
