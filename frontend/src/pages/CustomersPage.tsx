@@ -7,7 +7,7 @@ import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import CustomerSummaryDialog from '@/components/CustomerSummaryDialog';
 import { useCustomersPageStore } from '@/store/customersPageStore';
 
@@ -161,18 +161,20 @@ const CustomersPage = () => {
     const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const filename = `${customer.name}_전체정보_${dateStr}.xlsx`;
 
-    const wb = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
 
     // === 1. 형상관리 시트 ===
     try {
       const sourceResponse = await apiClient.get(`/customers/${customer.id}/source-management`);
       const sourceData = sourceResponse.data;
 
+      const sourceWorksheet = workbook.addWorksheet('형상관리');
+      sourceWorksheet.columns = [{ width: 25 }, { width: 50 }];
+
       // 소스 관리 정보가 등록되지 않은 경우 (id가 null)
       if (!sourceData.id) {
         const emptySourceData = [['형상 관리 정보'], ['고객사명', customer.name], [''], ['등록된 형상 관리 정보가 없습니다.']];
-        const emptySourceWs = XLSX.utils.aoa_to_sheet(emptySourceData);
-        XLSX.utils.book_append_sheet(wb, emptySourceWs, '형상관리');
+        emptySourceData.forEach(row => sourceWorksheet.addRow(row));
       } else {
         const sourceSheetData: any[][] = [
           ['형상 관리 정보', ''],
@@ -238,33 +240,65 @@ const CustomersPage = () => {
         sourceSheetData.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
         sourceSheetData.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
 
-        const sourceWs = XLSX.utils.aoa_to_sheet(sourceSheetData);
-        sourceWs['!cols'] = [{ wch: 25 }, { wch: 50 }];
-        XLSX.utils.book_append_sheet(wb, sourceWs, '형상관리');
+        sourceSheetData.forEach(row => sourceWorksheet.addRow(row));
       }
+
+      // 중단 정렬 적용
+      sourceWorksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+        });
+      });
     } catch (error) {
       // API 호출 실패 시 에러 시트 추가
+      const sourceWorksheet = workbook.addWorksheet('형상관리');
+      sourceWorksheet.columns = [{ width: 25 }, { width: 50 }];
       const errorSourceData = [['형상 관리 정보'], [''], ['형상 관리 정보를 불러오는데 실패했습니다.']];
-      const errorSourceWs = XLSX.utils.aoa_to_sheet(errorSourceData);
-      XLSX.utils.book_append_sheet(wb, errorSourceWs, '형상관리');
+      errorSourceData.forEach(row => sourceWorksheet.addRow(row));
+
+      sourceWorksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+        });
+      });
     }
 
     // === 2. 지원목록 시트 ===
     try {
-      const supportResponse = await apiClient.get(`/customers/${customer.id}/support-logs`);
+      const supportResponse = await apiClient.get(`/support-logs/customer/${customer.id}`);
       const supportLogs = supportResponse.data;
 
+      const supportWorksheet = workbook.addWorksheet('지원목록');
+      supportWorksheet.columns = [
+        { width: 12 },  // 지원일자
+        { width: 12 },  // 문의자
+        { width: 15 },  // 대상
+        { width: 12 },  // 구분
+        { width: 15 },  // 사용자 정보
+        { width: 12 },  // 진척 상태
+        { width: 30 },  // 문의 내용
+        { width: 30 },  // 진척 사항
+        { width: 30 },  // 조치 결과
+        { width: 20 },  // 비고
+        { width: 12 },  // 작성자
+        { width: 12 },  // 등록일
+      ];
+
       const supportSheetData: any[][] = [
-        ['지원 목록', '', '', '', '', '', '', ''],
-        ['고객사명', customer.name, '', '', '', '', '', ''],
-        ['', '', '', '', '', '', '', ''],
+        ['지원 목록', '', '', '', '', '', '', '', '', '', '', ''],
+        ['고객사명', customer.name, '', '', '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', '', '', '', ''],
         [
           '지원일자',
           '문의자',
           '대상',
           '구분',
-          '내용',
-          '처리 내용',
+          '사용자 정보',
+          '진척 상태',
+          '문의 내용',
+          '진척 사항',
+          '조치 결과',
+          '비고',
           '작성자',
           '등록일',
         ],
@@ -277,33 +311,40 @@ const CustomersPage = () => {
             log.inquirer || '-',
             log.target || '-',
             log.category || '-',
-            log.content || '-',
-            log.resolution || '-',
+            log.userInfo || '-',
+            log.actionStatus || '-',
+            log.inquiryContent || '-',
+            log.actionContent || '-',
+            log.actionResult || '-',
+            log.remarks || '-',
             log.creator?.name || '-',
             log.createdAt ? new Date(log.createdAt).toLocaleDateString('ko-KR') : '-',
           ]);
         });
       } else {
-        supportSheetData.push(['등록된 지원 내역이 없습니다.', '', '', '', '', '', '', '']);
+        supportSheetData.push(['등록된 지원 내역이 없습니다.', '', '', '', '', '', '', '', '', '', '', '']);
       }
 
-      const supportWs = XLSX.utils.aoa_to_sheet(supportSheetData);
-      supportWs['!cols'] = [
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 30 },
-        { wch: 30 },
-        { wch: 12 },
-        { wch: 12 },
-      ];
-      XLSX.utils.book_append_sheet(wb, supportWs, '지원목록');
+      supportSheetData.forEach(row => supportWorksheet.addRow(row));
+
+      // 중단 정렬 적용
+      supportWorksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+        });
+      });
     } catch (error) {
       // 지원목록 데이터가 없는 경우 빈 시트 추가
+      const supportWorksheet = workbook.addWorksheet('지원목록');
+      supportWorksheet.columns = [{ width: 25 }, { width: 50 }];
       const emptySupportData = [['지원 목록'], [''], ['등록된 지원 내역이 없습니다.']];
-      const emptySupportWs = XLSX.utils.aoa_to_sheet(emptySupportData);
-      XLSX.utils.book_append_sheet(wb, emptySupportWs, '지원목록');
+      emptySupportData.forEach(row => supportWorksheet.addRow(row));
+
+      supportWorksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+        });
+      });
     }
 
     // === 3. 세부사항 시트 ===
@@ -318,6 +359,9 @@ const CustomersPage = () => {
       if (customer.inspectionCycleType === '연1회') return `연1회 (${customer.inspectionCycleMonth}월)`;
       return customer.inspectionCycleType || '-';
     };
+
+    const detailWorksheet = workbook.addWorksheet('세부사항');
+    detailWorksheet.columns = [{ width: 25 }, { width: 50 }];
 
     const detailSheetData: (string | number)[][] = [
       ['고객사 세부사항'],
@@ -410,12 +454,24 @@ const CustomersPage = () => {
       detailSheetData.push(['[비고]'], [customer.notes]);
     }
 
-    const detailWs = XLSX.utils.aoa_to_sheet(detailSheetData);
-    detailWs['!cols'] = [{ wch: 25 }, { wch: 50 }];
-    XLSX.utils.book_append_sheet(wb, detailWs, '세부사항');
+    detailSheetData.forEach(row => detailWorksheet.addRow(row));
+
+    // 중단 정렬 적용
+    detailWorksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+    });
 
     // 파일 다운로드
-    XLSX.writeFile(wb, filename);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
 
     // 로그 기록
     try {

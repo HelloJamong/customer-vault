@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Close, Download } from '@mui/icons-material';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface CustomerSummary {
   id: number;
@@ -58,10 +58,26 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
     return `${start} ~ ${end}`;
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const today = new Date();
     const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const filename = `전체고객사요약_${dateStr}.xlsx`;
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('전체 고객사 요약');
+
+    worksheet.columns = [
+      { width: 25 },
+      { width: 10 },
+      { width: 15 },
+      { width: 12 },
+      { width: 25 },
+      { width: 14 },
+      { width: 20 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+    ];
 
     const sheetData: any[][] = [
       [
@@ -93,22 +109,25 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
       ]);
     });
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = [
-      { wch: 25 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 25 },
-      { wch: 14 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 12 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws, '전체 고객사 요약');
-    XLSX.writeFile(wb, filename);
+    // 데이터 추가
+    sheetData.forEach(row => worksheet.addRow(row));
+
+    // 중단 정렬 적용
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+    });
+
+    // 다운로드
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const columns: GridColDef<CustomerSummary>[] = [

@@ -19,7 +19,7 @@ import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import type { Customer } from '@/types/customer.types';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { logsApi } from '@/api/logs.api';
 
 const CustomerDetailPage = () => {
@@ -103,6 +103,10 @@ const CustomerDetailPage = () => {
     const today = new Date();
     const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const filename = `${customer.name}_세부사항_${dateStr}.xlsx`;
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('세부사항');
+    worksheet.columns = [{ width: 25 }, { width: 50 }];
 
     const data: (string | number)[][] = [];
 
@@ -202,13 +206,25 @@ const CustomerDetailPage = () => {
       data.push([customer.notes]);
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 25 }, { wch: 50 }];
+    // 데이터 추가
+    data.forEach(row => worksheet.addRow(row));
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '세부사항');
+    // 중단 정렬 적용
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+    });
 
-    XLSX.writeFile(wb, filename);
+    // 다운로드
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
 
     // 로그 기록
     try {

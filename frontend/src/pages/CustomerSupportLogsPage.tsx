@@ -31,7 +31,7 @@ import { customersAPI } from '@/api/customers.api';
 import { logsApi } from '@/api/logs.api';
 import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/types/support-log.types';
 import type { Customer } from '@/types/customer.types';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 dayjs.locale('ko');
 
@@ -193,39 +193,56 @@ const CustomerSupportLogsPage = () => {
     const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const filename = `${customer.name}_지원목록_${dateStr}.xlsx`;
 
-    const data: (string | number)[][] = [];
+    // ExcelJS 워크북 생성
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('지원목록');
+
+    // 컬럼 너비 설정
+    worksheet.columns = [
+      { width: 12 },  // 지원날짜
+      { width: 12 },  // 문의자
+      { width: 12 },  // 대상
+      { width: 10 },  // 구분
+      { width: 15 },  // 사용자 정보
+      { width: 12 },  // 조치 여부
+      { width: 12 },  // 지원 엔지니어
+      { width: 40 },  // 문의 내용
+      { width: 40 },  // 진척 사항
+      { width: 40 },  // 조치 결과
+      { width: 30 },  // 비고
+    ];
 
     // 헤더
-    data.push(['지원 목록']);
-    data.push([]);
-    data.push(['고객사', customer.name || '']);
-    data.push(['진행 중인 문의 사항', `${statistics.inProgress}개`]);
-    data.push([]);
+    worksheet.addRow(['지원 목록']);
+    worksheet.addRow([]);
+    worksheet.addRow(['고객사', customer.name || '']);
+    worksheet.addRow(['진행 중인 문의 사항', `${statistics.inProgress}개`]);
+    worksheet.addRow([]);
 
     // 통계 표
-    data.push(['대상', '이슈', '문의', '합계']);
-    data.push([
+    worksheet.addRow(['대상', '이슈', '문의', '합계']);
+    worksheet.addRow([
       '클라이언트',
       `${statistics.client.issue}개`,
       `${statistics.client.inquiry}개`,
       `${statistics.client.issue + statistics.client.inquiry}개`,
     ]);
-    data.push([
+    worksheet.addRow([
       '서버',
       `${statistics.server.issue}개`,
       `${statistics.server.inquiry}개`,
       `${statistics.server.issue + statistics.server.inquiry}개`,
     ]);
-    data.push([
+    worksheet.addRow([
       '기타',
       `${statistics.etc.issue}개`,
       `${statistics.etc.inquiry}개`,
       `${statistics.etc.issue + statistics.etc.inquiry}개`,
     ]);
-    data.push([]);
+    worksheet.addRow([]);
 
     // 지원 로그 테이블 헤더
-    data.push([
+    worksheet.addRow([
       '지원날짜',
       '문의자',
       '대상',
@@ -239,9 +256,9 @@ const CustomerSupportLogsPage = () => {
       '비고',
     ]);
 
-    // 데이터 행 (filteredLogs 사용)
+    // 데이터 행
     filteredLogs.forEach(log => {
-      data.push([
+      worksheet.addRow([
         dayjs(log.supportDate).format('YYYY-MM-DD'),
         log.inquirer || '',
         log.target || '',
@@ -256,36 +273,22 @@ const CustomerSupportLogsPage = () => {
       ]);
     });
 
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [
-      { wch: 12 }, // 지원날짜
-      { wch: 12 }, // 문의자
-      { wch: 12 }, // 대상
-      { wch: 10 }, // 구분
-      { wch: 15 }, // 사용자 정보
-      { wch: 12 }, // 조치 여부
-      { wch: 12 }, // 지원 엔지니어
-      { wch: 40 }, // 문의 내용
-      { wch: 40 }, // 진척 사항
-      { wch: 40 }, // 조치 결과
-      { wch: 30 }, // 비고
-    ];
+    // 모든 셀에 중단 정렬 및 자동 줄바꿈 적용
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+    });
 
-    // 모든 셀에 중단 정렬 스타일 적용
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-        if (!ws[cellAddress]) continue;
-        if (!ws[cellAddress].s) ws[cellAddress].s = {};
-        ws[cellAddress].s.alignment = { vertical: 'center', wrapText: true };
-      }
-    }
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '지원목록');
-
-    XLSX.writeFile(wb, filename);
+    // 파일 다운로드
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
 
     // 로그 기록
     try {

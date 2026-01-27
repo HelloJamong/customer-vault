@@ -18,7 +18,7 @@ import { ArrowBack, Edit, Download } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ServerInfo {
   id?: number;
@@ -118,6 +118,10 @@ const CustomerSourceManagementDetailPage = () => {
     const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const filename = `${customerName}_운영정보_${dateStr}.xlsx`;
 
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('형상 관리');
+    worksheet.columns = [{ width: 25 }, { width: 50 }];
+
     // 엑셀 데이터 준비
     const data: any[][] = [
       ['형상 관리 정보', ''],
@@ -183,21 +187,25 @@ const CustomerSourceManagementDetailPage = () => {
     data.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
     data.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
 
-    // 워크시트 생성
-    const ws = XLSX.utils.aoa_to_sheet(data);
+    // 데이터 추가
+    data.forEach(row => worksheet.addRow(row));
 
-    // 열 너비 설정
-    ws['!cols'] = [
-      { wch: 25 }, // 첫 번째 열
-      { wch: 50 }, // 두 번째 열
-    ];
+    // 중단 정렬 적용
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+    });
 
-    // 워크북 생성
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '형상 관리');
-
-    // 파일 다운로드
-    XLSX.writeFile(wb, filename);
+    // 다운로드
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
 
     // 로그 기록
     try {
