@@ -39,5 +39,9 @@ export class CreateSupportLogDto {
 
   @IsOptional()
   @IsString()
+  actionResult?: string;
+
+  @IsOptional()
+  @IsString()
   remarks?: string;
 }

@@ -58,6 +58,7 @@ const CustomerSupportLogsPage = () => {
     actionStatus: '',
     inquiryContent: '',
     actionContent: '',
+    actionResult: '',
     remarks: '',
   });
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
@@ -233,7 +234,8 @@ const CustomerSupportLogsPage = () => {
       '조치 여부',
       '지원 엔지니어',
       '문의 내용',
-      '조치 내용',
+      '진척 사항',
+      '조치 결과',
       '비고',
     ]);
 
@@ -249,6 +251,7 @@ const CustomerSupportLogsPage = () => {
         log.creator?.name || '',
         log.inquiryContent || '',
         log.actionContent || '',
+        log.actionResult || '',
         log.remarks || '',
       ]);
     });
@@ -263,7 +266,8 @@ const CustomerSupportLogsPage = () => {
       { wch: 12 }, // 조치 여부
       { wch: 12 }, // 지원 엔지니어
       { wch: 40 }, // 문의 내용
-      { wch: 40 }, // 조치 내용
+      { wch: 40 }, // 진척 사항
+      { wch: 40 }, // 조치 결과
       { wch: 30 }, // 비고
     ];
 
@@ -315,6 +319,7 @@ const CustomerSupportLogsPage = () => {
       actionStatus: log.actionStatus || '',
       inquiryContent: log.inquiryContent || '',
       actionContent: log.actionContent || '',
+      actionResult: log.actionResult || '',
       remarks: log.remarks || '',
     });
     setSelectedDate(dayjs(log.supportDate));
@@ -339,6 +344,7 @@ const CustomerSupportLogsPage = () => {
         actionStatus: formData.actionStatus,
         inquiryContent: formData.inquiryContent,
         actionContent: formData.actionContent,
+        actionResult: formData.actionResult,
         remarks: formData.remarks,
       };
 
@@ -369,6 +375,7 @@ const CustomerSupportLogsPage = () => {
         actionStatus: formData.actionStatus,
         inquiryContent: formData.inquiryContent,
         actionContent: formData.actionContent,
+        actionResult: formData.actionResult,
         remarks: formData.remarks,
       };
 
@@ -771,11 +778,21 @@ const CustomerSupportLogsPage = () => {
               </Box>
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
-                  조치 내용
+                  진척 사항
                 </Typography>
                 <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
                   <Typography variant="body2" whiteSpace="pre-wrap">
                     {selectedLog.actionContent || '-'}
+                  </Typography>
+                </Paper>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  조치 결과
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                  <Typography variant="body2" whiteSpace="pre-wrap">
+                    {selectedLog.actionResult || '-'}
                   </Typography>
                 </Paper>
               </Box>
@@ -878,9 +895,17 @@ const CustomerSupportLogsPage = () => {
               fullWidth
               multiline
               rows={4}
-              label="조치 내용"
+              label="진척 사항"
               value={formData.actionContent}
               onChange={(e) => setFormData({ ...formData, actionContent: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="조치 결과"
+              value={formData.actionResult}
+              onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
             />
             <TextField
               fullWidth
@@ -981,9 +1006,17 @@ const CustomerSupportLogsPage = () => {
               fullWidth
               multiline
               rows={4}
-              label="조치 내용"
+              label="진척 사항"
               value={formData.actionContent}
               onChange={(e) => setFormData({ ...formData, actionContent: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="조치 결과"
+              value={formData.actionResult}
+              onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
             />
             <TextField
               fullWidth

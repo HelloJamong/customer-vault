@@ -9,6 +9,7 @@ export interface SupportLog {
   actionStatus?: string;
   inquiryContent?: string;
   actionContent?: string;
+  actionResult?: string;
   remarks?: string;
   createdBy?: number;
   createdAt: string;
@@ -34,6 +35,7 @@ export interface CreateSupportLogDto {
   actionStatus?: string;
   inquiryContent?: string;
   actionContent?: string;
+  actionResult?: string;
   remarks?: string;
 }
 
@@ -47,5 +49,6 @@ export interface UpdateSupportLogDto {
   actionStatus?: string;
   inquiryContent?: string;
   actionContent?: string;
+  actionResult?: string;
   remarks?: string;
 }

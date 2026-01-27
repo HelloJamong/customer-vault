@@ -340,7 +340,8 @@ model SupportLog {
   userInfo        String?   @map("user_info") @db.VarChar(200)  // 사용자 정보
   actionStatus    String?   @map("action_status") @db.VarChar(50) // 조치 여부
   inquiryContent  String?   @map("inquiry_content") @db.Text    // 문의 내용
-  actionContent   String?   @map("action_content") @db.Text     // 조치 내용
+  actionContent   String?   @map("action_content") @db.Text     // 진척 사항
+  actionResult    String?   @map("action_result") @db.Text      // 조치 결과
   remarks         String?   @db.Text               // 비고
   createdBy       Int?      @map("created_by")     // 작성자 (지원 엔지니어)
   createdAt       DateTime  @default(now()) @map("created_at")
