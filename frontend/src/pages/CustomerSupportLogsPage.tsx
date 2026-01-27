@@ -271,6 +271,17 @@ const CustomerSupportLogsPage = () => {
       { wch: 30 }, // 비고
     ];
 
+    // 모든 셀에 중단 정렬 스타일 적용
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) continue;
+        if (!ws[cellAddress].s) ws[cellAddress].s = {};
+        ws[cellAddress].s.alignment = { vertical: 'center', wrapText: true };
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '지원목록');
 
@@ -888,6 +899,7 @@ const CustomerSupportLogsPage = () => {
               multiline
               rows={4}
               label="문의 내용"
+              placeholder="ex) 가상PC 구동 시 종료되는 증상 발생"
               value={formData.inquiryContent}
               onChange={(e) => setFormData({ ...formData, inquiryContent: e.target.value })}
             />
@@ -896,6 +908,11 @@ const CustomerSupportLogsPage = () => {
               multiline
               rows={4}
               label="진척 사항"
+              placeholder="ex) [26-00-00]
+- VT-x 활성화 확인을 위해 관련 툴 전달드림
+
+[26-00-00]
+- 확인결과 가상화 상태가 비활성화라 활성화 방법 메일로 안내드림"
               value={formData.actionContent}
               onChange={(e) => setFormData({ ...formData, actionContent: e.target.value })}
             />
@@ -904,6 +921,7 @@ const CustomerSupportLogsPage = () => {
               multiline
               rows={4}
               label="조치 결과"
+              placeholder="ex) VT-x 활성화 후 정상 구동 확인됨"
               value={formData.actionResult}
               onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
             />
@@ -999,6 +1017,7 @@ const CustomerSupportLogsPage = () => {
               multiline
               rows={4}
               label="문의 내용"
+              placeholder="ex) 가상PC 구동 시 종료되는 증상 발생"
               value={formData.inquiryContent}
               onChange={(e) => setFormData({ ...formData, inquiryContent: e.target.value })}
             />
@@ -1007,6 +1026,11 @@ const CustomerSupportLogsPage = () => {
               multiline
               rows={4}
               label="진척 사항"
+              placeholder="ex) [26-00-00]
+- VT-x 활성화 확인을 위해 관련 툴 전달드림
+
+[26-00-00]
+- 확인결과 가상화 상태가 비활성화라 활성화 방법 메일로 안내드림"
               value={formData.actionContent}
               onChange={(e) => setFormData({ ...formData, actionContent: e.target.value })}
             />
@@ -1015,6 +1039,7 @@ const CustomerSupportLogsPage = () => {
               multiline
               rows={4}
               label="조치 결과"
+              placeholder="ex) VT-x 활성화 후 정상 구동 확인됨"
               value={formData.actionResult}
               onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
             />
