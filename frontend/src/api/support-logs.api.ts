@@ -4,8 +4,10 @@ import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/typ
 export interface PendingNotification {
   customerId: number;
   customerName: string;
-  count: number;
-  latestSupportDate: Date | null;
+  inProgressCount: number;
+  impossibleCount: number;
+  onHoldCount: number;
+  latestInProgressDate: Date | null;
 }
 
 export const supportLogsAPI = {

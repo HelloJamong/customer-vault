@@ -14,10 +14,8 @@ export class SupportLogsService {
   async getPendingNotifications(userId: number, userRole: string) {
     const role = userRole.toLowerCase();
 
-    // 진행 중인 지원 로그 조회 조건
-    const whereCondition: any = {
-      actionStatus: '진행 중',
-    };
+    // 기본 조건 (권한에 따른 고객사 필터링)
+    let customerIds: number[] | undefined;
 
     // 일반 사용자(user)는 본인이 담당하는 고객사만 조회
     // super_admin, admin은 모든 고객사 조회
@@ -34,34 +32,75 @@ export class SupportLogsService {
         select: { id: true },
       });
 
-      const customerIds = assignedCustomers.map((c) => c.id);
+      customerIds = assignedCustomers.map((c) => c.id);
 
       // 담당 고객사가 없으면 빈 배열 반환
       if (customerIds.length === 0) {
         return [];
       }
-
-      // 담당 고객사만 필터링
-      whereCondition.customerId = { in: customerIds };
     }
 
-    // 진행 중인 지원 로그를 고객사별로 그룹화하여 카운트
-    const pendingLogs = await this.prisma.supportLog.groupBy({
-      by: ['customerId'],
-      where: whereCondition,
-      _count: {
-        id: true,
-      },
-      _max: {
-        supportDate: true,
-      },
-    });
+    // 3가지 상태별로 조회: 진행 중, 진행 불가, 보류
+    const statuses = ['진행 중', '진행 불가', '보류'];
+
+    // 각 상태별로 그룹화 결과를 담을 Map (customerId -> 상태별 카운트)
+    const customerDataMap = new Map<number, {
+      inProgressCount: number;
+      impossibleCount: number;
+      onHoldCount: number;
+      latestInProgressDate: Date | null;
+    }>();
+
+    // 각 상태별로 데이터 조회
+    for (const status of statuses) {
+      const whereCondition: any = {
+        actionStatus: status,
+      };
+
+      if (customerIds) {
+        whereCondition.customerId = { in: customerIds };
+      }
+
+      const logs = await this.prisma.supportLog.groupBy({
+        by: ['customerId'],
+        where: whereCondition,
+        _count: {
+          id: true,
+        },
+        _max: {
+          supportDate: true,
+        },
+      });
+
+      // Map에 데이터 누적
+      logs.forEach((log) => {
+        if (!customerDataMap.has(log.customerId)) {
+          customerDataMap.set(log.customerId, {
+            inProgressCount: 0,
+            impossibleCount: 0,
+            onHoldCount: 0,
+            latestInProgressDate: null,
+          });
+        }
+
+        const data = customerDataMap.get(log.customerId)!;
+
+        if (status === '진행 중') {
+          data.inProgressCount = log._count.id;
+          data.latestInProgressDate = log._max.supportDate;
+        } else if (status === '진행 불가') {
+          data.impossibleCount = log._count.id;
+        } else if (status === '보류') {
+          data.onHoldCount = log._count.id;
+        }
+      });
+    }
 
     // 고객사 정보와 함께 반환
     const notifications = await Promise.all(
-      pendingLogs.map(async (log) => {
+      Array.from(customerDataMap.entries()).map(async ([customerId, data]) => {
         const customer = await this.prisma.customer.findUnique({
-          where: { id: log.customerId },
+          where: { id: customerId },
           select: {
             id: true,
             name: true,
@@ -69,18 +108,20 @@ export class SupportLogsService {
         });
 
         return {
-          customerId: log.customerId,
+          customerId,
           customerName: customer?.name || '알 수 없음',
-          count: log._count.id,
-          latestSupportDate: log._max.supportDate,
+          inProgressCount: data.inProgressCount,
+          impossibleCount: data.impossibleCount,
+          onHoldCount: data.onHoldCount,
+          latestInProgressDate: data.latestInProgressDate,
         };
       }),
     );
 
-    // 최신 지원 날짜 기준으로 내림차순 정렬 (최신 이슈가 상단에 표시)
+    // '진행 중' 항목의 최신 지원 날짜 기준으로 내림차순 정렬 (최신 이슈가 상단에 표시)
     notifications.sort((a, b) => {
-      const dateA = a.latestSupportDate ? new Date(a.latestSupportDate).getTime() : 0;
-      const dateB = b.latestSupportDate ? new Date(b.latestSupportDate).getTime() : 0;
+      const dateA = a.latestInProgressDate ? new Date(a.latestInProgressDate).getTime() : 0;
+      const dateB = b.latestInProgressDate ? new Date(b.latestInProgressDate).getTime() : 0;
       return dateB - dateA;
     });
 

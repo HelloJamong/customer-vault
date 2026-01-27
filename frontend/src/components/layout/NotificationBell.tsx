@@ -27,8 +27,11 @@ const NotificationBell = () => {
     enabled: !!user, // 사용자 정보가 있을 때만 실행
   });
 
-  // 총 알림 개수
-  const totalCount = notifications.reduce((sum, n) => sum + n.count, 0);
+  // 총 알림 개수 (진행 중 + 진행 불가 + 보류)
+  const totalCount = notifications.reduce(
+    (sum, n) => sum + n.inProgressCount + n.impossibleCount + n.onHoldCount,
+    0
+  );
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -145,7 +148,7 @@ const NotificationBell = () => {
                       color: '#64748b',
                     }}
                   >
-                    지원 중인 항목이 {notification.count}건 존재합니다
+                    진행 중 {notification.inProgressCount} / 진행 불가 {notification.impossibleCount} / 보류 {notification.onHoldCount}
                   </Typography>
                 </Box>
               </MenuItem>
