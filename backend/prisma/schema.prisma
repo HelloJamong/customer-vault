@@ -305,9 +305,11 @@ model ServerInfo {
   modelName             String?  @map("model_name") @db.VarChar(100) // 모델명
   hostname              String?  @db.VarChar(100)      // 호스트네임
 
+  // 시리얼 번호
+  serialNumber          String?  @map("serial_number") @db.VarChar(100) // 시리얼 번호
+
   // OS 정보
-  osType                String?  @map("os_type") @db.VarChar(50)     // OS 종류 (예: CentOS, Ubuntu, Windows Server)
-  osVersion             String?  @map("os_version") @db.VarChar(50)  // OS 버전 (예: 7.9, 20.04)
+  osVersion             String?  @map("os_version") @db.VarChar(50)  // OS 버전 (예: RockyLinux 9.5, CentOS 7.9)
 
   // 하드웨어 정보
   cpuType               String?  @map("cpu_type") @db.VarChar(100)   // CPU 종류

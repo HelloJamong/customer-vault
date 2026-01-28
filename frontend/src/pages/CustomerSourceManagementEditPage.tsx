@@ -24,7 +24,7 @@ interface ServerInfo {
   manufacturer?: string;
   modelName?: string;
   hostname?: string;
-  osType?: string;
+  serialNumber?: string;
   osVersion?: string;
   cpuType?: string;
   memoryCapacity?: string;
@@ -159,7 +159,7 @@ const CustomerSourceManagementEditPage = () => {
       manufacturer: '',
       modelName: '',
       hostname: '',
-      osType: '',
+      serialNumber: '',
       osVersion: '',
       cpuType: '',
       memoryCapacity: '',
@@ -430,10 +430,10 @@ const CustomerSourceManagementEditPage = () => {
                     <TextField
                       fullWidth
                       size="small"
-                      label="OS 종류"
-                      value={server.osType || ''}
-                      onChange={(e) => handleServerChange(index, 'osType', e.target.value)}
-                      placeholder="예: Linux, Windows Server"
+                      label="SerialNumber"
+                      value={server.serialNumber || ''}
+                      onChange={(e) => handleServerChange(index, 'serialNumber', e.target.value)}
+                      placeholder="예: 1234567890"
                     />
                   </Grid>
                   <Grid xs={12} sm={4}>
@@ -443,7 +443,7 @@ const CustomerSourceManagementEditPage = () => {
                       label="OS 버전"
                       value={server.osVersion || ''}
                       onChange={(e) => handleServerChange(index, 'osVersion', e.target.value)}
-                      placeholder="예: Ubuntu 22.04, Windows Server 2019"
+                      placeholder="예: RockyLinux 9.5, CentOS 7.9"
                     />
                   </Grid>
                   <Grid xs={12} sm={4}>

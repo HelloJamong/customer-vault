@@ -27,10 +27,10 @@ export class ServerInfoDto {
   @IsString()
   hostname?: string;
 
-  @ApiProperty({ required: false, description: 'OS 종류' })
+  @ApiProperty({ required: false, description: '시리얼 번호' })
   @IsOptional()
   @IsString()
-  osType?: string;
+  serialNumber?: string;
 
   @ApiProperty({ required: false, description: 'OS 버전' })
   @IsOptional()

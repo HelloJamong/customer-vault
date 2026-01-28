@@ -26,7 +26,7 @@ interface ServerInfo {
   manufacturer?: string;
   modelName?: string;
   hostname?: string;
-  osType?: string;
+  serialNumber?: string;
   osVersion?: string;
   cpuType?: string;
   memoryCapacity?: string;
@@ -154,7 +154,7 @@ const CustomerSourceManagementDetailPage = () => {
         '제조사',
         '모델명',
         '호스트네임',
-        'OS 종류',
+        'SerialNumber',
         'OS 버전',
         'CPU 종류',
         '메모리 용량',
@@ -169,7 +169,7 @@ const CustomerSourceManagementDetailPage = () => {
           server.manufacturer || '-',
           server.modelName || '-',
           server.hostname || '-',
-          server.osType || '-',
+          server.serialNumber || '-',
           server.osVersion || '-',
           server.cpuType || '-',
           server.memoryCapacity || '-',
@@ -396,7 +396,7 @@ const CustomerSourceManagementDetailPage = () => {
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>제조사</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>모델명</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>호스트네임</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>OS 종류</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>SerialNumber</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>OS 버전</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>CPU 종류</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>메모리</TableCell>
@@ -413,7 +413,7 @@ const CustomerSourceManagementDetailPage = () => {
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.manufacturer || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.modelName || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.hostname || '-'}</TableCell>
-                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.osType || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.serialNumber || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.osVersion || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.cpuType || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.memoryCapacity || '-'}</TableCell>
