@@ -290,6 +290,7 @@ model SourceManagement {
 
   customer              Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   servers               ServerInfo[]
+  accessInfo            ServerAccessInfo[]
 
   @@map("source_management")
 }
@@ -329,6 +330,36 @@ model ServerInfo {
   sourceManagement      SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
 
   @@map("server_info")
+}
+
+// 서버 접근 정보 (민감 정보 - Excel 내보내기 제외)
+model ServerAccessInfo {
+  id                    Int      @id @default(autoincrement())
+  sourceManagementId    Int      @map("source_management_id")
+
+  // 접근 구분
+  accessType            String   @map("access_type") @db.VarChar(50) // 관리웹, 서버
+
+  // 관리웹 접근 정보
+  webUrl                String?  @map("web_url") @db.VarChar(200)      // 관리웹 주소
+  webAccount            String?  @map("web_account") @db.VarChar(100)  // 관리웹 계정
+  webPassword           String?  @map("web_password") @db.VarChar(100) // 관리웹 패스워드
+
+  // 서버 접근 정보
+  serverHostname        String?  @map("server_hostname") @db.VarChar(100) // HostName
+  serverIpAddress       String?  @map("server_ip_address") @db.VarChar(50) // IP 주소
+  serverSshPort         Int?     @map("server_ssh_port")                   // SSH 포트
+  serverRootAccessible  String?  @map("server_root_accessible") @db.VarChar(20) // root 접근 여부 (가능/불가능)
+  serverSshAccount      String?  @map("server_ssh_account") @db.VarChar(100)    // SSH 계정
+  serverSshPassword     String?  @map("server_ssh_password") @db.VarChar(100)   // SSH 패스워드
+  serverRootPassword    String?  @map("server_root_password") @db.VarChar(100)  // root 패스워드
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  sourceManagement      SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+
+  @@map("server_access_info")
 }
 
 // 고객사 지원 로그

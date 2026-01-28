@@ -501,6 +501,9 @@ export class CustomersService {
         servers: {
           orderBy: { id: 'asc' },
         },
+        accessInfo: {
+          orderBy: { id: 'asc' },
+        },
       },
     });
 
@@ -519,6 +522,7 @@ export class CustomersService {
         adminWebCustomInfo: null,
         redundancyType: null,
         servers: [],
+        accessInfo: [],
         hrIntegration: {
           enabled: false,
           dbType: null,
@@ -555,6 +559,20 @@ export class CustomersService {
         nicUtpCount: server.nicUtpCount,
         powerSupplyCount: server.powerSupplyCount,
       })),
+      accessInfo: (sourceManagement as any).accessInfo?.map((access: any) => ({
+        id: access.id,
+        accessType: access.accessType,
+        webUrl: access.webUrl,
+        webAccount: access.webAccount,
+        webPassword: access.webPassword,
+        serverHostname: access.serverHostname,
+        serverIpAddress: access.serverIpAddress,
+        serverSshPort: access.serverSshPort,
+        serverRootAccessible: access.serverRootAccessible,
+        serverSshAccount: access.serverSshAccount,
+        serverSshPassword: access.serverSshPassword,
+        serverRootPassword: access.serverRootPassword,
+      })) || [],
       hrIntegration: {
         enabled: sourceManagement.hrIntegrationEnabled,
         dbType: sourceManagement.hrDbType,
@@ -613,6 +631,21 @@ export class CustomersService {
             powerSupplyCount: server.powerSupplyCount || 0,
           })),
         } : undefined,
+        accessInfo: dto.accessInfo ? {
+          create: dto.accessInfo.map(access => ({
+            accessType: access.accessType,
+            webUrl: access.webUrl,
+            webAccount: access.webAccount,
+            webPassword: access.webPassword,
+            serverHostname: access.serverHostname,
+            serverIpAddress: access.serverIpAddress,
+            serverSshPort: access.serverSshPort,
+            serverRootAccessible: access.serverRootAccessible,
+            serverSshAccount: access.serverSshAccount,
+            serverSshPassword: access.serverSshPassword,
+            serverRootPassword: access.serverRootPassword,
+          })),
+        } : undefined,
       },
     });
 
@@ -643,17 +676,22 @@ export class CustomersService {
     // 기존 데이터 조회
     const existing = await this.prisma.sourceManagement.findUnique({
       where: { customerId },
-      include: { servers: true },
+      include: { servers: true, accessInfo: true },
     });
 
     if (!existing) {
       throw new NotFoundException('소스 관리 정보가 없습니다');
     }
 
-    // 트랜잭션으로 서버 정보 업데이트
+    // 트랜잭션으로 서버 정보 및 접근 정보 업데이트
     await this.prisma.$transaction(async (tx) => {
       // 기존 서버 정보 삭제
       await tx.serverInfo.deleteMany({
+        where: { sourceManagementId: existing.id },
+      });
+
+      // 기존 접근 정보 삭제
+      await (tx as any).serverAccessInfo.deleteMany({
         where: { sourceManagementId: existing.id },
       });
 
@@ -693,6 +731,26 @@ export class CustomersService {
             nicFiberCount: server.nicFiberCount || 0,
             nicUtpCount: server.nicUtpCount || 0,
             powerSupplyCount: server.powerSupplyCount || 0,
+          })),
+        });
+      }
+
+      // 새로운 접근 정보 생성
+      if (dto.accessInfo && dto.accessInfo.length > 0) {
+        await (tx as any).serverAccessInfo.createMany({
+          data: dto.accessInfo.map(access => ({
+            sourceManagementId: existing.id,
+            accessType: access.accessType,
+            webUrl: access.webUrl,
+            webAccount: access.webAccount,
+            webPassword: access.webPassword,
+            serverHostname: access.serverHostname,
+            serverIpAddress: access.serverIpAddress,
+            serverSshPort: access.serverSshPort,
+            serverRootAccessible: access.serverRootAccessible,
+            serverSshAccount: access.serverSshAccount,
+            serverSshPassword: access.serverSshPassword,
+            serverRootPassword: access.serverRootPassword,
           })),
         });
       }

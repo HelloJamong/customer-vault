@@ -34,6 +34,21 @@ interface ServerInfo {
   powerSupplyCount?: number;
 }
 
+interface ServerAccessInfo {
+  id?: number;
+  accessType: '관리웹' | '서버';
+  webUrl?: string;
+  webAccount?: string;
+  webPassword?: string;
+  serverHostname?: string;
+  serverIpAddress?: string;
+  serverSshPort?: number;
+  serverRootAccessible?: '가능' | '불가능';
+  serverSshAccount?: string;
+  serverSshPassword?: string;
+  serverRootPassword?: string;
+}
+
 interface HRIntegration {
   enabled: boolean;
   dbType: string;
@@ -53,6 +68,7 @@ interface SourceManagement {
   adminWebCustomInfo: string;
   redundancyType: '이중화 구성' | '단일 구성';
   servers?: ServerInfo[];
+  accessInfo?: ServerAccessInfo[];
   hrIntegration: HRIntegration;
 }
 
@@ -75,6 +91,7 @@ const CustomerSourceManagementEditPage = () => {
     adminWebCustomInfo: '',
     redundancyType: '단일 구성',
     servers: [],
+    accessInfo: [],
     hrIntegration: {
       enabled: false,
       dbType: '',
@@ -187,6 +204,41 @@ const CustomerSourceManagementEditPage = () => {
       [field]: value,
     };
     setFormData({ ...formData, servers: updatedServers });
+  };
+
+  const handleAddAccessInfo = () => {
+    const newAccessInfo: ServerAccessInfo = {
+      accessType: '관리웹',
+      webUrl: '',
+      webAccount: '',
+      webPassword: '',
+      serverHostname: '',
+      serverIpAddress: '',
+      serverSshPort: 22,
+      serverRootAccessible: '불가능',
+      serverSshAccount: '',
+      serverSshPassword: '',
+      serverRootPassword: '',
+    };
+    setFormData({
+      ...formData,
+      accessInfo: [...(formData.accessInfo || []), newAccessInfo],
+    });
+  };
+
+  const handleRemoveAccessInfo = (index: number) => {
+    const updatedAccessInfo = [...(formData.accessInfo || [])];
+    updatedAccessInfo.splice(index, 1);
+    setFormData({ ...formData, accessInfo: updatedAccessInfo });
+  };
+
+  const handleAccessInfoChange = (index: number, field: keyof ServerAccessInfo, value: any) => {
+    const updatedAccessInfo = [...(formData.accessInfo || [])];
+    updatedAccessInfo[index] = {
+      ...updatedAccessInfo[index],
+      [field]: value,
+    };
+    setFormData({ ...formData, accessInfo: updatedAccessInfo });
   };
 
   if (isLoading) {
@@ -335,6 +387,184 @@ const CustomerSourceManagementEditPage = () => {
             placeholder="커스텀 정보를 입력하세요"
           />
         </Box>
+      </Paper>
+
+      {/* 서버 접근 정보 */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6" fontWeight="bold">
+            서버 접근 정보
+          </Typography>
+          <Button variant="outlined" startIcon={<Add />} onClick={handleAddAccessInfo} size="small">
+            접근 정보 추가
+          </Button>
+        </Box>
+        <Divider sx={{ mb: 3 }} />
+
+        {formData.accessInfo && formData.accessInfo.length > 0 ? (
+          <Box>
+            {formData.accessInfo.map((access, index) => (
+              <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    접근 정보 #{index + 1}
+                  </Typography>
+                  <IconButton size="small" color="error" onClick={() => handleRemoveAccessInfo(index)}>
+                    <Delete />
+                  </IconButton>
+                </Box>
+
+                <Grid container spacing={2}>
+                  <Grid xs={12} sm={6}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>구분</InputLabel>
+                      <Select
+                        value={access.accessType}
+                        label="구분"
+                        onChange={(e) =>
+                          handleAccessInfoChange(index, 'accessType', e.target.value as '관리웹' | '서버')
+                        }
+                      >
+                        <MenuItem value="관리웹">관리웹</MenuItem>
+                        <MenuItem value="서버">서버</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {access.accessType === '관리웹' && (
+                    <>
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="관리웹 주소"
+                          value={access.webUrl || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'webUrl', e.target.value)}
+                          placeholder="예: https://admin.example.com"
+                        />
+                      </Grid>
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="계정"
+                          value={access.webAccount || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'webAccount', e.target.value)}
+                          placeholder="계정 입력"
+                        />
+                      </Grid>
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="패스워드"
+                          value={access.webPassword || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'webPassword', e.target.value)}
+                          placeholder="예: password123 또는 담당자를 통해 확인 필요"
+                        />
+                      </Grid>
+                    </>
+                  )}
+
+                  {access.accessType === '서버' && (
+                    <>
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="HostName"
+                          value={access.serverHostname || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'serverHostname', e.target.value)}
+                          placeholder="예: server01"
+                        />
+                      </Grid>
+                      <Grid xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="IP 주소"
+                          value={access.serverIpAddress || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'serverIpAddress', e.target.value)}
+                          placeholder="예: 192.168.1.100"
+                        />
+                      </Grid>
+                      <Grid xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          label="SSH 포트"
+                          value={access.serverSshPort || 22}
+                          onChange={(e) =>
+                            handleAccessInfoChange(index, 'serverSshPort', parseInt(e.target.value) || 22)
+                          }
+                          placeholder="22"
+                        />
+                      </Grid>
+                      <Grid xs={12} sm={4}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>root 접근 여부</InputLabel>
+                          <Select
+                            value={access.serverRootAccessible || '불가능'}
+                            label="root 접근 여부"
+                            onChange={(e) =>
+                              handleAccessInfoChange(
+                                index,
+                                'serverRootAccessible',
+                                e.target.value as '가능' | '불가능'
+                              )
+                            }
+                          >
+                            <MenuItem value="가능">가능</MenuItem>
+                            <MenuItem value="불가능">불가능</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="SSH 계정"
+                          value={access.serverSshAccount || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'serverSshAccount', e.target.value)}
+                          placeholder="예: admin"
+                        />
+                      </Grid>
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="SSH 패스워드"
+                          value={access.serverSshPassword || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'serverSshPassword', e.target.value)}
+                          placeholder="예: password123 또는 담당자를 통해 확인 필요"
+                        />
+                      </Grid>
+                      {access.serverRootAccessible === '가능' && (
+                        <Grid xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="root 패스워드"
+                            value={access.serverRootPassword || ''}
+                            onChange={(e) => handleAccessInfoChange(index, 'serverRootPassword', e.target.value)}
+                            placeholder="예: rootpass123 또는 담당자를 통해 확인 필요"
+                          />
+                        </Grid>
+                      )}
+                    </>
+                  )}
+                </Grid>
+              </Paper>
+            ))}
+          </Box>
+        ) : (
+          <Box textAlign="center" py={3}>
+            <Typography variant="body2" color="text.secondary">
+              등록된 접근 정보가 없습니다. 상단 버튼을 클릭하여 추가하세요.
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* 서버 구성 */}

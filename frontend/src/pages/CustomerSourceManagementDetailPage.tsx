@@ -36,6 +36,21 @@ interface ServerInfo {
   powerSupplyCount?: number;
 }
 
+interface ServerAccessInfo {
+  id?: number;
+  accessType: '관리웹' | '서버';
+  webUrl?: string;
+  webAccount?: string;
+  webPassword?: string;
+  serverHostname?: string;
+  serverIpAddress?: string;
+  serverSshPort?: number;
+  serverRootAccessible?: '가능' | '불가능';
+  serverSshAccount?: string;
+  serverSshPassword?: string;
+  serverRootPassword?: string;
+}
+
 interface HRIntegration {
   enabled: boolean;
   dbType: string;
@@ -55,6 +70,7 @@ interface SourceManagement {
   adminWebCustomInfo: string;
   redundancyType: '이중화 구성' | '단일 구성';
   servers?: ServerInfo[];
+  accessInfo?: ServerAccessInfo[];
   hrIntegration: HRIntegration;
 }
 
@@ -372,6 +388,110 @@ const CustomerSourceManagementDetailPage = () => {
                 </Typography>
               </Grid>
             </Grid>
+          </Paper>
+
+          {/* 서버 접근 정보 */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              서버 접근 정보
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            {sourceData.accessInfo && sourceData.accessInfo.length > 0 ? (
+              <Box>
+                {sourceData.accessInfo.map((access, index) => (
+                  <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                      접근 정보 #{index + 1}
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid xs={12} sm={3}>
+                        <Typography variant="body2" color="text.secondary">
+                          구분
+                        </Typography>
+                        <Typography variant="body1">{access.accessType}</Typography>
+                      </Grid>
+
+                      {access.accessType === '관리웹' && (
+                        <>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              관리웹 주소
+                            </Typography>
+                            <Typography variant="body1">{access.webUrl || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              계정
+                            </Typography>
+                            <Typography variant="body1">{access.webAccount || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              패스워드
+                            </Typography>
+                            <Typography variant="body1">{access.webPassword || '-'}</Typography>
+                          </Grid>
+                        </>
+                      )}
+
+                      {access.accessType === '서버' && (
+                        <>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              HostName
+                            </Typography>
+                            <Typography variant="body1">{access.serverHostname || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              IP 주소
+                            </Typography>
+                            <Typography variant="body1">{access.serverIpAddress || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              SSH 포트
+                            </Typography>
+                            <Typography variant="body1">{access.serverSshPort || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              root 접근 여부
+                            </Typography>
+                            <Typography variant="body1">{access.serverRootAccessible || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              SSH 계정
+                            </Typography>
+                            <Typography variant="body1">{access.serverSshAccount || '-'}</Typography>
+                          </Grid>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              SSH 패스워드
+                            </Typography>
+                            <Typography variant="body1">{access.serverSshPassword || '-'}</Typography>
+                          </Grid>
+                          {access.serverRootAccessible === '가능' && (
+                            <Grid xs={12} sm={3}>
+                              <Typography variant="body2" color="text.secondary">
+                                root 패스워드
+                              </Typography>
+                              <Typography variant="body1">{access.serverRootPassword || '-'}</Typography>
+                            </Grid>
+                          )}
+                        </>
+                      )}
+                    </Grid>
+                  </Paper>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                등록된 접근 정보가 없습니다.
+              </Typography>
+            )}
           </Paper>
 
           {/* 서버 구성 */}
