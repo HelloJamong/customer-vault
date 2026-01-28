@@ -80,6 +80,7 @@ const CustomerSourceManagementDetailPage = () => {
   const [customerName, setCustomerName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [sourceData, setSourceData] = useState<SourceManagement | null>(null);
+  const [revealedAccessInfo, setRevealedAccessInfo] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -399,93 +400,162 @@ const CustomerSourceManagementDetailPage = () => {
 
             {sourceData.accessInfo && sourceData.accessInfo.length > 0 ? (
               <Box>
-                {sourceData.accessInfo.map((access, index) => (
-                  <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
-                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                      접근 정보 #{index + 1}
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid xs={12} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          구분
+                {sourceData.accessInfo.map((access, index) => {
+                  const isRevealed = revealedAccessInfo.has(index);
+
+                  return (
+                    <Paper
+                      key={index}
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        mb: 2,
+                        position: 'relative',
+                        cursor: isRevealed ? 'default' : 'pointer',
+                        transition: 'all 0.3s ease',
+                        '&:hover': isRevealed
+                          ? {}
+                          : {
+                              borderColor: 'primary.main',
+                              boxShadow: 1,
+                            },
+                      }}
+                      onClick={() => {
+                        if (!isRevealed) {
+                          setRevealedAccessInfo(new Set(revealedAccessInfo).add(index));
+                        }
+                      }}
+                    >
+                      {!isRevealed && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            zIndex: 1,
+                            borderRadius: 1,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <Typography
+                            variant="h6"
+                            color="warning.main"
+                            fontWeight="bold"
+                            gutterBottom
+                            sx={{ textAlign: 'center' }}
+                          >
+                            ⚠️ 민감 정보 포함 ({access.accessType})
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', px: 2 }}>
+                            해당 항목은 민감 정보가 포함되어 있어 열람 시 주의가 필요합니다
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                            (클릭하여 보기)
+                          </Typography>
+                        </Box>
+                      )}
+
+                      <Box
+                        sx={{
+                          filter: isRevealed ? 'none' : 'blur(8px)',
+                          transition: 'filter 0.3s ease',
+                          userSelect: isRevealed ? 'text' : 'none',
+                        }}
+                      >
+                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                          접근 정보 #{index + 1}
                         </Typography>
-                        <Typography variant="body1">{access.accessType}</Typography>
-                      </Grid>
+                        <Grid container spacing={2}>
+                          <Grid xs={12} sm={3}>
+                            <Typography variant="body2" color="text.secondary">
+                              구분
+                            </Typography>
+                            <Typography variant="body1">{access.accessType}</Typography>
+                          </Grid>
 
-                      {access.accessType === '관리웹' && (
-                        <>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              관리웹 주소
-                            </Typography>
-                            <Typography variant="body1">{access.webUrl || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              계정
-                            </Typography>
-                            <Typography variant="body1">{access.webAccount || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              패스워드
-                            </Typography>
-                            <Typography variant="body1">{access.webPassword || '-'}</Typography>
-                          </Grid>
-                        </>
-                      )}
-
-                      {access.accessType === '서버' && (
-                        <>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              HostName
-                            </Typography>
-                            <Typography variant="body1">{access.serverHostname || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              IP 주소
-                            </Typography>
-                            <Typography variant="body1">{access.serverIpAddress || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              SSH 포트
-                            </Typography>
-                            <Typography variant="body1">{access.serverSshPort || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              root 접근 여부
-                            </Typography>
-                            <Typography variant="body1">{access.serverRootAccessible || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              SSH 계정
-                            </Typography>
-                            <Typography variant="body1">{access.serverSshAccount || '-'}</Typography>
-                          </Grid>
-                          <Grid xs={12} sm={3}>
-                            <Typography variant="body2" color="text.secondary">
-                              SSH 패스워드
-                            </Typography>
-                            <Typography variant="body1">{access.serverSshPassword || '-'}</Typography>
-                          </Grid>
-                          {access.serverRootAccessible === '가능' && (
-                            <Grid xs={12} sm={3}>
-                              <Typography variant="body2" color="text.secondary">
-                                root 패스워드
-                              </Typography>
-                              <Typography variant="body1">{access.serverRootPassword || '-'}</Typography>
-                            </Grid>
+                          {access.accessType === '관리웹' && (
+                            <>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  관리웹 주소
+                                </Typography>
+                                <Typography variant="body1">{access.webUrl || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  계정
+                                </Typography>
+                                <Typography variant="body1">{access.webAccount || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  패스워드
+                                </Typography>
+                                <Typography variant="body1">{access.webPassword || '-'}</Typography>
+                              </Grid>
+                            </>
                           )}
-                        </>
-                      )}
-                    </Grid>
-                  </Paper>
-                ))}
+
+                          {access.accessType === '서버' && (
+                            <>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  HostName
+                                </Typography>
+                                <Typography variant="body1">{access.serverHostname || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  IP 주소
+                                </Typography>
+                                <Typography variant="body1">{access.serverIpAddress || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  SSH 포트
+                                </Typography>
+                                <Typography variant="body1">{access.serverSshPort || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  root 접근 여부
+                                </Typography>
+                                <Typography variant="body1">{access.serverRootAccessible || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  SSH 계정
+                                </Typography>
+                                <Typography variant="body1">{access.serverSshAccount || '-'}</Typography>
+                              </Grid>
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  SSH 패스워드
+                                </Typography>
+                                <Typography variant="body1">{access.serverSshPassword || '-'}</Typography>
+                              </Grid>
+                              {access.serverRootAccessible === '가능' && (
+                                <Grid xs={12} sm={3}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    root 패스워드
+                                  </Typography>
+                                  <Typography variant="body1">{access.serverRootPassword || '-'}</Typography>
+                                </Grid>
+                              )}
+                            </>
+                          )}
+                        </Grid>
+                      </Box>
+                    </Paper>
+                  );
+                })}
               </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
