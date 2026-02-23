@@ -157,10 +157,9 @@ export class BackupService implements OnModuleInit {
       },
     });
 
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[:.]/g, '-')
-      .slice(0, 19);
+    // KST(UTC+9) 기준 타임스탬프
+    const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const timestamp = now.toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
 
     let localDbPath: string | null = null;
     let localDocsPath: string | null = null;
