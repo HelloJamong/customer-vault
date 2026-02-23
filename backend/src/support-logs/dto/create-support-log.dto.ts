@@ -43,5 +43,9 @@ export class CreateSupportLogDto {
 
   @IsOptional()
   @IsString()
+  jiraTicket?: string;
+
+  @IsOptional()
+  @IsString()
   remarks?: string;
 }

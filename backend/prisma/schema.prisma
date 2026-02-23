@@ -379,6 +379,7 @@ model SupportLog {
   inquiryContent  String?   @map("inquiry_content") @db.Text    // 문의 내용
   actionContent   String?   @map("action_content") @db.Text     // 진척 사항
   actionResult    String?   @map("action_result") @db.Text      // 조치 결과
+  jiraTicket      String?   @map("jira_ticket") @db.VarChar(100) // JIRA 티켓 번호
   remarks         String?   @db.Text               // 비고
   createdBy       Int?      @map("created_by")     // 작성자 (지원 엔지니어)
   createdAt       DateTime  @default(now()) @map("created_at")

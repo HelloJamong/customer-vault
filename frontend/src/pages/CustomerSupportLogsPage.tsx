@@ -29,6 +29,7 @@ import { ArrowBack, Add, ExpandMore, Search, Refresh, Download } from '@mui/icon
 import { supportLogsAPI } from '@/api/support-logs.api';
 import { customersAPI } from '@/api/customers.api';
 import { logsApi } from '@/api/logs.api';
+import { settingsApi } from '@/api/settings.api';
 import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/types/support-log.types';
 import type { Customer } from '@/types/customer.types';
 import ExcelJS from 'exceljs';
@@ -41,6 +42,8 @@ const CustomerSupportLogsPage = () => {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [supportLogs, setSupportLogs] = useState<SupportLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [jiraEnabled, setJiraEnabled] = useState(false);
+  const [jiraBaseUrl, setJiraBaseUrl] = useState('');
 
   // Dialog states
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -59,6 +62,7 @@ const CustomerSupportLogsPage = () => {
     inquiryContent: '',
     actionContent: '',
     actionResult: '',
+    jiraTicket: '',
     remarks: '',
   });
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
@@ -75,6 +79,13 @@ const CustomerSupportLogsPage = () => {
   useEffect(() => {
     if (!customerId) return;
     fetchData();
+    settingsApi.getSettings().then((s) => {
+      setJiraEnabled(s.jiraEnabled);
+      setJiraBaseUrl(s.jiraBaseUrl ?? '');
+    }).catch(() => {
+      // super_admin이 아닌 경우 403 → JIRA 기능 비활성화로 처리
+      setJiraEnabled(false);
+    });
   }, [customerId]);
 
   useEffect(() => {
@@ -316,6 +327,8 @@ const CustomerSupportLogsPage = () => {
       actionStatus: '',
       inquiryContent: '',
       actionContent: '',
+      actionResult: '',
+      jiraTicket: '',
       remarks: '',
     });
     setSelectedDate(null);
@@ -334,6 +347,7 @@ const CustomerSupportLogsPage = () => {
       inquiryContent: log.inquiryContent || '',
       actionContent: log.actionContent || '',
       actionResult: log.actionResult || '',
+      jiraTicket: log.jiraTicket || '',
       remarks: log.remarks || '',
     });
     setSelectedDate(dayjs(log.supportDate));
@@ -359,6 +373,7 @@ const CustomerSupportLogsPage = () => {
         inquiryContent: formData.inquiryContent,
         actionContent: formData.actionContent,
         actionResult: formData.actionResult,
+        jiraTicket: formData.jiraTicket,
         remarks: formData.remarks,
       };
 
@@ -390,6 +405,7 @@ const CustomerSupportLogsPage = () => {
         inquiryContent: formData.inquiryContent,
         actionContent: formData.actionContent,
         actionResult: formData.actionResult,
+        jiraTicket: formData.jiraTicket,
         remarks: formData.remarks,
       };
 
@@ -810,6 +826,27 @@ const CustomerSupportLogsPage = () => {
                   </Typography>
                 </Paper>
               </Box>
+              {jiraEnabled && jiraBaseUrl && (
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    JIRA 티켓
+                  </Typography>
+                  {selectedLog.jiraTicket ? (
+                    <Typography
+                      variant="body1"
+                      component="a"
+                      href={`${jiraBaseUrl}/browse/${selectedLog.jiraTicket}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ color: 'primary.main', textDecoration: 'underline', cursor: 'pointer' }}
+                    >
+                      {selectedLog.jiraTicket}
+                    </Typography>
+                  ) : (
+                    <Typography variant="body1">-</Typography>
+                  )}
+                </Box>
+              )}
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
                   비고
@@ -928,6 +965,16 @@ const CustomerSupportLogsPage = () => {
               value={formData.actionResult}
               onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
             />
+            {jiraEnabled && jiraBaseUrl && (
+              <TextField
+                fullWidth
+                label="JIRA 티켓"
+                placeholder="ex) MTC-1234"
+                value={formData.jiraTicket || ''}
+                onChange={(e) => setFormData({ ...formData, jiraTicket: e.target.value })}
+                helperText="JIRA 티켓 번호를 입력하세요 (예: MTC-1234)"
+              />
+            )}
             <TextField
               fullWidth
               multiline
@@ -1046,6 +1093,16 @@ const CustomerSupportLogsPage = () => {
               value={formData.actionResult}
               onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
             />
+            {jiraEnabled && jiraBaseUrl && (
+              <TextField
+                fullWidth
+                label="JIRA 티켓"
+                placeholder="ex) MTC-1234"
+                value={formData.jiraTicket || ''}
+                onChange={(e) => setFormData({ ...formData, jiraTicket: e.target.value })}
+                helperText="JIRA 티켓 번호를 입력하세요 (예: MTC-1234)"
+              />
+            )}
             <TextField
               fullWidth
               multiline

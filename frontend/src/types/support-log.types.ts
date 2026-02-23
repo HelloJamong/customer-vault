@@ -10,6 +10,7 @@ export interface SupportLog {
   inquiryContent?: string;
   actionContent?: string;
   actionResult?: string;
+  jiraTicket?: string;
   remarks?: string;
   createdBy?: number;
   createdAt: string;
@@ -36,6 +37,7 @@ export interface CreateSupportLogDto {
   inquiryContent?: string;
   actionContent?: string;
   actionResult?: string;
+  jiraTicket?: string;
   remarks?: string;
 }
 
@@ -50,5 +52,6 @@ export interface UpdateSupportLogDto {
   inquiryContent?: string;
   actionContent?: string;
   actionResult?: string;
+  jiraTicket?: string;
   remarks?: string;
 }

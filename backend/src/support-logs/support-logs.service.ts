@@ -184,6 +184,7 @@ export class SupportLogsService {
         inquiryContent: createDto.inquiryContent,
         actionContent: createDto.actionContent,
         actionResult: createDto.actionResult,
+        jiraTicket: createDto.jiraTicket,
         remarks: createDto.remarks,
         createdBy: userId,
       },
@@ -233,6 +234,7 @@ export class SupportLogsService {
         ...(updateDto.inquiryContent !== undefined && { inquiryContent: updateDto.inquiryContent }),
         ...(updateDto.actionContent !== undefined && { actionContent: updateDto.actionContent }),
         ...(updateDto.actionResult !== undefined && { actionResult: updateDto.actionResult }),
+        ...(updateDto.jiraTicket !== undefined && { jiraTicket: updateDto.jiraTicket }),
         ...(updateDto.remarks !== undefined && { remarks: updateDto.remarks }),
       },
       include: {
