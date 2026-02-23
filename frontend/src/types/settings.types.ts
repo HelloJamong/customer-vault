@@ -11,6 +11,8 @@ export interface SystemSettings {
   loginFailureLimitEnabled: boolean;
   loginFailureLimit: number;
   accountLockMinutes: number;
+  jiraEnabled: boolean;
+  jiraBaseUrl: string | null;
   updatedAt: string;
   updatedBy: number | null;
 }
@@ -27,6 +29,8 @@ export interface UpdateSettingsRequest {
   loginFailureLimitEnabled?: boolean;
   loginFailureLimit?: number;
   accountLockMinutes?: number;
+  jiraEnabled?: boolean;
+  jiraBaseUrl?: string;
 }
 
 export interface UpdateSettingsResponse {

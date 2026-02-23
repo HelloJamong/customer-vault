@@ -122,4 +122,22 @@ export class UpdateSettingsDto {
   @Min(5)
   @Max(30)
   accountLockMinutes?: number;
+
+  @ApiProperty({
+    description: 'JIRA 연동 기능 사용 여부',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  jiraEnabled?: boolean;
+
+  @ApiProperty({
+    description: 'JIRA 서버 Base URL (예: http://192.168.0.1:8080)',
+    example: 'http://192.168.0.1:8080',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  jiraBaseUrl?: string;
 }

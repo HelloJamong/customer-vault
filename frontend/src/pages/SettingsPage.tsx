@@ -44,6 +44,8 @@ const SettingsPage = () => {
         loginFailureLimitEnabled: settings.loginFailureLimitEnabled,
         loginFailureLimit: settings.loginFailureLimit,
         accountLockMinutes: settings.accountLockMinutes,
+        jiraEnabled: settings.jiraEnabled,
+        jiraBaseUrl: settings.jiraBaseUrl ?? '',
       });
     }
   }, [settings]);
@@ -337,6 +339,50 @@ const SettingsPage = () => {
                   </FormControl>
                 </Grid>
               </>
+            )}
+          </Grid>
+        </Paper>
+
+        {/* 6. JIRA 연결 설정 */}
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            6. JIRA 연결 설정
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            지원 로그의 JIRA 티켓 연동 기능을 설정합니다
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.jiraEnabled || false}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jiraEnabled: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label="JIRA 연동 기능 사용"
+              />
+            </Grid>
+            {formData.jiraEnabled && (
+              <Grid xs={12}>
+                <TextField
+                  fullWidth
+                  label="JIRA URL"
+                  value={formData.jiraBaseUrl || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, jiraBaseUrl: e.target.value })
+                  }
+                  variant="outlined"
+                  size="small"
+                  placeholder="http://192.168.0.1:8080"
+                  helperText="JIRA 서버의 Base URL을 입력하세요 (예: http://IP:포트)"
+                />
+              </Grid>
             )}
           </Grid>
         </Paper>

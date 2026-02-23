@@ -206,6 +206,10 @@ model SystemSettings {
   loginFailureLimit           Int       @default(5) @map("login_failure_limit")
   accountLockMinutes          Int       @default(10) @map("account_lock_minutes")
 
+  // JIRA 연결 설정
+  jiraEnabled                 Boolean   @default(false) @map("jira_enabled")
+  jiraBaseUrl                 String?   @map("jira_base_url") @db.VarChar(255)
+
   updatedAt                   DateTime  @updatedAt @map("updated_at")
   updatedBy                   Int?      @map("updated_by")
 

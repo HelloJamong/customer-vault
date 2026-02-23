@@ -100,6 +100,18 @@ export class SettingsService {
       afterValues.push(data.loginFailureLimitEnabled ? '활성화' : '비활성화');
     }
 
+    if (data.jiraEnabled !== undefined && data.jiraEnabled !== settings.jiraEnabled) {
+      changes.push('JIRA 연동 기능');
+      beforeValues.push(settings.jiraEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.jiraEnabled ? '활성화' : '비활성화');
+    }
+
+    if (data.jiraBaseUrl !== undefined && data.jiraBaseUrl !== settings.jiraBaseUrl) {
+      changes.push('JIRA 서버 URL');
+      beforeValues.push(settings.jiraBaseUrl || '미설정');
+      afterValues.push(data.jiraBaseUrl || '미설정');
+    }
+
     const updated = await this.prisma.systemSettings.update({
       where: { id: settings.id },
       data: {
