@@ -79,11 +79,10 @@ const CustomerSupportLogsPage = () => {
   useEffect(() => {
     if (!customerId) return;
     fetchData();
-    settingsApi.getSettings().then((s) => {
+    settingsApi.getJiraConfig().then((s) => {
       setJiraEnabled(s.jiraEnabled);
       setJiraBaseUrl(s.jiraBaseUrl ?? '');
     }).catch(() => {
-      // super_admin이 아닌 경우 403 → JIRA 기능 비활성화로 처리
       setJiraEnabled(false);
     });
   }, [customerId]);

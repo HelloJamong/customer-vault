@@ -90,6 +90,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+        - VITE_APP_VERSION=${VERSION:-dev}
     container_name: customer_frontend
     restart: unless-stopped
     depends_on:

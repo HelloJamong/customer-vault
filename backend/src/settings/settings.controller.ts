@@ -29,6 +29,17 @@ export class SettingsController {
     return this.service.getSettings();
   }
 
+  @Get('jira-config')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: 'JIRA 설정 조회 (인증된 사용자 공통)' })
+  async getJiraConfig() {
+    const settings = await this.service.getSettings();
+    return {
+      jiraEnabled: settings.jiraEnabled,
+      jiraBaseUrl: settings.jiraBaseUrl,
+    };
+  }
+
   @Patch()
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: '시스템 설정 업데이트' })

@@ -63,7 +63,9 @@ docker build -t customer_backend:${VERSION} ./backend
 log_success "Backend 이미지 빌드 완료"
 
 log_info "Frontend 이미지 빌드 중..."
-docker build -t customer_frontend:${VERSION} ./frontend
+docker build \
+    --build-arg VITE_APP_VERSION=v${VERSION} \
+    -t customer_frontend:${VERSION} ./frontend
 log_success "Frontend 이미지 빌드 완료"
 
 # Docker Hub 이미지가 있다면 로컬 태그로도 생성

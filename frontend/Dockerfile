@@ -7,6 +7,10 @@ WORKDIR /app
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
+# App version (GitHub Release 태그 주입, 예: v2.4.0)
+ARG VITE_APP_VERSION=dev
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+
 # 의존성 설치
 COPY package*.json .npmrc ./
 RUN npm ci

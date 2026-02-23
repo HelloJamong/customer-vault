@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Button, Menu, MenuItem } from '@mui/material';
+import { Box, Button, Menu, MenuItem, Typography, Tooltip, IconButton } from '@mui/material';
 import { KeyboardArrowDown } from '@mui/icons-material';
+import GitHubIcon from '@mui/icons-material/GitHub';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -579,6 +580,49 @@ const MainLayout = () => {
           onClose={handleNoticePopupClose}
         />
       )}
+
+      {/* Footer */}
+      <Box
+        component="footer"
+        sx={{
+          width: '100%',
+          borderTop: '1px solid #e2e8f0',
+          bgcolor: 'white',
+          py: 2,
+          px: 5,
+        }}
+      >
+        <Box
+          sx={{
+            maxWidth: '1440px',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Typography variant="caption" color="text.disabled">
+            © {new Date().getFullYear()} Customer Vault. All rights reserved.
+            {import.meta.env.VITE_APP_VERSION && import.meta.env.VITE_APP_VERSION !== 'dev' && (
+              <Box component="span" sx={{ ml: 1.5 }}>
+                {import.meta.env.VITE_APP_VERSION}
+              </Box>
+            )}
+          </Typography>
+          <Tooltip title="GitHub 저장소">
+            <IconButton
+              component="a"
+              href="https://github.com/HelloJamong/customer-vault"
+              target="_blank"
+              rel="noopener noreferrer"
+              size="small"
+              sx={{ color: '#64748b', '&:hover': { color: '#0f172a' } }}
+            >
+              <GitHubIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
     </Box>
   );
 };
