@@ -13,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SupportLogsModule } from './support-logs/support-logs.module';
 import { InspectionStatusModule } from './inspection-status/inspection-status.module';
 import { NoticesModule } from './notices/notices.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { NoticesModule } from './notices/notices.module';
     SupportLogsModule,
     InspectionStatusModule,
     NoticesModule,
+    BackupModule,
   ],
 })
 export class AppModule {}

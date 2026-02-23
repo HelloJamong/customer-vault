@@ -7,6 +7,7 @@ import {
   Max,
   IsOptional,
   MinLength,
+  IsIn,
 } from 'class-validator';
 
 export class UpdateSettingsDto {
@@ -140,4 +141,83 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsString()
   jiraBaseUrl?: string;
+
+  // ─── 데이터 백업 설정 ────────────────────────────────────────────────────
+
+  @ApiProperty({ description: '백업 기능 활성화 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  backupEnabled?: boolean;
+
+  @ApiProperty({ description: '백업 주기 타입 (daily/weekly/monthly)', required: false })
+  @IsOptional()
+  @IsString()
+  @IsIn(['daily', 'weekly', 'monthly'])
+  backupScheduleType?: string;
+
+  @ApiProperty({ description: '백업 실행 시간 (0-23)', required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  backupScheduleHour?: number;
+
+  @ApiProperty({ description: '백업 실행 요일(0-6) 또는 날짜(1-31)', required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(31)
+  backupScheduleDay?: number;
+
+  @ApiProperty({ description: 'DB 백업 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  backupTargetDb?: boolean;
+
+  @ApiProperty({ description: '점검서 파일 백업 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  backupTargetDocs?: boolean;
+
+  @ApiProperty({ description: '로컬 저장 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  backupDestLocal?: boolean;
+
+  @ApiProperty({ description: '원격 SFTP 저장 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  backupDestRemote?: boolean;
+
+  @ApiProperty({ description: '보관 개수 (최근 N개 유지)', required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  backupRetentionCount?: number;
+
+  @ApiProperty({ description: 'SFTP 서버 주소 (host:port)', required: false })
+  @IsOptional()
+  @IsString()
+  sftpHost?: string;
+
+  @ApiProperty({ description: 'SFTP 계정', required: false })
+  @IsOptional()
+  @IsString()
+  sftpUsername?: string;
+
+  @ApiProperty({ description: 'SFTP 패스워드 (평문 입력, 서버에서 암호화)', required: false })
+  @IsOptional()
+  @IsString()
+  sftpPassword?: string;
+
+  @ApiProperty({ description: 'SSH 키 파일 경로 (선택)', required: false })
+  @IsOptional()
+  @IsString()
+  sftpKeyPath?: string;
+
+  @ApiProperty({ description: '원격 백업 기본 경로', required: false })
+  @IsOptional()
+  @IsString()
+  sftpRemotePath?: string;
 }

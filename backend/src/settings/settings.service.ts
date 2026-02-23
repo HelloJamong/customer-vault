@@ -112,12 +112,59 @@ export class SettingsService {
       afterValues.push(data.jiraBaseUrl || '미설정');
     }
 
+    if (data.backupEnabled !== undefined && data.backupEnabled !== settings.backupEnabled) {
+      changes.push('백업 기능');
+      beforeValues.push(settings.backupEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.backupEnabled ? '활성화' : '비활성화');
+    }
+
+    if (data.backupScheduleType !== undefined && data.backupScheduleType !== settings.backupScheduleType) {
+      changes.push('백업 주기 타입');
+      beforeValues.push(settings.backupScheduleType);
+      afterValues.push(data.backupScheduleType);
+    }
+
+    if (data.backupDestRemote !== undefined && data.backupDestRemote !== settings.backupDestRemote) {
+      changes.push('원격 백업');
+      beforeValues.push(settings.backupDestRemote ? '활성화' : '비활성화');
+      afterValues.push(data.backupDestRemote ? '활성화' : '비활성화');
+    }
+
+    if (data.sftpHost !== undefined && data.sftpHost !== settings.sftpHost) {
+      changes.push('SFTP 서버 주소');
+      beforeValues.push(settings.sftpHost || '미설정');
+      afterValues.push(data.sftpHost || '미설정');
+    }
+
+    // SFTP 패스워드는 평문으로 입력받아 암호화 저장
+    let updateData: any = { ...data, updatedBy: userId };
+    if (data.sftpPassword !== undefined && data.sftpPassword !== '') {
+      const crypto = require('crypto');
+      const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '0'.repeat(64);
+      const IV_LENGTH = 16;
+      const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+      const iv = crypto.randomBytes(IV_LENGTH);
+      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+      const encrypted = Buffer.concat([cipher.update(data.sftpPassword), cipher.final()]);
+      updateData.sftpPassword = iv.toString('hex') + ':' + encrypted.toString('hex');
+      if (data.sftpPassword !== settings.sftpPassword) {
+        changes.push('SFTP 패스워드');
+        beforeValues.push('***');
+        afterValues.push('***');
+      }
+    } else if (data.sftpPassword === '') {
+      updateData.sftpPassword = null;
+    }
+
+    const backupScheduleChanged =
+      data.backupEnabled !== undefined ||
+      data.backupScheduleType !== undefined ||
+      data.backupScheduleHour !== undefined ||
+      data.backupScheduleDay !== undefined;
+
     const updated = await this.prisma.systemSettings.update({
       where: { id: settings.id },
-      data: {
-        ...data,
-        updatedBy: userId,
-      },
+      data: updateData,
     });
 
     // 변경 사항이 있을 경우에만 로그 기록
@@ -136,6 +183,8 @@ export class SettingsService {
     return {
       message: '시스템 설정이 저장되었습니다.',
       updatedAt: updated.updatedAt,
+      backupScheduleChanged,
+      updatedSettings: updated,
     };
   }
 

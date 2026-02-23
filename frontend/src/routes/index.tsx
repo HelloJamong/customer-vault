@@ -29,6 +29,7 @@ import LoginLogsPage from '@/pages/LoginLogsPage';
 import { InspectionStatusPage } from '@/pages/InspectionStatusPage';
 import { AssignmentStatusPage } from '@/pages/AssignmentStatusPage';
 import NoticesPage from '@/pages/NoticesPage';
+import BackupPage from '@/pages/BackupPage';
 
 export const router = createBrowserRouter([
   {
@@ -148,6 +149,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
             <SettingsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'backup',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+            <BackupPage />
           </RoleRoute>
         ),
       },

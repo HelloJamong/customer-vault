@@ -464,6 +464,28 @@ const MainLayout = () => {
                 시스템 설정
               </Button>
             )}
+
+            {/* 백업 관리 */}
+            {isSuperAdmin && (
+              <Button
+                onClick={() => navigate('/backup')}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: isActive('/backup') ? 600 : 500,
+                  color: isActive('/backup') ? '#2563eb' : '#64748b',
+                  bgcolor: isActive('/backup') ? '#eff6ff' : 'transparent',
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  '&:hover': {
+                    color: '#0f172a',
+                  },
+                }}
+              >
+                백업 관리
+              </Button>
+            )}
           </Box>
         </Box>
 

@@ -51,6 +51,7 @@ model User {
   createdSupportLogs    SupportLog[] @relation("SupportLogCreator")
   createdNotices        Notice[] @relation("NoticeCreator")
   noticeViews           UserNoticeView[] @relation("UserNoticeViews")
+  backupLogs            BackupLog[]
 
   @@map("users")
 }
@@ -209,6 +210,22 @@ model SystemSettings {
   // JIRA 연결 설정
   jiraEnabled                 Boolean   @default(false) @map("jira_enabled")
   jiraBaseUrl                 String?   @map("jira_base_url") @db.VarChar(255)
+
+  // 데이터 백업 설정
+  backupEnabled               Boolean   @default(false) @map("backup_enabled")
+  backupScheduleType          String    @default("daily") @map("backup_schedule_type") @db.VarChar(10)
+  backupScheduleHour          Int       @default(2) @map("backup_schedule_hour")
+  backupScheduleDay           Int?      @map("backup_schedule_day")
+  backupTargetDb              Boolean   @default(true) @map("backup_target_db")
+  backupTargetDocs            Boolean   @default(true) @map("backup_target_docs")
+  backupDestLocal             Boolean   @default(true) @map("backup_dest_local")
+  backupDestRemote            Boolean   @default(false) @map("backup_dest_remote")
+  backupRetentionCount        Int       @default(7) @map("backup_retention_count")
+  sftpHost                    String?   @map("sftp_host") @db.VarChar(255)
+  sftpUsername                String?   @map("sftp_username") @db.VarChar(100)
+  sftpPassword                String?   @map("sftp_password") @db.VarChar(500)
+  sftpKeyPath                 String?   @map("sftp_key_path") @db.VarChar(500)
+  sftpRemotePath              String?   @map("sftp_remote_path") @db.VarChar(500)
 
   updatedAt                   DateTime  @updatedAt @map("updated_at")
   updatedBy                   Int?      @map("updated_by")
@@ -418,5 +435,24 @@ model UserNoticeView {
 
   @@id([userId, noticeId])
   @@map("user_notice_views")
+}
+
+// 백업 이력
+model BackupLog {
+  id            Int       @id @default(autoincrement())
+  status        String    @db.VarChar(20)          // 'success' | 'failed' | 'running'
+  type          String    @db.VarChar(20)          // 'auto' | 'manual'
+  targets       String    @db.VarChar(50)          // 'db', 'docs', 'db,docs'
+  destinations  String    @db.VarChar(50)          // 'local', 'remote', 'local,remote'
+  filePath      String?   @map("file_path") @db.VarChar(500)
+  fileSize      BigInt?   @map("file_size")
+  errorMessage  String?   @map("error_message") @db.Text
+  startedAt     DateTime  @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  createdBy     Int?      @map("created_by")
+
+  creator       User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("backup_logs")
 }
 

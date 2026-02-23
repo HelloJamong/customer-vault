@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, Request, Inject, Optional } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
@@ -13,7 +13,14 @@ import { getClientIp } from '../common/utils/ip.util';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class SettingsController {
-  constructor(private readonly service: SettingsService) {}
+  private backupService: any;
+
+  constructor(
+    private readonly service: SettingsService,
+    @Optional() @Inject('BACKUP_SERVICE') backupServiceRef?: any,
+  ) {
+    this.backupService = backupServiceRef;
+  }
 
   @Get()
   @Roles(Role.SUPER_ADMIN)
@@ -25,8 +32,20 @@ export class SettingsController {
   @Patch()
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: '시스템 설정 업데이트' })
-  updateSettings(@Body() data: UpdateSettingsDto, @Request() req) {
+  async updateSettings(@Body() data: UpdateSettingsDto, @Request() req) {
     const ipAddress = getClientIp(req);
-    return this.service.updateSettings(data, req.user.id, ipAddress);
+    const result = await this.service.updateSettings(data, req.user.id, ipAddress);
+
+    // 백업 스케줄 관련 설정이 변경된 경우 스케줄 재설정
+    if (result.backupScheduleChanged && this.backupService) {
+      const updatedSettings = result.updatedSettings;
+      if (updatedSettings.backupEnabled) {
+        this.backupService.scheduleBackup(updatedSettings);
+      } else {
+        this.backupService.cancelSchedule();
+      }
+    }
+
+    return { message: result.message, updatedAt: result.updatedAt };
   }
 }

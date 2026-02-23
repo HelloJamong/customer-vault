@@ -55,9 +55,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIR: /app/logs
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      BACKUP_DIR: /app/backups
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - ./backups:/app/backups
       - /sys:/host/sys:ro
       - /proc:/host/proc:ro
       - /etc:/host/etc:ro
