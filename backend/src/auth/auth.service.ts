@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { SessionEventService } from './session-event.service';
@@ -15,6 +16,9 @@ import { cleanIpAddress } from '../common/utils/ip.util';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginDto, ChangePasswordDto } from './dto/login.dto';
+
+// 브라우저 종료 등으로 heartbeat가 끊긴 세션을 만료로 처리하는 기준 (30분)
+const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -69,14 +73,17 @@ export class AuthService {
     // 중복 로그인 방지가 활성화된 경우 기존 세션 확인
     if (settings.preventDuplicateLogin && !forceLogin) {
       console.log(`[로그인] 기존 세션 확인 중...`);
+
+      // lastActivity 기준으로 활성 세션만 확인 (브라우저 종료 등으로 만료된 세션 제외)
+      const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MS);
       const existingSession = await this.prisma.userSession.findFirst({
-        where: { userId: user.id },
+        where: { userId: user.id, lastActivity: { gte: expiryTime } },
       });
 
-      console.log(`[로그인] 기존 세션 조회 결과:`, existingSession ? `세션 ID: ${existingSession.sessionId}` : '없음');
+      console.log(`[로그인] 기존 활성 세션 조회 결과:`, existingSession ? `세션 ID: ${existingSession.sessionId}` : '없음 (없거나 만료됨)');
 
       if (existingSession) {
-        // 기존 세션이 있으면 DUPLICATE_SESSION 에러 반환
+        // 활성 세션이 있으면 DUPLICATE_SESSION 에러 반환
         console.log(`[로그인] 중복 세션 감지 - DUPLICATE_SESSION 에러 반환`);
         throw new ForbiddenException('DUPLICATE_SESSION');
       }
@@ -543,6 +550,18 @@ export class AuthService {
 
     if (settings.passwordRequireNumber && !/[0-9]/.test(password)) {
       throw new BadRequestException('비밀번호에는 숫자가 포함되어야 합니다.');
+    }
+  }
+
+  // 5분마다 실행: lastActivity 기준으로 만료된 세션 자동 삭제
+  @Cron('0 */5 * * * *')
+  async cleanupExpiredSessions() {
+    const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MS);
+    const result = await this.prisma.userSession.deleteMany({
+      where: { lastActivity: { lt: expiryTime } },
+    });
+    if (result.count > 0) {
+      console.log(`[세션 정리] 만료된 세션 ${result.count}개 삭제 완료 (기준: ${SESSION_EXPIRY_MS / 60000}분 비활동)`);
     }
   }
 

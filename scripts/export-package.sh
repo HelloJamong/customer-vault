@@ -33,16 +33,30 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 버전 인자 확인
-VERSION=${1:-"2.1.2"}
-log_info "배포 패키지 버전: ${VERSION}"
-
 # 프로젝트 루트 디렉토리로 이동
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 log_info "프로젝트 루트: $PROJECT_ROOT"
+
+# 버전 인자 확인 (미입력 시 CHANGELOG.md에서 최신 버전 자동 추출)
+if [ -n "$1" ]; then
+    VERSION="$1"
+    log_info "지정된 버전 사용: ${VERSION}"
+else
+    CHANGELOG_VERSION=$(grep -m 1 '## \[v' CHANGELOG.md 2>/dev/null | sed 's/## \[v\([^]]*\)\].*/\1/')
+    if [ -n "$CHANGELOG_VERSION" ]; then
+        VERSION="$CHANGELOG_VERSION"
+        log_info "CHANGELOG.md에서 최신 버전 자동 감지: ${VERSION}"
+    else
+        log_error "CHANGELOG.md에서 버전을 찾을 수 없습니다. 버전을 직접 지정해주세요."
+        log_error "사용법: ./scripts/export-package.sh 26.03.01"
+        exit 1
+    fi
+fi
+
+log_info "배포 패키지 버전: ${VERSION}"
 
 # 패키지 디렉토리 생성
 PACKAGE_NAME="customer_vault_${VERSION}_package"
