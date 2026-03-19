@@ -21,6 +21,9 @@ uploads/*
 *.swo
 .claude/
 .claudeignore
+
+# oh-my-claudecode 상태/메모 디렉토리
+.omc/
 PROJECT_STRUCTURE_GUIDE.md
 
 # OS

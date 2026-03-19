@@ -49,8 +49,8 @@ jobs:
           tags: |
             # main 브랜치 푸시 시 latest 태그
             type=raw,value=latest,enable={{is_default_branch}}
-            # 태그 푸시 시 버전 태그 (예: v2.1.2 -> 2.1.2)
-            type=semver,pattern={{version}}
+            # 태그 푸시 시 버전 태그 (예: v26.03.01 -> 26.03.01, leading zero 보존)
+            type=match,pattern=v(\d+\.\d+\.\d+),group=1
 
       # 5. Backend Docker 이미지 빌드 및 푸시
       - name: Build and push Backend Docker image
@@ -99,8 +99,8 @@ jobs:
           tags: |
             # main 브랜치 푸시 시 latest 태그
             type=raw,value=latest,enable={{is_default_branch}}
-            # 태그 푸시 시 버전 태그 (예: v2.1.2 -> 2.1.2)
-            type=semver,pattern={{version}}
+            # 태그 푸시 시 버전 태그 (예: v26.03.01 -> 26.03.01, leading zero 보존)
+            type=match,pattern=v(\d+\.\d+\.\d+),group=1
 
       # 5. Frontend Docker 이미지 빌드 및 푸시
       - name: Build and push Frontend Docker image

@@ -24,9 +24,9 @@ push: ## Docker Hub에 이미지 푸시
 
 build-push: build push ## 빌드 후 즉시 푸시
 
-tag: ## 새 버전 태그 생성 (예: make tag VERSION=1.0.0)
+tag: ## 새 버전 태그 생성 (예: make tag VERSION=26.03.01)
 	@if [ -z "$(VERSION)" ] || [ "$(VERSION)" = "latest" ]; then \
-		echo "❌ VERSION을 지정해주세요. 예: make tag VERSION=1.0.0"; \
+		echo "❌ VERSION을 지정해주세요. 예: make tag VERSION=26.03.01"; \
 		exit 1; \
 	fi
 	@echo "🏷️  버전 태그 생성: v$(VERSION)"
@@ -122,9 +122,9 @@ install-dev: ## 개발 환경 설정
 	@echo "✓ 개발 환경 설정 완료"
 
 # 개발자 워크플로우
-release: ## 새 버전 릴리즈 (예: make release VERSION=1.0.0)
+release: ## 새 버전 릴리즈 (예: make release VERSION=26.03.01)
 	@if [ -z "$(VERSION)" ] || [ "$(VERSION)" = "latest" ]; then \
-		echo "❌ VERSION을 지정해주세요. 예: make release VERSION=1.0.0"; \
+		echo "❌ VERSION을 지정해주세요. 예: make release VERSION=26.03.01"; \
 		exit 1; \
 	fi
 	@echo "🚀 버전 $(VERSION) 릴리즈 준비..."
