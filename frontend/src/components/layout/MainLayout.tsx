@@ -125,7 +125,7 @@ const MainLayout = () => {
   const canManageCustomers = isAdmin || userRole === 'user';
 
   return (
-    <Box sx={{ minHeight: '100vh', width: '100vw', bgcolor: '#f8fafc' }}>
+    <Box sx={{ minHeight: '100vh', width: '100vw', bgcolor: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box
         component="header"
@@ -558,8 +558,10 @@ const MainLayout = () => {
         component="main"
         sx={{
           maxWidth: '1440px',
+          width: '100%',
           margin: '0 auto',
           p: 5,
+          flexGrow: 1,
         }}
       >
         <Outlet />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
-import { Add, Visibility, Info, Code, SupportAgent, Download, Summarize, Search, FilterAlt } from '@mui/icons-material';
+import { Add, Visibility, Info, Code, SupportAgent, Summarize, Search, FilterAlt, Download } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
@@ -53,6 +53,7 @@ const CustomersPage = () => {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
   const [summaryCustomers, setSummaryCustomers] = useState<any[]>([]);
+  const [hoveredRowId, setHoveredRowId] = useState<number | null>(null);
 
   // 컴포넌트 마운트 시 스크롤 위치 복원
   useEffect(() => {
@@ -490,6 +491,28 @@ const CustomersPage = () => {
       headerName: '고객사명',
       width: 200,
       flex: 1,
+      renderCell: (params) => (
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}
+          onMouseEnter={() => setHoveredRowId(params.row.id)}
+          onMouseLeave={() => setHoveredRowId(null)}
+        >
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {params.value}
+          </span>
+          {hoveredRowId === params.row.id && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Download />}
+              onClick={(e) => { e.stopPropagation(); handleExportFullData(params.row); }}
+              sx={{ flexShrink: 0, fontSize: '0.7rem', px: 0.8, py: 0.2, minWidth: 'unset' }}
+            >
+              전체 정보
+            </Button>
+          )}
+        </Box>
+      ),
     },
     {
       field: 'version',
@@ -523,23 +546,23 @@ const CustomersPage = () => {
     },
     {
       field: 'exportFullData',
-      headerName: '전체 정보',
-      width: 140,
+      headerName: '회의록',
+      width: 120,
       sortable: false,
       renderCell: (params) => (
         <Button
           size="small"
-          variant="contained"
-          startIcon={<Download />}
-          onClick={() => handleExportFullData(params.row)}
+          variant="outlined"
+          startIcon={<Visibility />}
+          onClick={() => navigate(`/customers/${params.row.id}/meeting-minutes`)}
         >
-          내보내기
+          보기
         </Button>
       ),
     },
     {
       field: 'viewDocuments',
-      headerName: '점검서보기',
+      headerName: '점검서',
       width: 120,
       sortable: false,
       renderCell: (params) => (
@@ -587,7 +610,7 @@ const CustomersPage = () => {
     },
     {
       field: 'viewDetails',
-      headerName: '세부사항보기',
+      headerName: '세부사항',
       width: 130,
       sortable: false,
       renderCell: (params) => (

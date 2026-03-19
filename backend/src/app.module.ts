@@ -15,6 +15,7 @@ import { SupportLogsModule } from './support-logs/support-logs.module';
 import { InspectionStatusModule } from './inspection-status/inspection-status.module';
 import { NoticesModule } from './notices/notices.module';
 import { BackupModule } from './backup/backup.module';
+import { MeetingMinutesModule } from './meeting-minutes/meeting-minutes.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { BackupModule } from './backup/backup.module';
     InspectionStatusModule,
     NoticesModule,
     BackupModule,
+    MeetingMinutesModule,
   ],
 })
 export class AppModule {}

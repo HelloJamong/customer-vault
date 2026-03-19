@@ -52,6 +52,7 @@ model User {
   createdNotices        Notice[] @relation("NoticeCreator")
   noticeViews           UserNoticeView[] @relation("UserNoticeViews")
   backupLogs            BackupLog[]
+  meetingMinutes        MeetingMinutes[] @relation("MeetingMinutesCreator")
 
   @@map("users")
 }
@@ -126,6 +127,7 @@ model Customer {
   inspectionTargets       InspectionTarget[]
   sourceManagement        SourceManagement?
   supportLogs             SupportLog[]
+  meetingMinutes          MeetingMinutes[]
 
   @@map("customers")
 }
@@ -456,3 +458,23 @@ model BackupLog {
   @@map("backup_logs")
 }
 
+// 회의록
+model MeetingMinutes {
+  id            Int       @id @default(autoincrement())
+  customerId    Int       @map("customer_id")
+  meetingDate   DateTime  @map("meeting_date") @db.Date
+  attendees     String?   @db.VarChar(500)
+  location      String?   @db.VarChar(200)
+  subject       String    @db.VarChar(300)
+  content       String?   @db.LongText
+  decisions     String?   @db.LongText
+  remarks       String?   @db.Text
+  createdBy     Int?      @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  creator       User?     @relation("MeetingMinutesCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("meeting_minutes")
+}
