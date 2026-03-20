@@ -39,6 +39,7 @@ logs/*
 backup_*/
 backups/
 *.sql.gz
+*.sql
 
 # Node modules
 node_modules/
