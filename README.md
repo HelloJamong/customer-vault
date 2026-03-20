@@ -49,95 +49,72 @@
 
 ## 🚀 빠른 시작
 
-### 1️⃣ 프로젝트 클론
+> Git 클론 없이 배포 파일 두 개만 받아 바로 실행할 수 있습니다.
+
+### 1️⃣ 배포 파일 다운로드
 
 ```bash
-git clone https://github.com/HelloJamong/customer-vault.git
-cd customer-vault
+# 배포 디렉토리 생성
+mkdir customer-vault && cd customer-vault
+
+# 최신 릴리즈 배포 파일 자동 다운로드
+curl -LO https://github.com/HelloJamong/customer-vault/releases/latest/download/docker-compose.yml
+curl -LO https://github.com/HelloJamong/customer-vault/releases/latest/download/.env.example
 ```
 
 ### 2️⃣ 환경 변수 설정
 
 ```bash
-# 환경 변수 파일 생성
 cp .env.example .env
-
-# 필요시 .env 파일 수정 (개발 환경은 기본값 사용 가능)
 vi .env
 ```
 
-**서비스 환경에서 반드시 변경해야 할 항목:**
+**운영 환경에서 반드시 변경해야 할 항목:**
 
-1. **NODE_ENV**를 production으로 변경
-```env
-NODE_ENV=production
-LOG_LEVEL=warn
-```
+| 항목 | 설명 |
+|------|------|
+| `NODE_ENV` | `production` 으로 변경 |
+| `JWT_SECRET` | 128자 이상 랜덤 문자열 (아래 생성 명령 참고) |
+| `DB_ROOT_PASSWORD` | 강력한 DB root 비밀번호 |
+| `DB_PASSWORD` | 강력한 DB 사용자 비밀번호 |
+| `CORS_ORIGIN` | 실제 접속 도메인 또는 IP (예: `http://10.0.0.5:3003`) |
+| `VERSION` | 다운로드한 버전과 동일하게 설정 (예: `26.03.03`) |
 
-2. **JWT_SECRET** (128자 랜덤 문자열)
-- 목적: JWT 서명용 비밀키. 충분히 길고 무작위여야 함.
-- 생성 명령:
 ```bash
+# JWT_SECRET 생성
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
-  - `randomBytes(64)` → 64바이트(512비트) 무작위 값을 생성
-  - `.toString('hex')` → 2배 길이의 128자 16진 문자열로 변환
-
-3. **DB_PASSWORD** (강력한 비밀번호)
-- 목적: DB 접속용 비밀번호. 대소문자/숫자/특수문자 포함.
-- 생성 명령:
-```bash
-node -e "
-const crypto = require('crypto');
-const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-let password = '';
-for (let i = 0; i < 32; i++) {
-  password += chars[crypto.randomInt(0, chars.length)];
-}
-console.log(password);
-"
-```
-  - 32자리 무작위 문자열 생성
-  - 문자 집합에 대문자/소문자/숫자/특수문자를 포함해 복잡도 확보
-
-4. **CORS_ORIGIN** (실제 프론트엔드 도메인)
-```env
-CORS_ORIGIN=https://yourdomain.com,https://app.yourdomain.com
-```
-   - 내부망/사설 IP 환경에서 도메인 없이 쓸 경우 예시: `http://10.0.0.5:3003`
-   - HTTPS를 쓰지 않는다면 `http://<IP>:<포트>` 형태로 현재 접속에 사용하는 주소를 그대로 넣으면 됨
 
 ### 3️⃣ 서비스 실행
 
-**기본 실행 (항상 최신 버전 사용):**
 ```bash
-# Docker Hub에서 최신 이미지 다운로드
-docker compose pull
-
-# 서비스 실행
-docker compose up -d
-```
-
-**특정 버전 고정이 필요한 경우:**
-```bash
-# .env 파일에 버전 추가
-echo "VERSION=2.1.6" >> .env
-
-# 지정한 버전으로 실행
 docker compose pull
 docker compose up -d
 ```
-
-**버전 관리 방식:**
-- 기본: `latest` 태그 사용 (항상 최신 버전)
-- Git 태그 push 시: `latest` + 버전별 태그 생성 (예: `v2.1.7` → `2.1.7` 태그)
-- 특정 버전 필요 시: `.env`에 `VERSION=2.1.6` 설정
 
 ### 4️⃣ 접속 정보
 
 **최초 로그인 계정:**
 - ID: `admin`
 - PW: `1111`
+
+> ⚠️ 최초 로그인 후 반드시 비밀번호를 변경하세요.
+
+---
+
+## 🔄 업그레이드
+
+```bash
+# 최신 docker-compose.yml 다운로드
+curl -LO https://github.com/HelloJamong/customer-vault/releases/latest/download/docker-compose.yml
+
+# .env의 VERSION을 최신 버전으로 업데이트 (Releases 페이지에서 확인)
+vi .env
+
+# 이미지 pull 및 재시작
+docker compose pull
+docker compose up -d
+```
 
 ---
 

@@ -5,7 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   CircularProgress, Grid,
 } from '@mui/material';
-import { Add, ArrowBack, RemoveCircleOutline } from '@mui/icons-material';
+import { Add, ArrowBack, FileDownload } from '@mui/icons-material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -14,6 +14,7 @@ import 'react-quill-new/dist/quill.snow.css';
 import { useParams, useNavigate } from 'react-router-dom';
 import { meetingMinutesApi, type MeetingMinutes, type CreateMeetingMinutesData } from '@/api/meetingMinutes.api';
 import { customersAPI } from '@/api/customers.api';
+import { exportMeetingMinutesToDocx } from '@/utils/exportMeetingMinutes';
 import dayjs, { Dayjs } from 'dayjs';
 
 const quillModules = {
@@ -24,23 +25,16 @@ const quillModules = {
   ],
 };
 
-const MAX_ATTENDEES = 10;
-
 // ─── MeetingForm: 컴포넌트 외부 선언 (내부 선언 시 리렌더마다 재마운트로 포커스 소실) ───
 interface MeetingFormProps {
-  formData: Omit<CreateMeetingMinutesData, 'attendees'> & { meetingDate: string };
-  setFormData: React.Dispatch<React.SetStateAction<Omit<CreateMeetingMinutesData, 'attendees'> & { meetingDate: string }>>;
+  formData: CreateMeetingMinutesData & { meetingDate: string };
+  setFormData: React.Dispatch<React.SetStateAction<CreateMeetingMinutesData & { meetingDate: string }>>;
   selectedDate: Dayjs;
   setSelectedDate: (d: Dayjs) => void;
-  attendeesList: string[];
-  addAttendee: () => void;
-  removeAttendee: (idx: number) => void;
-  updateAttendee: (idx: number, value: string) => void;
 }
 
 const MeetingForm = ({
   formData, setFormData, selectedDate, setSelectedDate,
-  attendeesList, addAttendee, removeAttendee, updateAttendee,
 }: MeetingFormProps) => (
   <LocalizationProvider dateAdapter={AdapterDayjs}>
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
@@ -74,38 +68,17 @@ const MeetingForm = ({
         onChange={(e) => setFormData((p) => ({ ...p, subject: e.target.value }))}
       />
 
-      <Box>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-          <Typography variant="caption" color="text.secondary">
-            참석자 ({attendeesList.length}/{MAX_ATTENDEES})
-          </Typography>
-          {attendeesList.length < MAX_ATTENDEES && (
-            <Button size="small" startIcon={<Add />} onClick={addAttendee} sx={{ fontSize: '0.75rem' }}>
-              참석자 추가
-            </Button>
-          )}
-        </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {attendeesList.map((attendee, idx) => (
-            <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TextField
-                placeholder="예) 삼성전자 홍길동 대리"
-                fullWidth
-                size="small"
-                value={attendee}
-                onChange={(e) => updateAttendee(idx, e.target.value)}
-              />
-              <IconButton
-                size="small"
-                onClick={() => removeAttendee(idx)}
-                sx={{ color: 'text.disabled', flexShrink: 0 }}
-              >
-                <RemoveCircleOutline fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
-        </Box>
-      </Box>
+      <TextField
+        label="참석자"
+        fullWidth
+        multiline
+        minRows={3}
+        size="small"
+        placeholder={"예) 삼성전자 홍길동 대리\n삼성전자 김철수 과장"}
+        helperText="줄바꿈(Enter)으로 참석자를 구분합니다."
+        value={formData.attendees}
+        onChange={(e) => setFormData((p) => ({ ...p, attendees: e.target.value }))}
+      />
 
       <Box>
         <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
@@ -150,10 +123,11 @@ const MeetingForm = ({
 );
 
 // ─── 메인 페이지 ───
-const emptyFormBase: Omit<CreateMeetingMinutesData, 'attendees'> & { meetingDate: string } = {
+const emptyFormBase: CreateMeetingMinutesData & { meetingDate: string } = {
   meetingDate: dayjs().format('YYYY-MM-DD'),
   location: '',
   subject: '',
+  attendees: '',
   content: '',
   decisions: '',
   remarks: '',
@@ -176,7 +150,6 @@ const CustomerMeetingMinutesPage = () => {
 
   const [formData, setFormData] = useState(emptyFormBase);
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
-  const [attendeesList, setAttendeesList] = useState<string[]>(['']);
 
   const id = Number(customerId);
 
@@ -208,13 +181,12 @@ const CustomerMeetingMinutesPage = () => {
       meetingDate: dayjs(item.meetingDate).format('YYYY-MM-DD'),
       location: item.location ?? '',
       subject: item.subject,
+      attendees: item.attendees ?? '',
       content: item.content ?? '',
       decisions: item.decisions ?? '',
       remarks: item.remarks ?? '',
     });
     setSelectedDate(dayjs(item.meetingDate));
-    const parsed = attendeesToLines(item.attendees);
-    setAttendeesList(parsed.length > 0 ? parsed : ['']);
     setEditOpen(true);
   };
 
@@ -229,14 +201,12 @@ const CustomerMeetingMinutesPage = () => {
   const handleCreateOpen = () => {
     setFormData(emptyFormBase);
     setSelectedDate(dayjs());
-    setAttendeesList(['']);
     setCreateOpen(true);
   };
 
   const buildPayload = (): CreateMeetingMinutesData => ({
     ...formData,
     meetingDate: selectedDate.format('YYYY-MM-DD'),
-    attendees: attendeesList.filter((a) => a.trim()).join('\n'),
   });
 
   const handleCreate = async () => {
@@ -257,19 +227,8 @@ const CustomerMeetingMinutesPage = () => {
     } catch (e) { alert('수정에 실패했습니다.'); }
   };
 
-  const addAttendee = () => {
-    if (attendeesList.length < MAX_ATTENDEES) setAttendeesList((p) => [...p, '']);
-  };
-  const removeAttendee = (idx: number) => {
-    setAttendeesList((p) => p.length === 1 ? [''] : p.filter((_, i) => i !== idx));
-  };
-  const updateAttendee = (idx: number, value: string) => {
-    setAttendeesList((p) => p.map((a, i) => i === idx ? value : a));
-  };
-
   const formProps: MeetingFormProps = {
     formData, setFormData, selectedDate, setSelectedDate,
-    attendeesList, addAttendee, removeAttendee, updateAttendee,
   };
 
   return (
@@ -299,7 +258,7 @@ const CustomerMeetingMinutesPage = () => {
                 <TableCell sx={{ fontWeight: 600, width: 110 }}>날짜</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>회의록 주제</TableCell>
                 <TableCell sx={{ fontWeight: 600, width: 100 }}>작성자</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 220 }} align="center">작업</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 260 }} align="center">작업</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -326,6 +285,14 @@ const CustomerMeetingMinutesPage = () => {
                         <Button size="small" variant="outlined" color="error" onClick={() => handleDelete(item)}>
                           삭제
                         </Button>
+                        <IconButton
+                          size="small"
+                          color="success"
+                          title="Word 내보내기"
+                          onClick={() => exportMeetingMinutesToDocx(item, customerName)}
+                        >
+                          <FileDownload fontSize="small" />
+                        </IconButton>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -409,6 +376,14 @@ const CustomerMeetingMinutesPage = () => {
           )}
         </DialogContent>
         <DialogActions>
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<FileDownload />}
+            onClick={() => selected && exportMeetingMinutesToDocx(selected, customerName)}
+          >
+            Word 내보내기
+          </Button>
           <Button onClick={() => setViewOpen(false)}>닫기</Button>
         </DialogActions>
       </Dialog>

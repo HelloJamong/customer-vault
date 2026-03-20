@@ -35,9 +35,9 @@ services:
   # NestJS 백엔드 API
   # ==========================================
   backend:
-    #image: igor0670/customer-storage-backend:${VERSION:-latest}
+    image: igor0670/customer-storage-backend:${VERSION:-latest}
     #오프라인 상태일 때 사용
-    image: customer_backend:${VERSION:-latest}
+    #image: customer_backend:${VERSION:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -82,9 +82,9 @@ services:
   # React 프론트엔드
   # ==========================================
   frontend:
-    #image: igor0670/customer-storage-frontend:${VERSION:-latest}
+    image: igor0670/customer-storage-frontend:${VERSION:-latest}
     #오프라인 상태일 때 사용
-    image: customer_frontend:${VERSION:-latest}
+    #image: customer_frontend:${VERSION:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
