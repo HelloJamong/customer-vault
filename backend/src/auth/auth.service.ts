@@ -61,11 +61,9 @@ export class AuthService {
       throw new UnauthorizedException('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
 
-    // 비밀번호 만료 확인
+    // 비밀번호 만료 확인 (만료되어도 로그인 허용 - 프론트엔드에서 강제 변경 처리)
     const settings = await this.getSystemSettings();
-    if (await this.isPasswordExpired(user.id, settings)) {
-      throw new ForbiddenException('비밀번호가 만료되었습니다. 비밀번호를 변경해주세요.');
-    }
+    const passwordExpired = await this.isPasswordExpired(user.id, settings);
 
     console.log(`[로그인] 사용자 ${user.username}(ID: ${user.id}) 로그인 시도`);
     console.log(`[로그인] 중복 로그인 방지: ${settings.preventDuplicateLogin}, 강제 로그인: ${forceLogin}`);
@@ -109,6 +107,7 @@ export class AuthService {
         name: user.name,
         role: user.role,
         isFirstLogin: user.isFirstLogin,
+        passwordExpired,
       },
     };
   }

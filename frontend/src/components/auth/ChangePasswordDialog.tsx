@@ -20,6 +20,7 @@ import apiClient from '@/api/axios';
 interface ChangePasswordDialogProps {
   open: boolean;
   isForced?: boolean;
+  forcedMessage?: string;
   onClose?: () => void;
   onSuccess: () => void;
 }
@@ -40,6 +41,7 @@ interface PasswordCheck {
 const ChangePasswordDialog = ({
   open,
   isForced = false,
+  forcedMessage,
   onClose,
   onSuccess,
 }: ChangePasswordDialogProps) => {
@@ -155,7 +157,7 @@ const ChangePasswordDialog = ({
       <DialogContent>
         {isForced && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            최초 로그인 또는 비밀번호 초기화 후에는 반드시 비밀번호를 변경해야 합니다.
+            {forcedMessage ?? '최초 로그인 또는 비밀번호 초기화 후에는 반드시 비밀번호를 변경해야 합니다.'}
           </Alert>
         )}
 

@@ -23,19 +23,25 @@ const MainLayout = () => {
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
+  const [forcedPasswordMessage, setForcedPasswordMessage] = useState<string | undefined>(undefined);
 
   // 공지사항 팝업 관련 상태
   const [unreadNotices, setUnreadNotices] = useState<Notice[]>([]);
   const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
 
-  // 최초 로그인 시 비밀번호 변경 강제
+  // 최초 로그인 또는 비밀번호 만료 시 비밀번호 변경 강제
   useEffect(() => {
-    if (user?.isFirstLogin) {
+    if (user?.passwordExpired) {
+      setForcedPasswordMessage('비밀번호 사용 기간이 만료되었습니다. 계속하려면 비밀번호를 변경해야 합니다.');
+      setIsForcedPasswordChange(true);
+      setPasswordDialogOpen(true);
+    } else if (user?.isFirstLogin) {
+      setForcedPasswordMessage(undefined);
       setIsForcedPasswordChange(true);
       setPasswordDialogOpen(true);
     }
-  }, [user?.isFirstLogin]);
+  }, [user?.isFirstLogin, user?.passwordExpired]);
 
   // 읽지 않은 공지사항 조회 (슈퍼 관리자 제외)
   useEffect(() => {
@@ -570,6 +576,7 @@ const MainLayout = () => {
       <ChangePasswordDialog
         open={passwordDialogOpen}
         isForced={isForcedPasswordChange}
+        forcedMessage={forcedPasswordMessage}
         onClose={handlePasswordDialogClose}
         onSuccess={handlePasswordChangeSuccess}
       />

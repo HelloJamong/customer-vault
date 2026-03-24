@@ -13,6 +13,7 @@ export interface User {
   isActive?: boolean;
   is_active?: boolean;
   isFirstLogin?: boolean;
+  passwordExpired?: boolean;
   lastLogin?: string;
   createdAt?: string;
   created_at?: string;
