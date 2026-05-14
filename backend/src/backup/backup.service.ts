@@ -8,15 +8,12 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { spawn } from 'child_process';
 import * as archiver from 'archiver';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { SettingsService } from '../settings/settings.service';
-
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '0'.repeat(64); // 32바이트 hex
-const IV_LENGTH = 16;
+import { CryptoService } from '../common/crypto/crypto.service';
 
 @Injectable()
 export class BackupService implements OnModuleInit {
@@ -29,6 +26,7 @@ export class BackupService implements OnModuleInit {
     private logsService: LogsService,
     private settingsService: SettingsService,
     private schedulerRegistry: SchedulerRegistry,
+    private cryptoService: CryptoService,
   ) {}
 
   async onModuleInit() {
@@ -40,28 +38,6 @@ export class BackupService implements OnModuleInit {
     } catch (e) {
       this.logger.warn('백업 스케줄 초기화 실패: ' + e.message);
     }
-  }
-
-  // ─── 암호화 / 복호화 ───────────────────────────────────────────────────────
-
-  encryptPassword(plainText: string): string {
-    const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    const encrypted = Buffer.concat([cipher.update(plainText), cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-  }
-
-  decryptPassword(encryptedText: string): string {
-    const [ivHex, encHex] = encryptedText.split(':');
-    const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-    const iv = Buffer.from(ivHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-    const decrypted = Buffer.concat([
-      decipher.update(Buffer.from(encHex, 'hex')),
-      decipher.final(),
-    ]);
-    return decrypted.toString();
   }
 
   // ─── 스케줄 관리 ──────────────────────────────────────────────────────────
@@ -346,7 +322,7 @@ export class BackupService implements OnModuleInit {
     if (settings.sftpKeyPath && fs.existsSync(settings.sftpKeyPath)) {
       connectOptions.privateKey = fs.readFileSync(settings.sftpKeyPath);
     } else if (settings.sftpPassword) {
-      connectOptions.password = this.decryptPassword(settings.sftpPassword);
+      connectOptions.password = this.cryptoService.safeDecrypt(settings.sftpPassword);
     }
 
     try {

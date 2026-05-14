@@ -9,6 +9,54 @@
 
 ---
 
+## [v26.05.01] - 2026-05-14
+
+### Added
+- **중앙화된 암호화 서비스 (`CryptoService`)**: AES-256-CBC 기반 암호화/복호화를 단일 서비스로 통합
+  - `encrypt()` / `decrypt()` / `safeDecrypt()` 메서드 제공
+  - `safeDecrypt()`: 암호화된 값과 평문 값 모두 처리 (마이그레이션 구간 역호환 보장)
+  - `CryptoModule`로 분리하여 필요한 모듈에서 import하여 사용
+- **서버 접근 정보 암호화 마이그레이션 스크립트**: 기존 평문으로 저장된 비밀번호를 일괄 암호화
+  - `prisma/scripts/encrypt-server-access-info.ts`
+  - 이미 암호화된 값은 건너뜀 (멱등성 보장)
+  - `SystemSettings.sftpPassword` 동시 처리
+- **전역 레이트 리밋**: `@nestjs/throttler` 적용
+  - 전역: 분당 200 요청 (IP 기준)
+  - 로그인 엔드포인트: 분당 10 요청으로 별도 제한 (브루트포스 방어)
+
+### Changed
+- **암호화 적용 범위 확대**: BackupService, SettingsService, CustomersService의 인라인 crypto 코드를 `CryptoService`로 교체
+  - SFTP 비밀번호 암호화/복호화 (BackupService, SettingsService)
+  - 서버 접근 정보(웹/SSH/Root 비밀번호) 암호화/복호화 (CustomersService)
+- **`ServerAccessInfo` 컬럼 길이 확장**: `webPassword`, `serverSshPassword`, `serverRootPassword` VARCHAR(100) → VARCHAR(512)
+  - AES-256-CBC 암호화 후 hex 인코딩 시 길이 증가 반영
+- **CORS 보안 강화**: `NODE_ENV=production`에서 `CORS_ORIGIN` 환경변수 기반 화이트리스트 적용
+  - 개발 환경: 전체 허용 유지
+  - 운영 환경: 미설정 시 전체 차단
+- **환경변수 시작 시 검증 강화** (`main.ts`):
+  - `ENCRYPTION_KEY`: 64자리 hex 형식 검증, 미달 시 서버 시작 거부
+  - `JWT_SECRET`: 32자 이상 검증, 미달 시 서버 시작 거부
+- **문서 다운로드/뷰어 접근 권한 체크** (`documents.controller.ts`):
+  - USER 역할: 담당 고객사(engineerId, engineerSubId, salesId)의 문서만 접근 가능
+  - ADMIN/SUPER_ADMIN: 전체 접근 허용
+- **파일 I/O 비동기화** (`documents.service.ts`): `fs.*Sync` 계열 전면 제거, `fs/promises` API로 교체
+  - `existsSync` → `fsp.access()`, `mkdirSync` → `fsp.mkdir()`, `renameSync` → `fsp.rename()`, `unlinkSync` → `fsp.unlink()`
+  - 고객사·점검대상 DB 조회 `Promise.all()` 병렬화
+
+### Fixed
+- **민감 정보 콘솔 노출 제거**: auth, customers, documents 모듈 전반의 `console.log` 전면 제거
+  - 로그인 흐름, 세션 관리, 파일 업로드, 소스 관리 등 디버그 로그 약 50여 개 삭제
+
+### Schema
+- **DB 인덱스 추가** (Prisma schema): 주요 조회 패턴에 맞춘 복합/단일 인덱스 추가
+  - `User`: `@@index([isActive])`
+  - `Customer`: `@@index([engineerId])`, `@@index([salesId])`, `@@index([contractEndDate])`, `@@index([lastInspectionDate])`
+  - `Document`: `@@index([customerId])`, `@@index([uploadedAt])`, `@@index([inspectionDate])`
+  - `LoginAttempt`: `@@index([userId, attemptTime])`
+  - `UserSession`: `@@index([userId, lastActivity])`
+
+---
+
 ## [v26.03.04] - 2026-03-24
 
 ### Fixed

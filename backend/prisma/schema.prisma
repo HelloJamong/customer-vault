@@ -54,6 +54,7 @@ model User {
   backupLogs            BackupLog[]
   meetingMinutes        MeetingMinutes[] @relation("MeetingMinutesCreator")
 
+  @@index([isActive])
   @@map("users")
 }
 
@@ -129,6 +130,10 @@ model Customer {
   supportLogs             SupportLog[]
   meetingMinutes          MeetingMinutes[]
 
+  @@index([engineerId])
+  @@index([salesId])
+  @@index([contractEndDate])
+  @@index([lastInspectionDate])
   @@map("customers")
 }
 
@@ -181,6 +186,9 @@ model Document {
   inspectionTarget    InspectionTarget? @relation(fields: [inspectionTargetId], references: [id], onDelete: SetNull)
   uploader            User      @relation(fields: [uploadedBy], references: [id])
 
+  @@index([customerId])
+  @@index([uploadedAt])
+  @@index([inspectionDate])
   @@map("documents")
 }
 
@@ -247,6 +255,7 @@ model LoginAttempt {
 
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, attemptTime])
   @@map("login_attempts")
 }
 
@@ -261,6 +270,7 @@ model UserSession {
 
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, lastActivity])
   @@map("user_sessions")
 }
 
@@ -366,7 +376,7 @@ model ServerAccessInfo {
   // 관리웹 접근 정보
   webUrl                String?  @map("web_url") @db.VarChar(200)      // 관리웹 주소
   webAccount            String?  @map("web_account") @db.VarChar(100)  // 관리웹 계정
-  webPassword           String?  @map("web_password") @db.VarChar(100) // 관리웹 패스워드
+  webPassword           String?  @map("web_password") @db.VarChar(512) // 관리웹 패스워드 (AES-256 암호화)
 
   // 서버 접근 정보
   serverHostname        String?  @map("server_hostname") @db.VarChar(100) // HostName
@@ -374,8 +384,8 @@ model ServerAccessInfo {
   serverSshPort         Int?     @map("server_ssh_port")                   // SSH 포트
   serverRootAccessible  String?  @map("server_root_accessible") @db.VarChar(20) // root 접근 여부 (가능/불가능)
   serverSshAccount      String?  @map("server_ssh_account") @db.VarChar(100)    // SSH 계정
-  serverSshPassword     String?  @map("server_ssh_password") @db.VarChar(100)   // SSH 패스워드
-  serverRootPassword    String?  @map("server_root_password") @db.VarChar(100)  // root 패스워드
+  serverSshPassword     String?  @map("server_ssh_password") @db.VarChar(512)   // SSH 패스워드 (AES-256 암호화)
+  serverRootPassword    String?  @map("server_root_password") @db.VarChar(512)  // root 패스워드 (AES-256 암호화)
 
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")

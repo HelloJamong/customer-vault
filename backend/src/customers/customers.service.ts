@@ -3,12 +3,14 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
+import { CryptoService } from '../common/crypto/crypto.service';
 
 @Injectable()
 export class CustomersService {
   constructor(
     private prisma: PrismaService,
     private logsService: LogsService,
+    private cryptoService: CryptoService,
   ) {}
 
   async findAll(filters?: {
@@ -187,8 +189,6 @@ export class CustomersService {
   }
 
   async create(createCustomerDto: CreateCustomerDto, userId: number, ipAddress?: string) {
-    console.log('[CustomersService] create 메서드 호출됨:', { userId, ipAddress });
-
     // 고객사명 중복 체크
     const existingCustomer = await this.prisma.customer.findUnique({
       where: { name: createCustomerDto.name },
@@ -214,7 +214,6 @@ export class CustomersService {
     });
 
     // 로그 기록
-    console.log('[CustomersService] 로그 기록 시작:', { userId, customerName: customer.name });
     await this.logsService.createServiceLog({
       userId,
       logType: '정상',
@@ -222,7 +221,6 @@ export class CustomersService {
       description: `새로운 고객사 "${customer.name}"를 추가했습니다.`,
       ipAddress,
     });
-    console.log('[CustomersService] 로그 기록 완료');
 
     return {
       id: customer.id,
@@ -564,14 +562,14 @@ export class CustomersService {
         accessType: access.accessType,
         webUrl: access.webUrl,
         webAccount: access.webAccount,
-        webPassword: access.webPassword,
+        webPassword: this.cryptoService.safeDecrypt(access.webPassword),
         serverHostname: access.serverHostname,
         serverIpAddress: access.serverIpAddress,
         serverSshPort: access.serverSshPort,
         serverRootAccessible: access.serverRootAccessible,
         serverSshAccount: access.serverSshAccount,
-        serverSshPassword: access.serverSshPassword,
-        serverRootPassword: access.serverRootPassword,
+        serverSshPassword: this.cryptoService.safeDecrypt(access.serverSshPassword),
+        serverRootPassword: this.cryptoService.safeDecrypt(access.serverRootPassword),
       })) || [],
       hrIntegration: {
         enabled: sourceManagement.hrIntegrationEnabled,
@@ -636,14 +634,14 @@ export class CustomersService {
             accessType: access.accessType,
             webUrl: access.webUrl,
             webAccount: access.webAccount,
-            webPassword: access.webPassword,
+            webPassword: access.webPassword ? this.cryptoService.encrypt(access.webPassword) : null,
             serverHostname: access.serverHostname,
             serverIpAddress: access.serverIpAddress,
             serverSshPort: access.serverSshPort,
             serverRootAccessible: access.serverRootAccessible,
             serverSshAccount: access.serverSshAccount,
-            serverSshPassword: access.serverSshPassword,
-            serverRootPassword: access.serverRootPassword,
+            serverSshPassword: access.serverSshPassword ? this.cryptoService.encrypt(access.serverSshPassword) : null,
+            serverRootPassword: access.serverRootPassword ? this.cryptoService.encrypt(access.serverRootPassword) : null,
           })),
         } : undefined,
       },
@@ -743,14 +741,14 @@ export class CustomersService {
             accessType: access.accessType,
             webUrl: access.webUrl,
             webAccount: access.webAccount,
-            webPassword: access.webPassword,
+            webPassword: access.webPassword ? this.cryptoService.encrypt(access.webPassword) : null,
             serverHostname: access.serverHostname,
             serverIpAddress: access.serverIpAddress,
             serverSshPort: access.serverSshPort,
             serverRootAccessible: access.serverRootAccessible,
             serverSshAccount: access.serverSshAccount,
-            serverSshPassword: access.serverSshPassword,
-            serverRootPassword: access.serverRootPassword,
+            serverSshPassword: access.serverSshPassword ? this.cryptoService.encrypt(access.serverSshPassword) : null,
+            serverRootPassword: access.serverRootPassword ? this.cryptoService.encrypt(access.serverRootPassword) : null,
           })),
         });
       }

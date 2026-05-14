@@ -17,12 +17,30 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', true);
 
+  // ConfigModule이 .env를 로드한 후 필수 환경 변수 검증
+  const encryptionKey = process.env.ENCRYPTION_KEY;
+  if (!encryptionKey || !/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
+    console.error('❌ ENCRYPTION_KEY 환경 변수가 유효하지 않습니다. 64자리 hex 문자열이 필요합니다.');
+    console.error('   생성: openssl rand -hex 32');
+    await app.close();
+    process.exit(1);
+  }
+
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret || jwtSecret.length < 32) {
+    console.error('❌ JWT_SECRET 환경 변수가 유효하지 않습니다. 32자 이상의 문자열이 필요합니다.');
+    console.error('   생성: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+    await app.close();
+    process.exit(1);
+  }
+
   // Enable CORS first - before any other middleware
   app.use(cors({
-    origin: (origin, callback) => {
-      // Always allow requests (for development)
-      callback(null, origin || '*');
-    },
+    origin: process.env.NODE_ENV === 'development'
+      ? true
+      : process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+        : false,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],

@@ -4,9 +4,10 @@ import { BackupService } from './backup.service';
 import { BackupController } from './backup.controller';
 import { LogsModule } from '../logs/logs.module';
 import { SettingsModule } from '../settings/settings.module';
+import { CryptoModule } from '../common/crypto/crypto.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), LogsModule, SettingsModule],
+  imports: [ScheduleModule.forRoot(), LogsModule, SettingsModule, CryptoModule],
   controllers: [BackupController],
   providers: [
     BackupService,

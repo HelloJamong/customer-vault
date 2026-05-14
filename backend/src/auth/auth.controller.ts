@@ -11,6 +11,7 @@ import {
   MessageEvent,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto, ChangePasswordDto, RefreshTokenDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -26,6 +27,7 @@ export class AuthController {
     private readonly sessionEventService: SessionEventService,
   ) {}
 
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '로그인' })
@@ -122,8 +124,6 @@ export class AuthController {
     const userId = req.user.id;
     const sessionId = req.user.sessionId;
 
-    console.log(`[SSE] 새 연결 - 사용자: ${userId}, 세션: ${sessionId}`);
-
     // 사용자의 이벤트 스트림 가져오기
     const eventStream = this.sessionEventService.getEventStream(userId);
 
@@ -133,7 +133,6 @@ export class AuthController {
         // 현재 세션 ID와 이벤트의 세션 ID가 같은 경우 로그아웃 처리
         // (다른 곳에서 로그인하여 이 세션이 강제 종료됨)
         if (event.sessionId === sessionId && event.type === 'logout') {
-          console.log(`[SSE] 로그아웃 이벤트 전송 - 사용자: ${userId}, 종료 대상 세션: ${sessionId}`);
           return {
             data: {
               type: event.type,

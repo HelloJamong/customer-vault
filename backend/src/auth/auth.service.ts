@@ -65,28 +65,17 @@ export class AuthService {
     const settings = await this.getSystemSettings();
     const passwordExpired = await this.isPasswordExpired(user.id, settings);
 
-    console.log(`[로그인] 사용자 ${user.username}(ID: ${user.id}) 로그인 시도`);
-    console.log(`[로그인] 중복 로그인 방지: ${settings.preventDuplicateLogin}, 강제 로그인: ${forceLogin}`);
-
     // 중복 로그인 방지가 활성화된 경우 기존 세션 확인
     if (settings.preventDuplicateLogin && !forceLogin) {
-      console.log(`[로그인] 기존 세션 확인 중...`);
-
       // lastActivity 기준으로 활성 세션만 확인 (브라우저 종료 등으로 만료된 세션 제외)
       const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MS);
       const existingSession = await this.prisma.userSession.findFirst({
         where: { userId: user.id, lastActivity: { gte: expiryTime } },
       });
 
-      console.log(`[로그인] 기존 활성 세션 조회 결과:`, existingSession ? `세션 ID: ${existingSession.sessionId}` : '없음 (없거나 만료됨)');
-
       if (existingSession) {
-        // 활성 세션이 있으면 DUPLICATE_SESSION 에러 반환
-        console.log(`[로그인] 중복 세션 감지 - DUPLICATE_SESSION 에러 반환`);
         throw new ForbiddenException('DUPLICATE_SESSION');
       }
-    } else {
-      console.log(`[로그인] 중복 세션 체크 스킵 (preventDuplicateLogin: ${settings.preventDuplicateLogin}, forceLogin: ${forceLogin})`);
     }
 
     // 로그인 성공 처리
@@ -288,20 +277,11 @@ export class AuthService {
   }
 
   async validateSession(userId: number, sessionId?: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true },
-    });
-
-    console.log(`[세션검증 API] 사용자 ${user?.username}(ID: ${userId}) 세션 검증 요청 (세션ID: ${sessionId})`);
-
     // 시스템 설정 확인
     const settings = await this.getSystemSettings();
-    console.log(`[세션검증 API] 중복 로그인 방지 설정: ${settings.preventDuplicateLogin}`);
 
     // 중복 로그인 방지가 비활성화되어 있으면 세션 검증 스킵
     if (!settings.preventDuplicateLogin) {
-      console.log(`[세션검증 API] 중복 로그인 방지 비활성화 - 세션 검증 스킵`);
       return { valid: true, sessionCheckDisabled: true };
     }
 
@@ -314,10 +294,7 @@ export class AuthService {
       where: whereClause,
     });
 
-    console.log(`[세션검증 API] 세션 조회 결과:`, session ? `세션 ID: ${session.sessionId}` : '세션 없음');
-
     if (!session) {
-      console.warn(`[세션검증 API] 세션 없음 - 401 에러 반환`);
       throw new UnauthorizedException('세션이 만료되었습니다.');
     }
 
@@ -327,7 +304,6 @@ export class AuthService {
       data: { lastActivity: new Date() },
     });
 
-    console.log(`[세션검증 API] 세션 유효 - lastActivity 업데이트 완료`);
     return { valid: true };
   }
 
@@ -472,14 +448,6 @@ export class AuthService {
   }
 
   private async manageUserSession(userId: number, ipAddress: string, settings: any, forceLogin?: boolean) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true }
-    });
-
-    console.log(`[세션관리] 사용자 ${user?.username}(ID: ${userId}) 세션 관리 시작`);
-    console.log(`[세션관리] 중복 로그인 방지: ${settings.preventDuplicateLogin}, 강제 로그인: ${forceLogin}`);
-
     // 기존 세션 조회 (SSE 이벤트 전송용)
     const existingSessions = await this.prisma.userSession.findMany({
       where: { userId },
@@ -493,13 +461,10 @@ export class AuthService {
     });
 
     if (deletedCount.count > 0) {
-      console.log(`[세션관리] 기존 세션 ${deletedCount.count}개 삭제 완료`);
-
       // 강제 로그인인 경우 SSE 이벤트 전송 및 로그 기록
       if (forceLogin && settings.preventDuplicateLogin) {
         // 기존 세션들에 로그아웃 이벤트 전송 (즉시 로그아웃)
         existingSessions.forEach((session) => {
-          console.log(`[세션관리] SSE 로그아웃 이벤트 전송 - 세션 ID: ${session.sessionId}`);
           this.sessionEventService.emitLogoutEvent(
             userId,
             session.sessionId,
@@ -528,7 +493,6 @@ export class AuthService {
       },
     });
 
-    console.log(`[세션관리] 새 세션 생성 완료 - 세션 ID: ${sessionId}`);
     return sessionId;
   }
 
@@ -556,12 +520,9 @@ export class AuthService {
   @Cron('0 */5 * * * *')
   async cleanupExpiredSessions() {
     const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MS);
-    const result = await this.prisma.userSession.deleteMany({
+    await this.prisma.userSession.deleteMany({
       where: { lastActivity: { lt: expiryTime } },
     });
-    if (result.count > 0) {
-      console.log(`[세션 정리] 만료된 세션 ${result.count}개 삭제 완료 (기준: ${SESSION_EXPIRY_MS / 60000}분 비활동)`);
-    }
   }
 
   private async getSystemSettings() {

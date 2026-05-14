@@ -2,12 +2,14 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { CryptoService } from '../common/crypto/crypto.service';
 
 @Injectable()
 export class SettingsService {
   constructor(
     private prisma: PrismaService,
     private logsService: LogsService,
+    private cryptoService: CryptoService,
   ) {}
 
   async getSettings() {
@@ -139,14 +141,7 @@ export class SettingsService {
     // SFTP 패스워드는 평문으로 입력받아 암호화 저장
     let updateData: any = { ...data, updatedBy: userId };
     if (data.sftpPassword !== undefined && data.sftpPassword !== '') {
-      const crypto = require('crypto');
-      const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '0'.repeat(64);
-      const IV_LENGTH = 16;
-      const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-      const iv = crypto.randomBytes(IV_LENGTH);
-      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-      const encrypted = Buffer.concat([cipher.update(data.sftpPassword), cipher.final()]);
-      updateData.sftpPassword = iv.toString('hex') + ':' + encrypted.toString('hex');
+      updateData.sftpPassword = this.cryptoService.encrypt(data.sftpPassword);
       if (data.sftpPassword !== settings.sftpPassword) {
         changes.push('SFTP 패스워드');
         beforeValues.push('***');

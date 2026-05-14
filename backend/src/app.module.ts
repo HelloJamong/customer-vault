@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -19,6 +21,7 @@ import { MeetingMinutesModule } from './meeting-minutes/meeting-minutes.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ name: 'global', ttl: 60000, limit: 200 }]),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -39,6 +42,9 @@ import { MeetingMinutesModule } from './meeting-minutes/meeting-minutes.module';
     NoticesModule,
     BackupModule,
     MeetingMinutesModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
