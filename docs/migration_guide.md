@@ -4,12 +4,182 @@
 
 ## 목차
 
-1. [개요](#개요)
-2. [개발 환경: DB 스키마 변경](#개발-환경-db-스키마-변경)
-3. [운영 환경: 오프라인 배포](#운영-환경-오프라인-배포)
-4. [스크립트 상세 설명](#스크립트-상세-설명)
-5. [트러블슈팅](#트러블슈팅)
-6. [베스트 프랙티스](#베스트-프랙티스)
+1. [버전별 마이그레이션 노트](#버전별-마이그레이션-노트)
+   - [v26.05.01 업그레이드 가이드](#v260501-업그레이드-가이드-이전-버전에서-업그레이드-시-필수)
+2. [개요](#개요)
+3. [개발 환경: DB 스키마 변경](#개발-환경-db-스키마-변경)
+4. [운영 환경: 오프라인 배포](#운영-환경-오프라인-배포)
+5. [스크립트 상세 설명](#스크립트-상세-설명)
+6. [트러블슈팅](#트러블슈팅)
+7. [베스트 프랙티스](#베스트-프랙티스)
+
+---
+
+## 버전별 마이그레이션 노트
+
+---
+
+## v26.05.01 업그레이드 가이드 (이전 버전에서 업그레이드 시 필수)
+
+> ⚠️ **v26.05.01은 이전 버전과 호환되지 않는 변경 사항이 포함되어 있습니다.**
+> v26.03.x 이하 버전에서 업그레이드하는 경우 아래 절차를 반드시 순서대로 따라야 합니다.
+
+### 변경 사항 요약
+
+| 항목 | 변경 내용 | 조치 필요 |
+|------|-----------|-----------|
+| 암호화 키 (`ENCRYPTION_KEY`) | 시작 시 64자리 hex 형식 필수 검증 | ✅ `.env` 확인 |
+| JWT 시크릿 (`JWT_SECRET`) | 시작 시 32자 이상 필수 검증 | ✅ `.env` 확인 |
+| DB 스키마 | 인덱스 추가, 비밀번호 컬럼 VARCHAR 확장 | ✅ 마이그레이션 실행 |
+| 서버 접근 정보 비밀번호 | 암호화 저장으로 변경 | ✅ 암호화 스크립트 실행 (1회) |
+| SFTP 비밀번호 | 암호화 저장으로 변경 | ✅ 암호화 스크립트 실행 (1회) |
+
+---
+
+### 1단계: 배포 전 `.env` 필수 확인
+
+v26.05.01부터 서버 시작 시 아래 두 환경변수를 검증합니다. 조건을 만족하지 않으면 **서버가 시작되지 않습니다.**
+
+```bash
+# 현재 값 확인
+grep -E "ENCRYPTION_KEY|JWT_SECRET" .env
+```
+
+#### ENCRYPTION_KEY 확인
+
+- **조건**: 64자리 hex 문자열 (소문자 영문 a-f, 숫자 0-9)
+- **기존에 설정하지 않았다면** 새로 생성:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+> ⚠️ **중요**: `ENCRYPTION_KEY`는 서버 접근 정보의 비밀번호를 암호화하는 키입니다.
+> 한 번 설정 후 절대 변경하지 마세요. 변경 시 기존 암호화 데이터를 복호화할 수 없습니다.
+
+#### JWT_SECRET 확인
+
+- **조건**: 32자 이상
+- **기존에 기본값(`please-change-this-...`)을 사용 중이라면** 반드시 교체:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
+
+`.env` 파일 적용:
+```env
+ENCRYPTION_KEY=여기에_생성된_64자리_hex_키
+JWT_SECRET=여기에_생성된_128자리_랜덤_문자열
+```
+
+---
+
+### 2단계: 이미지 pull 및 서비스 재시작
+
+```bash
+# 새 이미지 가져오기
+docker compose pull
+
+# 서비스 재시작 (DB는 데이터를 유지한 채 재기동)
+docker compose up -d
+
+# 백엔드 정상 기동 확인 (오류 없이 "Application is running" 출력 확인)
+docker compose logs backend --tail=30
+```
+
+정상 기동 시 로그 예시:
+```
+🚀 Application is running on: http://localhost:5005
+📚 API Documentation: http://localhost:5005/api/docs
+```
+
+`ENCRYPTION_KEY` 또는 `JWT_SECRET` 오류 시:
+```
+❌ ENCRYPTION_KEY 환경 변수가 유효하지 않습니다. 64자리 hex 문자열이 필요합니다.
+```
+→ 1단계로 돌아가서 `.env`를 수정한 후 `docker compose up -d` 재실행
+
+---
+
+### 3단계: DB 스키마 마이그레이션
+
+서버 접근 정보 비밀번호 컬럼 크기가 확장되고 성능 인덱스가 추가됩니다.
+
+> ✅ **데이터는 보존됩니다.** 컬럼 크기 확장과 인덱스 추가만 수행하며 기존 데이터는 변경되지 않습니다.
+
+```bash
+# 마이그레이션 적용
+docker compose exec backend npx prisma migrate deploy
+
+# 완료 확인
+docker compose exec backend npx prisma migrate status
+```
+
+성공 시 출력:
+```
+All migrations have been successfully applied.
+```
+
+---
+
+### 4단계: 기존 평문 비밀번호 암호화 (최초 1회)
+
+v26.05.01 이전에 저장된 서버 접근 정보와 SFTP 비밀번호가 평문으로 저장되어 있습니다.
+아래 스크립트를 실행하면 이를 AES-256-CBC 방식으로 암호화합니다.
+
+```bash
+docker compose exec backend npx ts-node -r tsconfig-paths/register prisma/scripts/encrypt-server-access-info.ts
+```
+
+성공 시 출력 예시:
+```
+[암호화 마이그레이션 시작]
+처리된 ServerAccessInfo 비밀번호: 12건
+처리된 SystemSettings.sftpPassword: 1건
+[완료] 암호화 마이그레이션 완료
+```
+
+> ℹ️ 이 스크립트는 멱등적으로 동작합니다. 이미 암호화된 값은 건너뛰므로 실수로 재실행해도 안전합니다.
+
+---
+
+### 5단계: 정상 동작 확인
+
+```bash
+# 전체 서비스 상태
+docker compose ps
+
+# 백엔드 로그 (에러 없는지 확인)
+docker compose logs backend --tail=50
+
+# 시스템 설정 → SFTP 비밀번호 저장/불러오기 정상 동작 확인
+# 고객사 상세 → 서버 접근 정보 비밀번호 표시 정상 확인
+```
+
+---
+
+### 롤백 절차 (문제 발생 시)
+
+3단계(마이그레이션) 실행 전이라면 단순히 이전 이미지로 되돌리면 됩니다.
+
+마이그레이션까지 적용한 경우:
+
+```bash
+# 1. 서비스 중지
+docker compose stop backend
+
+# 2. 마이그레이션 전 DB 백업 파일로 복원
+#    (import-package.sh 사용 시 자동 백업된 파일 사용)
+docker exec -i customer_db mysql -u root -p"${DB_ROOT_PASSWORD}" customer_db < backup_before_migration_YYYYMMDD_HHMMSS.sql
+
+# 3. 이전 버전 이미지로 docker-compose.yml 변경 후 재시작
+docker compose up -d
+```
+
+---
+
+**작성일**: 2026-05-14
+**적용 버전**: v26.05.01 이상
 
 ---
 
