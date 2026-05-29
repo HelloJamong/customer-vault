@@ -57,6 +57,7 @@ const CustomerSupportLogsPage = () => {
     inquirer: '',
     target: '',
     category: '',
+    title: '',
     userInfo: '',
     actionStatus: '',
     inquiryContent: '',
@@ -213,6 +214,7 @@ const CustomerSupportLogsPage = () => {
       { width: 12 },  // 문의자
       { width: 12 },  // 대상
       { width: 10 },  // 구분
+      { width: 30 },  // 제목
       { width: 15 },  // 사용자 정보
       { width: 12 },  // 조치 여부
       { width: 12 },  // 지원 엔지니어
@@ -257,6 +259,7 @@ const CustomerSupportLogsPage = () => {
       '문의자',
       '대상',
       '구분',
+      '제목',
       '사용자 정보',
       '조치 여부',
       '지원 엔지니어',
@@ -273,6 +276,7 @@ const CustomerSupportLogsPage = () => {
         log.inquirer || '',
         log.target || '',
         log.category || '',
+        log.title || '',
         log.userInfo || '',
         log.actionStatus || '',
         log.creator?.name || '',
@@ -322,6 +326,7 @@ const CustomerSupportLogsPage = () => {
       inquirer: '',
       target: '',
       category: '',
+      title: '',
       userInfo: '',
       actionStatus: '',
       inquiryContent: '',
@@ -341,6 +346,7 @@ const CustomerSupportLogsPage = () => {
       inquirer: log.inquirer || '',
       target: log.target || '',
       category: log.category || '',
+      title: log.title || '',
       userInfo: log.userInfo || '',
       actionStatus: log.actionStatus || '',
       inquiryContent: log.inquiryContent || '',
@@ -367,6 +373,7 @@ const CustomerSupportLogsPage = () => {
         inquirer: formData.inquirer,
         target: formData.target,
         category: formData.category,
+        title: formData.title,
         userInfo: formData.userInfo,
         actionStatus: formData.actionStatus,
         inquiryContent: formData.inquiryContent,
@@ -399,6 +406,7 @@ const CustomerSupportLogsPage = () => {
         inquirer: formData.inquirer,
         target: formData.target,
         category: formData.category,
+        title: formData.title,
         userInfo: formData.userInfo,
         actionStatus: formData.actionStatus,
         inquiryContent: formData.inquiryContent,
@@ -458,9 +466,10 @@ const CustomerSupportLogsPage = () => {
       renderCell: (params) => params.value || '-',
     },
     {
-      field: 'userInfo',
-      headerName: '사용자 정보',
-      width: 180,
+      field: 'title',
+      headerName: '제목',
+      width: 200,
+      flex: 1,
       renderCell: (params) => params.value || '-',
     },
     {
@@ -797,6 +806,14 @@ const CustomerSupportLogsPage = () => {
               </Box>
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
+                  제목
+                </Typography>
+                <Typography variant="body1">
+                  {selectedLog.title || '-'}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
                   문의 내용
                 </Typography>
                 <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
@@ -916,7 +933,7 @@ const CustomerSupportLogsPage = () => {
               <TextField
                 fullWidth
                 label="사용자 정보"
-                value={formData.userInfo}
+                value={formData.userInfo || ''}
                 onChange={(e) => setFormData({ ...formData, userInfo: e.target.value })}
               />
               <FormControl fullWidth>
@@ -933,6 +950,13 @@ const CustomerSupportLogsPage = () => {
                 </Select>
               </FormControl>
             </Box>
+            <TextField
+              fullWidth
+              label="제목"
+              placeholder="ex) 가상PC 구동 불가 이슈"
+              value={formData.title || ''}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
             <TextField
               fullWidth
               multiline
@@ -1044,7 +1068,7 @@ const CustomerSupportLogsPage = () => {
               <TextField
                 fullWidth
                 label="사용자 정보"
-                value={formData.userInfo}
+                value={formData.userInfo || ''}
                 onChange={(e) => setFormData({ ...formData, userInfo: e.target.value })}
               />
               <FormControl fullWidth>
@@ -1061,6 +1085,13 @@ const CustomerSupportLogsPage = () => {
                 </Select>
               </FormControl>
             </Box>
+            <TextField
+              fullWidth
+              label="제목"
+              placeholder="ex) 가상PC 구동 불가 이슈"
+              value={formData.title || ''}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
             <TextField
               fullWidth
               multiline

@@ -403,7 +403,8 @@ model SupportLog {
   inquirer        String?   @db.VarChar(100)       // 문의자
   target          String?   @db.VarChar(200)       // 대상
   category        String?   @db.VarChar(100)       // 구분
-  userInfo        String?   @map("user_info") @db.VarChar(200)  // 사용자 정보
+  title           String?   @db.VarChar(200)                      // 제목
+  userInfo        String?   @map("user_info") @db.VarChar(200)  // 사용자 정보 (deprecated)
   actionStatus    String?   @map("action_status") @db.VarChar(50) // 조치 여부
   inquiryContent  String?   @map("inquiry_content") @db.Text    // 문의 내용
   actionContent   String?   @map("action_content") @db.Text     // 진척 사항

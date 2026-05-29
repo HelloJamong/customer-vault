@@ -5,6 +5,7 @@ export interface SupportLog {
   inquirer?: string;
   target?: string;
   category?: string;
+  title?: string;
   userInfo?: string;
   actionStatus?: string;
   inquiryContent?: string;
@@ -32,6 +33,7 @@ export interface CreateSupportLogDto {
   inquirer?: string;
   target?: string;
   category?: string;
+  title?: string;
   userInfo?: string;
   actionStatus?: string;
   inquiryContent?: string;
@@ -47,6 +49,7 @@ export interface UpdateSupportLogDto {
   inquirer?: string;
   target?: string;
   category?: string;
+  title?: string;
   userInfo?: string;
   actionStatus?: string;
   inquiryContent?: string;

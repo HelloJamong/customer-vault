@@ -23,6 +23,10 @@ export class CreateSupportLogDto {
 
   @IsOptional()
   @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
   userInfo?: string;
 
   @IsOptional()
