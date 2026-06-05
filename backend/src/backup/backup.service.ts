@@ -65,18 +65,26 @@ export class BackupService implements OnModuleInit {
   }
 
   private buildCronExpression(settings: any): string {
-    const hour = settings.backupScheduleHour ?? 2;
+    const kstHour = settings.backupScheduleHour ?? 2;
     const type = settings.backupScheduleType ?? 'daily';
     const day = settings.backupScheduleDay ?? 1;
 
+    // 사용자 입력은 KST(UTC+9) 기준이나 cron은 서버 시간(UTC) 기준으로 동작하므로 변환
+    let utcHour = kstHour - 9;
+    const dayShift = utcHour < 0 ? -1 : 0;
+    if (utcHour < 0) utcHour += 24;
+
     if (type === 'daily') {
-      return `0 ${hour} * * *`;
+      return `0 ${utcHour} * * *`;
     } else if (type === 'weekly') {
-      return `0 ${hour} * * ${day}`;
+      // 0(일)~6(토), 음수 시 하루 앞으로 이동 (0 → 6으로 순환)
+      const utcDay = ((day + dayShift) % 7 + 7) % 7;
+      return `0 ${utcHour} * * ${utcDay}`;
     } else {
-      // monthly
+      // monthly: 1~28일, 음수 시 하루 앞으로 이동 (1일 → 말일은 지원 범위 밖이므로 최소 1)
       const dayOfMonth = day >= 1 && day <= 28 ? day : 1;
-      return `0 ${hour} ${dayOfMonth} * *`;
+      const utcDay = Math.max(1, dayOfMonth + dayShift);
+      return `0 ${utcHour} ${utcDay} * *`;
     }
   }
 
@@ -96,15 +104,19 @@ export class BackupService implements OnModuleInit {
   async runBackup(userId: number, ipAddress: string) {
     const log = await this.executeBackup(userId, 'manual');
 
-    await this.logsService.createServiceLog({
-      userId,
-      logType: log.status === 'success' ? '정상' : '오류',
-      action: '수동 백업 실행',
-      description: log.status === 'success'
-        ? `백업 성공 (대상: ${log.targets}, 경로: ${log.destinations})`
-        : `백업 실패: ${log.errorMessage}`,
-      ipAddress,
-    });
+    try {
+      await this.logsService.createServiceLog({
+        userId,
+        logType: log.status === 'success' ? '정상' : '오류',
+        action: '수동 백업 실행',
+        description: log.status === 'success'
+          ? `백업 성공 (대상: ${log.targets}, 경로: ${log.destinations})`
+          : `백업 실패: ${log.errorMessage}`,
+        ipAddress,
+      });
+    } catch (e) {
+      this.logger.error('백업 서비스 로그 기록 실패: ' + e.message);
+    }
 
     return log;
   }

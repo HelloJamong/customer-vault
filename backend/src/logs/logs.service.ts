@@ -244,10 +244,15 @@ export class LogsService {
     // 검색 텍스트 필터링 (로그인 시도 포함)
     let filteredLogs = allLogs;
     if (filters?.searchText) {
-      filteredLogs = allLogs.filter(log =>
+      filteredLogs = filteredLogs.filter(log =>
         log.action.includes(filters.searchText!) ||
         log.description.includes(filters.searchText!)
       );
+    }
+
+    // logType 후처리 필터링 (loginAttempt는 DB에서 필터 불가하므로 여기서 적용)
+    if (filters?.logType) {
+      filteredLogs = filteredLogs.filter(log => log.logType === filters.logType);
     }
 
     // 전체 개수
@@ -615,6 +620,11 @@ export class LogsService {
           log.action.includes(filters.searchText!) ||
           (log.description && log.description.includes(filters.searchText!)),
       );
+    }
+
+    // logType 후처리 필터링 (loginAttempt는 DB에서 필터 불가하므로 여기서 적용)
+    if (filters?.logType) {
+      allLogs = allLogs.filter((log) => log.logType === filters.logType);
     }
 
     // 최신순 정렬

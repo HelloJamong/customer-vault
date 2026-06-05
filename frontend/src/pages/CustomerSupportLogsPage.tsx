@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -39,6 +40,7 @@ dayjs.locale('ko');
 const CustomerSupportLogsPage = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [supportLogs, setSupportLogs] = useState<SupportLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -386,6 +388,7 @@ const CustomerSupportLogsPage = () => {
       await supportLogsAPI.create(createDto);
       setAddDialogOpen(false);
       await fetchData();
+      queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
       alert('지원 로그가 추가되었습니다.');
     } catch (error) {
       console.error('추가 실패:', error);
@@ -419,6 +422,7 @@ const CustomerSupportLogsPage = () => {
       await supportLogsAPI.update(selectedLog.id, updateDto);
       setEditDialogOpen(false);
       await fetchData();
+      queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
       alert('지원 로그가 수정되었습니다.');
     } catch (error) {
       console.error('수정 실패:', error);
@@ -432,6 +436,7 @@ const CustomerSupportLogsPage = () => {
     try {
       await supportLogsAPI.delete(log.id);
       await fetchData();
+      queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
       alert('지원 로그가 삭제되었습니다.');
     } catch (error) {
       console.error('삭제 실패:', error);
