@@ -9,6 +9,15 @@
 
 ---
 
+## [v26.06.02] - 2026-06-16
+
+### Fixed
+- **점검서 열람·다운로드 403 오류 수정**: 고객사 담당자/부담당자/영업담당자로 지정되지 않은 사용자가 `documents/{id}/view` 및 `documents/{id}/download` 접근 시 403 에러와 함께 "문서를 불러올 수 없습니다" 페이지가 표시되는 문제 수정
+  - `DocumentsController`의 `view`, `download` 엔드포인트에서 `isUserAssignedToCustomer` 배정 확인 로직 제거
+  - 로그인한 모든 사용자(user/admin/super_admin)가 점검서 열람 및 다운로드 가능
+
+---
+
 ## [v26.06.01] - 2026-06-05
 
 ### Fixed

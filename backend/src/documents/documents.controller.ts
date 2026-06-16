@@ -138,19 +138,11 @@ export class DocumentsController {
   }
 
   @Get(':id/download')
-  async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response, @Request() req) {
+  async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const document = await this.service.findOne(id);
 
     if (!document) {
       return res.status(404).json({ message: '문서를 찾을 수 없습니다.' });
-    }
-
-    const userRole = req.user.role;
-    if (userRole !== Role.ADMIN && userRole !== Role.SUPER_ADMIN) {
-      const isAssigned = await this.service.isUserAssignedToCustomer(req.user.id, document.customerId);
-      if (!isAssigned) {
-        throw new ForbiddenException('담당하지 않는 고객사의 문서에 접근할 수 없습니다.');
-      }
     }
 
     const filepath = this.service.getFilePath(document);
@@ -164,19 +156,11 @@ export class DocumentsController {
   }
 
   @Get(':id/view')
-  async view(@Param('id', ParseIntPipe) id: number, @Res() res: Response, @Request() req) {
+  async view(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const document = await this.service.findOne(id);
 
     if (!document) {
       return res.status(404).json({ message: '문서를 찾을 수 없습니다.' });
-    }
-
-    const userRole = req.user.role;
-    if (userRole !== Role.ADMIN && userRole !== Role.SUPER_ADMIN) {
-      const isAssigned = await this.service.isUserAssignedToCustomer(req.user.id, document.customerId);
-      if (!isAssigned) {
-        throw new ForbiddenException('담당하지 않는 고객사의 문서에 접근할 수 없습니다.');
-      }
     }
 
     const filepath = this.service.getFilePath(document);
