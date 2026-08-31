@@ -1,9 +1,17 @@
 # 고객창고 (Customer-Storage) - 통합 Docker Compose 설정
 #
-# 사용법:
-#   개발 환경: docker compose up -d
-#   프로덕션 환경: docker compose --profile production up -d
-#   전체 스택 (Frontend 포함): docker compose --profile frontend up -d
+# ── 온라인 ─────────────────────────────────────────────────────────────
+#   docker compose up -d          # 이미지는 Docker Hub에서 자동 pull
+#   docker compose pull && docker compose up -d   # 업그레이드
+#
+# ── 오프라인 / 폐쇄망 ──────────────────────────────────────────────────
+#   1) GitHub Release에서 customer-vault-images-<버전>.tar.gz 다운로드
+#   2) docker load -i customer-vault-images-<버전>.tar.gz
+#        → backend / frontend / mariadb:10.11 / nginx:alpine 이미지가 로컬에 로드됨
+#   3) .env 에 VERSION=<버전>, NODE_ENV=production 설정
+#   4) docker compose up -d
+#        → 이미지가 로컬에 있으면 pull하지 않으므로 이 파일 그대로 사용 가능
+#      (build: 섹션은 `docker compose up`에서 무시되어 소스 코드가 없어도 동작)
 
 services:
   # ==========================================
@@ -37,8 +45,7 @@ services:
   # ==========================================
   backend:
     image: igor0670/customer-storage-backend:${VERSION:-latest}
-    #오프라인 상태일 때 사용
-    #image: customer_backend:${VERSION:-latest}
+    # 오프라인: 위 이미지를 `docker load`로 미리 로드해두면 pull 없이 그대로 사용됩니다.
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -83,8 +90,7 @@ services:
   # ==========================================
   frontend:
     image: igor0670/customer-storage-frontend:${VERSION:-latest}
-    #오프라인 상태일 때 사용
-    #image: customer_frontend:${VERSION:-latest}
+    # 오프라인: 위 이미지를 `docker load`로 미리 로드해두면 pull 없이 그대로 사용됩니다.
     build:
       context: ./frontend
       dockerfile: Dockerfile

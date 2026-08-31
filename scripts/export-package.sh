@@ -4,7 +4,11 @@
 # =============================================================================
 # 용도: Docker 이미지를 빌드하고 오프라인 환경으로 이전할 패키지 생성
 # 실행: ./scripts/export-package.sh [버전]
-# 예시: ./scripts/export-package.sh 2.1.2
+# 예시: ./scripts/export-package.sh 26.7.0
+#
+# 참고: GitHub Release에 CI가 오프라인 이미지 번들(customer-vault-images-<버전>.tar.gz)을
+#       자동 첨부하므로, 보통은 이 스크립트 대신 Release 자산을 받으면 됩니다.
+#       이 스크립트는 마이그레이션 가이드 등이 포함된 전체 패키지가 필요할 때 사용합니다.
 # =============================================================================
 
 set -e  # 에러 발생 시 스크립트 중단
@@ -45,13 +49,14 @@ if [ -n "$1" ]; then
     VERSION="$1"
     log_info "지정된 버전 사용: ${VERSION}"
 else
-    CHANGELOG_VERSION=$(grep -m 1 '## \[v' CHANGELOG.md 2>/dev/null | sed 's/## \[v\([^]]*\)\].*/\1/')
+    # `## [26.7.0]` 또는 구버전 `## [v26.06.02]` 모두에서 버전 추출
+    CHANGELOG_VERSION=$(grep -m 1 -E '^## \[v?[0-9]' CHANGELOG.md 2>/dev/null | sed -E 's/^## \[v?([^]]*)\].*/\1/')
     if [ -n "$CHANGELOG_VERSION" ]; then
         VERSION="$CHANGELOG_VERSION"
         log_info "CHANGELOG.md에서 최신 버전 자동 감지: ${VERSION}"
     else
         log_error "CHANGELOG.md에서 버전을 찾을 수 없습니다. 버전을 직접 지정해주세요."
-        log_error "사용법: ./scripts/export-package.sh 26.03.01"
+        log_error "사용법: ./scripts/export-package.sh 26.7.0"
         exit 1
     fi
 fi
@@ -78,7 +83,7 @@ log_success "Backend 이미지 빌드 완료"
 
 log_info "Frontend 이미지 빌드 중..."
 docker build \
-    --build-arg VITE_APP_VERSION=v${VERSION} \
+    --build-arg VITE_APP_VERSION=${VERSION} \
     -t customer_frontend:${VERSION} ./frontend
 log_success "Frontend 이미지 빌드 완료"
 
