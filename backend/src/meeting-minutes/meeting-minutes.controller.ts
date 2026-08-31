@@ -36,7 +36,7 @@ export class MeetingMinutesController {
     @Body() dto: CreateMeetingMinutesDto,
     @Request() req: any,
   ) {
-    return this.service.create(customerId, dto, req.user.id, getClientIp(req));
+    return this.service.create(customerId, dto, req.user.id, getClientIp(req), req.user);
   }
 
   @Patch(':id')
@@ -46,12 +46,12 @@ export class MeetingMinutesController {
     @Body() dto: UpdateMeetingMinutesDto,
     @Request() req: any,
   ) {
-    return this.service.update(id, dto, req.user.id, getClientIp(req));
+    return this.service.update(id, dto, req.user.id, getClientIp(req), req.user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: '회의록 삭제' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.service.remove(id, req.user.id, getClientIp(req));
+    return this.service.remove(id, req.user.id, getClientIp(req), req.user);
   }
 }

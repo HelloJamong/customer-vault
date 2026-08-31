@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateSupportLogDto } from './dto/create-support-log.dto';
 import { UpdateSupportLogDto } from './dto/update-support-log.dto';
+import { assertCustomerEditable } from '../common/utils/customer-access.util';
 
 @Injectable()
 export class SupportLogsService {
@@ -171,7 +172,14 @@ export class SupportLogsService {
     return supportLog;
   }
 
-  async create(createDto: CreateSupportLogDto, userId: number, ipAddress: string) {
+  async create(
+    createDto: CreateSupportLogDto,
+    userId: number,
+    ipAddress: string,
+    user: { id: number; role: string },
+  ) {
+    await assertCustomerEditable(this.prisma, createDto.customerId, user, '담당하는 고객사의 지원 로그만 작성할 수 있습니다.');
+
     const supportLog = await this.prisma.supportLog.create({
       data: {
         customerId: createDto.customerId,
@@ -219,8 +227,18 @@ export class SupportLogsService {
     return supportLog;
   }
 
-  async update(id: number, updateDto: UpdateSupportLogDto, userId: number, ipAddress: string) {
+  async update(
+    id: number,
+    updateDto: UpdateSupportLogDto,
+    userId: number,
+    ipAddress: string,
+    user: { id: number; role: string },
+  ) {
     const existingSupportLog = await this.findOne(id);
+    await assertCustomerEditable(this.prisma, existingSupportLog.customerId, user, '담당하는 고객사의 지원 로그만 수정할 수 있습니다.');
+    if (updateDto.customerId && updateDto.customerId !== existingSupportLog.customerId) {
+      await assertCustomerEditable(this.prisma, updateDto.customerId, user, '담당하는 고객사로만 이동할 수 있습니다.');
+    }
 
     const updatedSupportLog = await this.prisma.supportLog.update({
       where: { id },
@@ -270,8 +288,9 @@ export class SupportLogsService {
     return updatedSupportLog;
   }
 
-  async remove(id: number, userId: number, ipAddress: string) {
+  async remove(id: number, userId: number, ipAddress: string, user: { id: number; role: string }) {
     const supportLog = await this.findOne(id);
+    await assertCustomerEditable(this.prisma, supportLog.customerId, user, '담당하는 고객사의 지원 로그만 삭제할 수 있습니다.');
 
     await this.prisma.supportLog.delete({
       where: { id },

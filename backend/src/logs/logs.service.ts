@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { cleanIpAddress } from '../common/utils/ip.util';
+import { buildKstDateWhere } from '../common/utils/date-range.util';
 import * as ExcelJS from 'exceljs';
 
 export interface SystemLogEntry {
   id: number;
+  // serviceLog와 loginAttempt는 PK가 겹칠 수 있으므로 프론트 렌더 key는 이 값을 사용한다.
+  rowKey: string;
   timestamp: Date;
   username: string;
   userId: number;
@@ -65,12 +68,7 @@ export class LogsService {
     if (filters?.action) where.action = filters.action;
     if (filters?.userId) where.userId = filters.userId;
 
-    if (filters?.startDate && filters?.endDate) {
-      where.createdAt = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(where, buildKstDateWhere('createdAt', filters?.startDate, filters?.endDate));
 
     return this.prisma.serviceLog.findMany({
       where,
@@ -93,12 +91,7 @@ export class LogsService {
     if (filters?.userId) where.userId = filters.userId;
     if (filters?.success !== undefined) where.success = filters.success;
 
-    if (filters?.startDate && filters?.endDate) {
-      where.attemptTime = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(where, buildKstDateWhere('attemptTime', filters?.startDate, filters?.endDate));
 
     return this.prisma.loginAttempt.findMany({
       where,
@@ -142,12 +135,7 @@ export class LogsService {
       serviceLogWhere.ipAddress = { contains: filters.ipAddress };
     }
 
-    if (filters?.startDate && filters?.endDate) {
-      serviceLogWhere.createdAt = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(serviceLogWhere, buildKstDateWhere('createdAt', filters?.startDate, filters?.endDate));
 
     if (filters?.username) {
       serviceLogWhere.user = {
@@ -162,12 +150,7 @@ export class LogsService {
       loginAttemptWhere.ipAddress = { contains: filters.ipAddress };
     }
 
-    if (filters?.startDate && filters?.endDate) {
-      loginAttemptWhere.attemptTime = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(loginAttemptWhere, buildKstDateWhere('attemptTime', filters?.startDate, filters?.endDate));
 
     if (filters?.username) {
       loginAttemptWhere.user = {
@@ -207,6 +190,7 @@ export class LogsService {
     for (const log of serviceLogs) {
       allLogs.push({
         id: log.id,
+        rowKey: `service-${log.id}`,
         timestamp: log.createdAt,
         username: log.user?.username || '시스템',
         userId: log.userId || 0,
@@ -226,6 +210,7 @@ export class LogsService {
 
       allLogs.push({
         id: attempt.id,
+        rowKey: `attempt-${attempt.id}`,
         timestamp: attempt.attemptTime,
         username: attempt.user?.username || '알 수 없음',
         userId: attempt.userId,
@@ -381,12 +366,7 @@ export class LogsService {
       serviceLogWhere.ipAddress = { contains: filters.ipAddress };
     }
 
-    if (filters?.startDate && filters?.endDate) {
-      serviceLogWhere.createdAt = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(serviceLogWhere, buildKstDateWhere('createdAt', filters?.startDate, filters?.endDate));
 
     if (filters?.username) {
       serviceLogWhere.user = {
@@ -405,6 +385,7 @@ export class LogsService {
     // 통합 로그 생성
     const allLogs: SystemLogEntry[] = serviceLogs.map((log) => ({
       id: log.id,
+      rowKey: `service-${log.id}`,
       timestamp: log.createdAt,
       username: log.user?.username || '시스템',
       userId: log.userId || 0,
@@ -525,12 +506,7 @@ export class LogsService {
       serviceLogWhere.ipAddress = { contains: filters.ipAddress };
     }
 
-    if (filters?.startDate && filters?.endDate) {
-      serviceLogWhere.createdAt = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(serviceLogWhere, buildKstDateWhere('createdAt', filters?.startDate, filters?.endDate));
 
     if (filters?.username) {
       serviceLogWhere.user = {
@@ -557,12 +533,7 @@ export class LogsService {
       loginAttemptWhere.ipAddress = { contains: filters.ipAddress };
     }
 
-    if (filters?.startDate && filters?.endDate) {
-      loginAttemptWhere.attemptTime = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
-    }
+    Object.assign(loginAttemptWhere, buildKstDateWhere('attemptTime', filters?.startDate, filters?.endDate));
 
     if (filters?.username) {
       loginAttemptWhere.user = {
@@ -581,6 +552,7 @@ export class LogsService {
     // 서비스 로그(로그인/로그아웃) 변환
     const serviceLogEntries: SystemLogEntry[] = serviceLogs.map((log) => ({
       id: log.id,
+      rowKey: `service-${log.id}`,
       timestamp: log.createdAt,
       username: log.user?.username || '시스템',
       userId: log.userId || 0,
@@ -599,6 +571,7 @@ export class LogsService {
 
       return {
         id: attempt.id,
+        rowKey: `attempt-${attempt.id}`,
         timestamp: attempt.attemptTime,
         username: attempt.user?.username || '알 수 없음',
         userId: attempt.userId,

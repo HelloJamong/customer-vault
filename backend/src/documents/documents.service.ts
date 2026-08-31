@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
+import { assertCustomerEditable } from '../common/utils/customer-access.util';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 
@@ -26,12 +27,11 @@ export class DocumentsService {
       where.inspectionTargetId = filters.inspectionTargetId;
     }
 
-    // 날짜 범위 필터 (startDate, endDate가 우선순위)
-    if (filters?.startDate && filters?.endDate) {
-      where.inspectionDate = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
+    // 날짜 범위 필터 (startDate/endDate가 우선). 한쪽만 지정돼도 해당 방향만 적용.
+    if (filters?.startDate || filters?.endDate) {
+      where.inspectionDate = {};
+      if (filters.startDate) where.inspectionDate.gte = new Date(filters.startDate);
+      if (filters.endDate) where.inspectionDate.lte = new Date(filters.endDate);
     } else if (filters?.year && filters?.month) {
       // 기존 year/month 필터 (하위 호환성)
       const startDate = new Date(filters.year, filters.month - 1, 1);
@@ -75,6 +75,8 @@ export class DocumentsService {
     inspectionDate: string;
     inspectionType: string;
   }) {
+    // 임시 파일을 최종 위치로 옮긴 뒤 DB 기록이 실패하면 이 경로의 고아 파일을 정리한다.
+    let movedFilepath: string | null = null;
     try {
       const inspectionDate = new Date(data.inspectionDate);
 
@@ -140,6 +142,7 @@ export class DocumentsService {
 
       // 임시 파일을 최종 위치로 이동
       await fsp.rename(data.tempFilepath, finalFilepath);
+      movedFilepath = finalFilepath;
 
       // title은 파일명(확장자 제외)으로 자동 설정
       const titleWithoutExt = finalFilename.replace('.pdf', '');
@@ -185,9 +188,12 @@ export class DocumentsService {
         message: '문서가 업로드되었습니다.',
       };
     } catch (error) {
-      // 에러 발생 시 임시 파일 삭제
+      // 에러 발생 시 임시 파일 / 옮겨진 최종 파일 정리
       if (data.tempFilepath && await fileExists(data.tempFilepath)) {
         await fsp.unlink(data.tempFilepath).catch(() => {});
+      }
+      if (movedFilepath && await fileExists(movedFilepath)) {
+        await fsp.unlink(movedFilepath).catch(() => {});
       }
       throw error;
     }
@@ -235,6 +241,16 @@ export class DocumentsService {
     return document.filepath;
   }
 
+  // 점검서 업로드 권한: 관리자는 제한 없음, 일반 사용자는 담당 고객사만.
+  async assertCanUpload(customerId: number, user: { id: number; role: string }) {
+    await assertCustomerEditable(
+      this.prisma,
+      customerId,
+      user,
+      '담당하지 않는 고객사에는 점검서를 업로드할 수 없습니다.',
+    );
+  }
+
   async isUserAssignedToCustomer(userId: number, customerId: number): Promise<boolean> {
     const customer = await this.prisma.customer.findFirst({
       where: {
@@ -250,45 +266,11 @@ export class DocumentsService {
     return !!customer;
   }
 
-  private async updateInspectionStatus(customerId: number): Promise<void> {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-      include: {
-        inspectionTargets: { select: { id: true } },
-      },
-    });
-
-    if (!customer || !this.isInspectionNeededThisMonth(customer)) {
-      return;
-    }
-
-    const targetIds = customer.inspectionTargets?.map((t) => t.id) || [];
-    if (targetIds.length === 0) return;
-
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const thisMonthDocuments = await this.prisma.document.findMany({
-      where: {
-        customerId,
-        inspectionTargetId: { in: targetIds },
-        inspectionDate: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-      },
-      select: { inspectionTargetId: true },
-    });
-
-    const completedTargetIds = new Set(
-      thisMonthDocuments
-        .map((doc) => doc.inspectionTargetId)
-        .filter((id): id is number => id !== null)
-    );
-
-    // 완료 여부 계산 (inspectionStatus 컬럼 추가 시 여기서 업데이트)
-    targetIds.every((id) => completedTargetIds.has(id));
+  // 점검 완료 상태를 저장할 inspectionStatus 컬럼이 아직 스키마에 없어 현재는 no-op.
+  // 컬럼 추가 시 여기서 이번 달 점검 완료 여부를 계산해 갱신한다.
+  // (isInspectionNeededThisMonth에 점검 주기 판정 로직 보존)
+  private async updateInspectionStatus(_customerId: number): Promise<void> {
+    return;
   }
 
   private isInspectionNeededThisMonth(customer: any): boolean {

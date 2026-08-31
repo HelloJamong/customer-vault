@@ -1,7 +1,8 @@
 version: 2
 
 paths-ignore:
-  - "**/*.example"
+  # .env.example만 제외한다. "**/*.example" 를 통째로 제외하면
+  # 다른 example 파일에 실제 시크릿이 들어가도 탐지되지 않는다.
   - "**/.env.example"
   - "**/.env.*.example"
   - "**/node_modules/**"

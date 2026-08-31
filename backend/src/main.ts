@@ -13,22 +13,37 @@ async function bootstrap() {
     bodyParser: true, // NestJS 기본 body parser 사용 (쿠키 처리 개선)
   });
 
-  // Trust proxy to get real client IP from X-Forwarded-For header
+  // Trust proxy to get real client IP from X-Forwarded-For header.
+  // 신뢰 홉 수를 고정한다(nginx 리버스 프록시 1대). true로 두면 클라이언트가
+  // X-Forwarded-For를 위조해 req.ip를 조작하고 레이트리밋을 우회할 수 있다.
   const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.set('trust proxy', true);
+  expressApp.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 
   // ConfigModule이 .env를 로드한 후 필수 환경 변수 검증
+  // 리포지토리/문서에 공개된 기본값은 형식 검증을 통과하더라도 거부한다.
+  const KNOWN_WEAK_SECRETS = new Set([
+    'please-change-this-secret-key-in-production-environment',
+    '0'.repeat(64),
+    'changeme',
+    'secret',
+    'your-secret-key',
+  ]);
+
   const encryptionKey = process.env.ENCRYPTION_KEY;
-  if (!encryptionKey || !/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
-    console.error('❌ ENCRYPTION_KEY 환경 변수가 유효하지 않습니다. 64자리 hex 문자열이 필요합니다.');
+  if (
+    !encryptionKey ||
+    !/^[0-9a-fA-F]{64}$/.test(encryptionKey) ||
+    KNOWN_WEAK_SECRETS.has(encryptionKey)
+  ) {
+    console.error('❌ ENCRYPTION_KEY 환경 변수가 유효하지 않거나 공개된 기본값입니다. 64자리 hex 문자열이 필요합니다.');
     console.error('   생성: openssl rand -hex 32');
     await app.close();
     process.exit(1);
   }
 
   const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret || jwtSecret.length < 32) {
-    console.error('❌ JWT_SECRET 환경 변수가 유효하지 않습니다. 32자 이상의 문자열이 필요합니다.');
+  if (!jwtSecret || jwtSecret.length < 32 || KNOWN_WEAK_SECRETS.has(jwtSecret)) {
+    console.error('❌ JWT_SECRET 환경 변수가 유효하지 않거나 공개된 기본값입니다. 32자 이상의 문자열이 필요합니다.');
     console.error('   생성: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
     await app.close();
     process.exit(1);
@@ -66,20 +81,24 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('Customer Storage API')
-    .setDescription('고객사 정보 및 유지보수 점검 이력 관리 API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger documentation (프로덕션에서는 노출하지 않음)
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Customer Storage API')
+      .setDescription('고객사 정보 및 유지보수 점검 이력 관리 API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.BACKEND_PORT || process.env.PORT || 5000;
   await app.listen(port);
   console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+  }
 }
 
 bootstrap();

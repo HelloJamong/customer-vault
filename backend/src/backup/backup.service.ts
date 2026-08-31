@@ -50,9 +50,17 @@ export class BackupService implements OnModuleInit {
       this.schedulerRegistry.deleteCronJob('auto-backup');
     } catch {}
 
-    const job = new CronJob(cronExpression, () => {
-      this.runScheduledBackup();
-    });
+    // 스케줄 시각은 KST 기준. cron 라이브러리에 타임존을 직접 지정해
+    // 서버 시간대(UTC 등)와 무관하게 동작하도록 한다.
+    const job = new CronJob(
+      cronExpression,
+      () => {
+        this.runScheduledBackup();
+      },
+      null,
+      false,
+      'Asia/Seoul',
+    );
     this.schedulerRegistry.addCronJob('auto-backup', job);
     job.start();
   }
@@ -65,27 +73,22 @@ export class BackupService implements OnModuleInit {
   }
 
   private buildCronExpression(settings: any): string {
-    const kstHour = settings.backupScheduleHour ?? 2;
+    // 모든 값은 KST 기준. CronJob에 timeZone: 'Asia/Seoul'을 지정하므로 별도 변환 불필요.
+    const hour = settings.backupScheduleHour ?? 2;
     const type = settings.backupScheduleType ?? 'daily';
     const day = settings.backupScheduleDay ?? 1;
 
-    // 사용자 입력은 KST(UTC+9) 기준이나 cron은 서버 시간(UTC) 기준으로 동작하므로 변환
-    let utcHour = kstHour - 9;
-    const dayShift = utcHour < 0 ? -1 : 0;
-    if (utcHour < 0) utcHour += 24;
-
-    if (type === 'daily') {
-      return `0 ${utcHour} * * *`;
-    } else if (type === 'weekly') {
-      // 0(일)~6(토), 음수 시 하루 앞으로 이동 (0 → 6으로 순환)
-      const utcDay = ((day + dayShift) % 7 + 7) % 7;
-      return `0 ${utcHour} * * ${utcDay}`;
-    } else {
-      // monthly: 1~28일, 음수 시 하루 앞으로 이동 (1일 → 말일은 지원 범위 밖이므로 최소 1)
-      const dayOfMonth = day >= 1 && day <= 28 ? day : 1;
-      const utcDay = Math.max(1, dayOfMonth + dayShift);
-      return `0 ${utcHour} ${utcDay} * *`;
+    if (type === 'weekly') {
+      // 0(일)~6(토)
+      const dow = ((day % 7) + 7) % 7;
+      return `0 ${hour} * * ${dow}`;
     }
+    if (type === 'monthly') {
+      // 1~28일 (말일 처리는 지원 범위 밖 → 최소 1)
+      const dom = day >= 1 && day <= 28 ? day : 1;
+      return `0 ${hour} ${dom} * *`;
+    }
+    return `0 ${hour} * * *`;
   }
 
   // ─── 자동 백업 실행 ────────────────────────────────────────────────────────
@@ -201,10 +204,19 @@ export class BackupService implements OnModuleInit {
         }
       }
 
-      // 보관 개수 정책 적용 (로컬)
+      // 로컬 보관이 선택된 경우: 보관 개수 정책 적용
+      // 원격 전용인 경우: 방금 만든 파일은 전송용 임시 파일이므로 삭제 (볼륨 무한 증가 방지)
       if (destinations.includes('local')) {
         await this.cleanupOldBackups('db-backup', settings.backupRetentionCount);
         await this.cleanupOldBackups('doc-backup', settings.backupRetentionCount);
+      } else {
+        for (const p of savedPaths) {
+          try {
+            if (fs.existsSync(p)) fs.unlinkSync(p);
+          } catch (e) {
+            this.logger.warn(`임시 백업 파일 삭제 실패: ${p} (${e.message})`);
+          }
+        }
       }
 
       // DB 이력 업데이트
@@ -240,26 +252,33 @@ export class BackupService implements OnModuleInit {
   private backupDatabase(destPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const dbUrl = process.env.DATABASE_URL || '';
-      // mysql://user:pass@host:port/dbname
-      const match = dbUrl.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
-      if (!match) {
-        reject(new Error('DATABASE_URL 파싱 실패'));
+      let user: string, pass: string, host: string, port: string, dbname: string;
+      try {
+        // mysql://user:pass@host:port/dbname?params — 쿼리 파라미터·특수문자 포함 비밀번호 대응
+        const u = new URL(dbUrl);
+        user = decodeURIComponent(u.username);
+        pass = decodeURIComponent(u.password);
+        host = u.hostname;
+        port = u.port || '3306';
+        dbname = u.pathname.replace(/^\//, '');
+        if (!user || !host || !dbname) throw new Error('필수 항목 누락');
+      } catch (e) {
+        reject(new Error(`DATABASE_URL 파싱 실패: ${e.message}`));
         return;
       }
-      const [, user, pass, host, port, dbname] = match;
 
       const outStream = fs.createWriteStream(destPath);
 
+      // 비밀번호는 인자(argv) 대신 환경변수로 전달해 ps/proc 노출을 막는다.
       const mysqldump = spawn('mysqldump', [
         `-h${host}`,
         `-P${port}`,
         `-u${user}`,
-        `-p${pass}`,
         '--single-transaction',
         '--routines',
         '--triggers',
         dbname,
-      ]);
+      ], { env: { ...process.env, MYSQL_PWD: pass } });
 
       const gzip = spawn('gzip', ['-c']);
 
@@ -270,17 +289,45 @@ export class BackupService implements OnModuleInit {
       mysqldump.stderr.on('data', (d) => { errorOutput += d.toString(); });
       gzip.stderr.on('data', (d) => { errorOutput += d.toString(); });
 
-      outStream.on('finish', () => {
-        if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
-          resolve();
-        } else {
-          reject(new Error('DB 백업 파일이 생성되지 않았습니다: ' + errorOutput));
-        }
-      });
+      let mysqldumpCode: number | null = null;
+      let gzipCode: number | null = null;
+      let streamFinished = false;
+      let settled = false;
 
-      mysqldump.on('error', reject);
-      gzip.on('error', reject);
-      outStream.on('error', reject);
+      const fail = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        // 실패 시 불완전한 파일을 남기지 않는다.
+        try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch {}
+        reject(err);
+      };
+
+      const finish = () => {
+        if (settled) return;
+        if (mysqldumpCode === null || gzipCode === null || !streamFinished) return;
+        if (mysqldumpCode !== 0) {
+          fail(new Error(`mysqldump 실패 (exit ${mysqldumpCode}): ${errorOutput.trim()}`));
+          return;
+        }
+        if (gzipCode !== 0) {
+          fail(new Error(`gzip 실패 (exit ${gzipCode}): ${errorOutput.trim()}`));
+          return;
+        }
+        if (!fs.existsSync(destPath) || fs.statSync(destPath).size === 0) {
+          fail(new Error('DB 백업 파일이 비어 있습니다: ' + errorOutput.trim()));
+          return;
+        }
+        settled = true;
+        resolve();
+      };
+
+      mysqldump.on('close', (code) => { mysqldumpCode = code ?? 1; finish(); });
+      gzip.on('close', (code) => { gzipCode = code ?? 1; finish(); });
+      outStream.on('finish', () => { streamFinished = true; finish(); });
+
+      mysqldump.on('error', fail);
+      gzip.on('error', fail);
+      outStream.on('error', fail);
     });
   }
 
@@ -365,13 +412,16 @@ export class BackupService implements OnModuleInit {
     const dir = path.join(this.backupDir, subDir);
     if (!fs.existsSync(dir)) return;
 
+    // 설정값이 없거나 잘못된 경우 기본 7개 보관
+    const keep = Number.isInteger(retentionCount) && retentionCount > 0 ? retentionCount : 7;
+
     const files = fs
       .readdirSync(dir)
       .filter((f) => f.endsWith('.gz'))
       .map((f) => ({ name: f, mtime: fs.statSync(path.join(dir, f)).mtime }))
       .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-    const toDelete = files.slice(retentionCount);
+    const toDelete = files.slice(keep);
     for (const file of toDelete) {
       fs.unlinkSync(path.join(dir, file.name));
       this.logger.log(`오래된 백업 삭제: ${file.name}`);

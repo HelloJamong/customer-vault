@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface CustomersPageState {
   // 검색 및 필터 상태
@@ -54,6 +54,8 @@ export const useCustomersPageStore = create<CustomersPageState>()(
     }),
     {
       name: 'customers-page-state',
+      // 인증과 동일하게 세션 단위로만 유지 (로그아웃/계정 전환 시 이전 검색어·필터가 남지 않도록)
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );

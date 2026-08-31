@@ -151,16 +151,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
    * 민감한 정보 제거 (비밀번호 등)
    */
   private sanitizeBody(body: any): any {
-    if (!body) return body;
+    if (!body || typeof body !== 'object') return body;
 
-    const sanitized = { ...body };
-    const sensitiveFields = ['password', 'token', 'secret', 'accessToken', 'refreshToken'];
+    // 키 이름에 password/token/secret/credential이 포함되면 마스킹
+    // (currentPassword, newPassword, accessToken 등도 포함)
+    const sensitive = /password|token|secret|credential|passwd/i;
+    const sanitized: Record<string, any> = { ...body };
 
-    sensitiveFields.forEach(field => {
-      if (sanitized[field]) {
-        sanitized[field] = '***REDACTED***';
+    for (const key of Object.keys(sanitized)) {
+      if (sensitive.test(key) && sanitized[key] !== undefined && sanitized[key] !== null) {
+        sanitized[key] = '***REDACTED***';
       }
-    });
+    }
 
     return sanitized;
   }

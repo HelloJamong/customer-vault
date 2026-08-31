@@ -81,9 +81,10 @@ export class CustomersController {
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '고객사 정보 수정' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto, @Request() req: any) {
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto, @Request() req: any) {
+    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
-    return this.customersService.update(id, updateCustomerDto, req.user.id, ipAddress);
+    return this.customersService.update(id, updateCustomerDto, req.user.id, ipAddress, req.user.role);
   }
 
   @Delete(':id')
@@ -99,17 +100,19 @@ export class CustomersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '소스 관리 정보 조회' })
   getSourceManagement(@Param('id', ParseIntPipe) id: number) {
+    // 조회는 로그인한 모든 내부 사용자에게 허용 (담당 여부 무관)
     return this.customersService.getSourceManagement(id);
   }
 
   @Post(':id/source-management')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '소스 관리 정보 생성' })
-  createSourceManagement(
+  async createSourceManagement(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateSourceManagementDto,
     @Request() req: any,
   ) {
+    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.createSourceManagement(id, dto, req.user.id, ipAddress);
   }
@@ -117,11 +120,12 @@ export class CustomersController {
   @Put(':id/source-management')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '소스 관리 정보 수정' })
-  updateSourceManagement(
+  async updateSourceManagement(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSourceManagementDto,
     @Request() req: any,
   ) {
+    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.updateSourceManagement(id, dto, req.user.id, ipAddress);
   }

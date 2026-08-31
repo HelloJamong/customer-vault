@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import { UpdateNoticeDto } from './dto/update-notice.dto';
+import { sanitizeRichText, sanitizeRichTextFields } from '../common/utils/html-sanitizer.util';
 
 @Injectable()
 export class NoticesService {
@@ -12,7 +13,7 @@ export class NoticesService {
   ) {}
 
   async findAll() {
-    return this.prisma.notice.findMany({
+    const list = await this.prisma.notice.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         creator: {
@@ -24,6 +25,7 @@ export class NoticesService {
         },
       },
     });
+    return list.map((n) => sanitizeRichTextFields(n, ['content']));
   }
 
   async findOne(id: number) {
@@ -44,7 +46,7 @@ export class NoticesService {
       throw new NotFoundException('공지사항을 찾을 수 없습니다.');
     }
 
-    return notice;
+    return sanitizeRichTextFields(notice, ['content']);
   }
 
   async create(
@@ -55,7 +57,7 @@ export class NoticesService {
     const notice = await this.prisma.notice.create({
       data: {
         title: createDto.title,
-        content: createDto.content,
+        content: sanitizeRichText(createDto.content),
         createdBy: userId,
       },
       include: {
@@ -93,7 +95,12 @@ export class NoticesService {
 
     const updatedNotice = await this.prisma.notice.update({
       where: { id },
-      data: updateDto,
+      data: {
+        ...updateDto,
+        ...(updateDto.content !== undefined && {
+          content: sanitizeRichText(updateDto.content),
+        }),
+      },
       include: {
         creator: {
           select: {
@@ -184,7 +191,7 @@ export class NoticesService {
       },
     });
 
-    return unreadNotices;
+    return unreadNotices.map((n) => sanitizeRichTextFields(n, ['content']));
   }
 
   /**

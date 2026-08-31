@@ -4,6 +4,7 @@ import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
+import { assertCustomerEditable, isAdminRole } from '../common/utils/customer-access.util';
 
 @Injectable()
 export class CustomersService {
@@ -229,7 +230,7 @@ export class CustomersService {
     };
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto, userId: number, ipAddress?: string) {
+  async update(id: number, updateCustomerDto: UpdateCustomerDto, userId: number, ipAddress?: string, role?: string) {
     // 변경 전 데이터 조회
     const beforeCustomer = await this.prisma.customer.findUnique({
       where: { id },
@@ -284,6 +285,14 @@ export class CustomersService {
     }
     if (updateCustomerDto.salesId === undefined || updateCustomerDto.salesId === null) {
       updateData.salesId = null;
+    }
+
+    // 일반 사용자(user)는 담당자 지정(정/부 엔지니어, 영업)을 변경할 수 없다.
+    // (담당자를 자기 자신으로 바꿔 권한을 얻는 것을 방지) — 위의 null 변환 이후에 제거
+    if (role !== undefined && !isAdminRole(role)) {
+      delete updateData.engineerId;
+      delete updateData.engineerSubId;
+      delete updateData.salesId;
     }
 
     const customer = await this.prisma.customer.update({
@@ -766,5 +775,10 @@ export class CustomersService {
     });
 
     return this.getSourceManagement(customerId);
+  }
+
+  // 편집 권한: 관리자는 제한 없음, 일반 사용자는 담당(정/부 엔지니어, 영업) 고객사만.
+  async assertCustomerAssignment(customerId: number, userId: number, role: string) {
+    await assertCustomerEditable(this.prisma, customerId, { id: userId, role });
   }
 }

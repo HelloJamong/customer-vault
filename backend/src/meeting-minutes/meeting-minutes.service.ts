@@ -3,6 +3,10 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateMeetingMinutesDto } from './dto/create-meeting-minutes.dto';
 import { UpdateMeetingMinutesDto } from './dto/update-meeting-minutes.dto';
+import { sanitizeRichText, sanitizeRichTextFields } from '../common/utils/html-sanitizer.util';
+import { assertCustomerEditable } from '../common/utils/customer-access.util';
+
+const RICH_FIELDS = ['content', 'decisions', 'remarks'] as const;
 
 @Injectable()
 export class MeetingMinutesService {
@@ -12,7 +16,7 @@ export class MeetingMinutesService {
   ) {}
 
   async findAllByCustomer(customerId: number) {
-    return this.prisma.meetingMinutes.findMany({
+    const list = await this.prisma.meetingMinutes.findMany({
       where: { customerId },
       orderBy: { meetingDate: 'desc' },
       include: {
@@ -21,6 +25,7 @@ export class MeetingMinutesService {
         },
       },
     });
+    return list.map((m) => sanitizeRichTextFields(m, [...RICH_FIELDS]));
   }
 
   async findOne(id: number) {
@@ -33,10 +38,18 @@ export class MeetingMinutesService {
       },
     });
     if (!minutes) throw new NotFoundException('회의록을 찾을 수 없습니다.');
-    return minutes;
+    return sanitizeRichTextFields(minutes, [...RICH_FIELDS]);
   }
 
-  async create(customerId: number, dto: CreateMeetingMinutesDto, userId: number, ipAddress: string) {
+  async create(
+    customerId: number,
+    dto: CreateMeetingMinutesDto,
+    userId: number,
+    ipAddress: string,
+    user: { id: number; role: string },
+  ) {
+    await assertCustomerEditable(this.prisma, customerId, user, '담당하는 고객사의 회의록만 작성할 수 있습니다.');
+
     const minutes = await this.prisma.meetingMinutes.create({
       data: {
         customerId,
@@ -44,9 +57,9 @@ export class MeetingMinutesService {
         attendees: dto.attendees,
         location: dto.location,
         subject: dto.subject,
-        content: dto.content,
-        decisions: dto.decisions,
-        remarks: dto.remarks,
+        content: sanitizeRichText(dto.content),
+        decisions: sanitizeRichText(dto.decisions),
+        remarks: sanitizeRichText(dto.remarks),
         createdBy: userId,
       },
       include: {
@@ -66,8 +79,15 @@ export class MeetingMinutesService {
     return minutes;
   }
 
-  async update(id: number, dto: UpdateMeetingMinutesDto, userId: number, ipAddress: string) {
+  async update(
+    id: number,
+    dto: UpdateMeetingMinutesDto,
+    userId: number,
+    ipAddress: string,
+    user: { id: number; role: string },
+  ) {
     const existing = await this.findOne(id);
+    await assertCustomerEditable(this.prisma, existing.customerId, user, '담당하는 고객사의 회의록만 수정할 수 있습니다.');
 
     const updated = await this.prisma.meetingMinutes.update({
       where: { id },
@@ -76,9 +96,9 @@ export class MeetingMinutesService {
         ...(dto.attendees !== undefined && { attendees: dto.attendees }),
         ...(dto.location !== undefined && { location: dto.location }),
         ...(dto.subject !== undefined && { subject: dto.subject }),
-        ...(dto.content !== undefined && { content: dto.content }),
-        ...(dto.decisions !== undefined && { decisions: dto.decisions }),
-        ...(dto.remarks !== undefined && { remarks: dto.remarks }),
+        ...(dto.content !== undefined && { content: sanitizeRichText(dto.content) }),
+        ...(dto.decisions !== undefined && { decisions: sanitizeRichText(dto.decisions) }),
+        ...(dto.remarks !== undefined && { remarks: sanitizeRichText(dto.remarks) }),
       },
       include: {
         creator: { select: { id: true, name: true, username: true } },
@@ -98,8 +118,9 @@ export class MeetingMinutesService {
     return updated;
   }
 
-  async remove(id: number, userId: number, ipAddress: string) {
+  async remove(id: number, userId: number, ipAddress: string, user: { id: number; role: string }) {
     const minutes = await this.findOne(id);
+    await assertCustomerEditable(this.prisma, minutes.customerId, user, '담당하는 고객사의 회의록만 삭제할 수 있습니다.');
 
     await this.prisma.meetingMinutes.delete({ where: { id } });
 

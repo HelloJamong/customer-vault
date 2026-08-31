@@ -227,6 +227,8 @@ export class DocumentsController {
     @Body() body: any,
     @Request() req,
   ) {
+    await this.service.assertCanUpload(customerId, req.user);
+
     return this.service.create({
       customerId,
       inspectionTargetId: parseInt(body.inspectionTargetId),

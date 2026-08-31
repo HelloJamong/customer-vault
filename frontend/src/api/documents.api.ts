@@ -28,8 +28,6 @@ export const documentsAPI = {
 
   // 사용자용 점검서 업로드
   uploadInspectionDocument: async (dto: UploadInspectionDocumentDto): Promise<any> => {
-    console.log('[Frontend] Upload DTO:', dto);
-
     const formData = new FormData();
     formData.append('customerId', dto.customerId.toString());
     formData.append('inspectionTargetId', dto.inspectionTargetId.toString());
@@ -37,26 +35,10 @@ export const documentsAPI = {
     formData.append('inspectionType', dto.inspectionType);
     formData.append('file', dto.file);
 
-    console.log('[Frontend] FormData entries:');
-    for (const [key, value] of formData.entries()) {
-      console.log(`  ${key}:`, value);
-    }
-
-    try {
-      // Content-Type을 명시적으로 제거하여 브라우저가 자동으로 multipart/form-data와 boundary를 설정하도록 함
-      const { data } = await apiClient.post('/documents/my/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      console.log('[Frontend] Upload success:', data);
-      return data;
-    } catch (error: any) {
-      console.error('[Frontend] Upload error:', error);
-      console.error('[Frontend] Error response:', error.response?.data);
-      console.error('[Frontend] Error status:', error.response?.status);
-      throw error;
-    }
+    const { data } = await apiClient.post('/documents/my/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
   },
 
   // 점검서 삭제 (관리자 전용)

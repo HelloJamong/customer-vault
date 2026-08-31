@@ -7,46 +7,24 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    console.log('[RolesGuard] ===== RolesGuard canActivate called =====');
-
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    console.log('[RolesGuard] Required roles from decorator:', requiredRoles);
-
+    // @Roles가 없는 라우트는 (JwtAuthGuard만 통과하면) 허용
     if (!requiredRoles) {
-      console.log('[RolesGuard] No required roles, allowing access');
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const { user } = request;
-    console.log('[RolesGuard] User object from request:', JSON.stringify(user, null, 2));
-    console.log('[RolesGuard] Full request path:', request.url);
-    console.log('[RolesGuard] Request method:', request.method);
-
+    const { user } = context.switchToHttp().getRequest();
     if (!user || !user.role) {
-      console.log('[RolesGuard] No user or role found - DENYING ACCESS');
       return false;
     }
 
-    const userRole = user.role;
-
-    // Normalize roles to avoid casing/whitespace mismatches between DB/token and enum
-    const normalizeRole = (role: any) => String(role ?? '').trim().toLowerCase();
-    const normalizedUserRole = normalizeRole(userRole);
-    const normalizedRequiredRoles = requiredRoles.map(normalizeRole);
-
-    console.log(`[RolesGuard] User role: "${userRole}" (normalized: "${normalizedUserRole}")`);
-    console.log(`[RolesGuard] Required roles: [${requiredRoles.join(', ')}] (normalized: [${normalizedRequiredRoles.join(', ')}])`);
-
-    const hasPermission = normalizedRequiredRoles.includes(normalizedUserRole);
-
-    console.log(`[RolesGuard] Permission check result: ${hasPermission ? 'ALLOWED' : 'DENIED'}`);
-    console.log('[RolesGuard] ===== RolesGuard canActivate finished =====');
-
-    return hasPermission;
+    // DB/토큰과 enum 간 대소문자·공백 차이를 흡수
+    const normalize = (role: any) => String(role ?? '').trim().toLowerCase();
+    const normalizedUserRole = normalize(user.role);
+    return requiredRoles.map(normalize).includes(normalizedUserRole);
   }
 }

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Query, Body, UseGuards, Res, Req } from '@nestjs
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 import { LogsService } from './logs.service';
+import { LogExcelExportDto } from './dto/log-export.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -237,7 +238,7 @@ export class LogsController {
   @Post('excel-export')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   async logExcelExport(
-    @Body() body: { action: string; description: string },
+    @Body() body: LogExcelExportDto,
     @Req() req: Request,
   ) {
     const user = req.user as any;

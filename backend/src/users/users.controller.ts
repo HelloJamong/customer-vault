@@ -62,6 +62,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @ApiOperation({ summary: '사용자 상세 조회' })
   @ApiResponse({ status: 200, description: '조회 성공' })
   findOne(@Param('id', ParseIntPipe) id: number) {

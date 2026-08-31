@@ -20,6 +20,9 @@ import { LoginDto, ChangePasswordDto } from './dto/login.dto';
 // 브라우저 종료 등으로 heartbeat가 끊긴 세션을 만료로 처리하는 기준 (30분)
 const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
+// 비밀번호 최대 길이 (SystemSettings에 별도 컬럼이 없어 고정값 사용)
+const PASSWORD_MAX_LENGTH = 20;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -133,16 +136,32 @@ export class AuthService {
   }
 
   async logoutWithAccessToken(accessToken: string, ipAddress?: string) {
-    // sendBeacon 등에서 Authorization 헤더를 붙일 수 없는 경우를 위한 로그아웃 처리
+    // 창 닫힘/브라우저 종료 시 sendBeacon으로 호출된다.
+    // 새로고침에서도 동일하게 발생하므로 세션은 삭제하지 않고 로그만 남긴다.
+    // 실제로 닫힌 세션은 비활성 30분 후 cleanupExpiredSessions가 정리한다.
     const payload = this.jwtService.verify(accessToken, {
       secret: this.configService.get<string>('JWT_SECRET'),
+      algorithms: ['HS256'],
     }) as { sub: number };
 
     if (!payload?.sub) {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
 
-    return this.logout(payload.sub, undefined, ipAddress);
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { username: true },
+    });
+
+    await this.logsService.createServiceLog({
+      userId: payload.sub,
+      logType: '정상',
+      action: '로그아웃',
+      description: `${user?.username} 사용자의 브라우저 연결이 종료되었습니다.`,
+      ipAddress,
+    });
+
+    return { message: '로그아웃 성공' };
   }
 
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto, ipAddress?: string) {
@@ -175,7 +194,7 @@ export class AuthService {
     await this.validatePassword(newPassword, settings);
 
     // 비밀번호 해시
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const passwordHash = await bcrypt.hash(newPassword, 12);
 
     // 비밀번호 업데이트
     await this.prisma.user.update({
@@ -203,7 +222,14 @@ export class AuthService {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('JWT_SECRET'),
+        algorithms: ['HS256'],
       });
+
+      // access 토큰을 refresh 엔드포인트에 재사용하지 못하도록 차단
+      // (구버전 토큰은 type이 없으므로 허용)
+      if (payload.type && payload.type !== 'refresh') {
+        throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+      }
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
@@ -213,13 +239,17 @@ export class AuthService {
         throw new UnauthorizedException('유효하지 않은 토큰입니다.');
       }
 
-      // refreshToken에서 sessionId 추출 (없으면 세션 조회)
-      let sessionId = payload.sessionId;
+      // 세션이 아직 살아있는지 확인한다. 로그아웃·강제 종료·관리자 세션 삭제 후에는
+      // refresh 토큰이 만료되지 않았더라도 액세스 토큰을 재발급하지 않는다.
+      const sessionId = payload.sessionId;
       if (!sessionId) {
-        const session = await this.prisma.userSession.findFirst({
-          where: { userId: user.id },
-        });
-        sessionId = session?.sessionId;
+        throw new UnauthorizedException('세션이 만료되었습니다.');
+      }
+      const session = await this.prisma.userSession.findFirst({
+        where: { userId: user.id, sessionId },
+      });
+      if (!session) {
+        throw new UnauthorizedException('세션이 만료되었습니다.');
       }
 
       const accessToken = this.jwtService.sign(
@@ -228,6 +258,7 @@ export class AuthService {
           username: user.username,
           role: user.role,
           sessionId,
+          type: 'access',
         },
         {
           secret: this.configService.get<string>('JWT_SECRET'),
@@ -269,7 +300,7 @@ export class AuthService {
 
     return {
       minLength: settings.passwordMinLength,
-      maxLength: 20, // 고정값 20자
+      maxLength: PASSWORD_MAX_LENGTH,
       requireUppercase: settings.passwordRequireUppercase,
       requireSpecial: settings.passwordRequireSpecial,
       requireNumber: settings.passwordRequireNumber,
@@ -309,17 +340,23 @@ export class AuthService {
 
   // Helper Methods
   private async generateTokens(userId: number, username: string, role: string, sessionId: string) {
-    const payload = { sub: userId, username, role, sessionId };
+    const base = { sub: userId, username, role, sessionId };
 
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION') || '1h',
-    } as any);
+    const accessToken = this.jwtService.sign(
+      { ...base, type: 'access' },
+      {
+        secret: this.configService.get<string>('JWT_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION') || '1h',
+      } as any,
+    );
 
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d',
-    } as any);
+    const refreshToken = this.jwtService.sign(
+      { ...base, type: 'refresh' },
+      {
+        secret: this.configService.get<string>('JWT_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d',
+      } as any,
+    );
 
     return { accessToken, refreshToken };
   }
@@ -390,8 +427,8 @@ export class AuthService {
       },
     });
 
-    // 실패 횟수 초과 시 계정 잠금
-    if (user.failedLoginAttempts >= settings.loginFailureLimit) {
+    // 실패 횟수 초과 시 계정 잠금 (기능이 활성화된 경우에만)
+    if (settings.loginFailureLimitEnabled && user.failedLoginAttempts >= settings.loginFailureLimit) {
       const lockedUntil = new Date(Date.now() + settings.accountLockMinutes * 60 * 1000);
 
       await this.prisma.user.update({
@@ -497,9 +534,9 @@ export class AuthService {
   }
 
   private async validatePassword(password: string, settings: any) {
-    if (password.length < settings.passwordMinLength || password.length > settings.passwordMaxLength) {
+    if (password.length < settings.passwordMinLength || password.length > PASSWORD_MAX_LENGTH) {
       throw new BadRequestException(
-        `비밀번호는 ${settings.passwordMinLength}자 이상 ${settings.passwordMaxLength}자 이하여야 합니다.`,
+        `비밀번호는 ${settings.passwordMinLength}자 이상 ${PASSWORD_MAX_LENGTH}자 이하여야 합니다.`,
       );
     }
 

@@ -50,7 +50,7 @@ export class SupportLogsController {
   @ApiOperation({ summary: '지원 로그 생성' })
   create(@Body() createDto: CreateSupportLogDto, @Request() req: any) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.create(createDto, req.user.id, ipAddress);
+    return this.supportLogsService.create(createDto, req.user.id, ipAddress, req.user);
   }
 
   @Patch(':id')
@@ -62,7 +62,7 @@ export class SupportLogsController {
     @Request() req: any,
   ) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.update(id, updateDto, req.user.id, ipAddress);
+    return this.supportLogsService.update(id, updateDto, req.user.id, ipAddress, req.user);
   }
 
   @Delete(':id')
@@ -70,6 +70,6 @@ export class SupportLogsController {
   @ApiOperation({ summary: '지원 로그 삭제' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.remove(id, req.user.id, ipAddress);
+    return this.supportLogsService.remove(id, req.user.id, ipAddress, req.user);
   }
 }

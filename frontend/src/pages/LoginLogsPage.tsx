@@ -29,11 +29,12 @@ import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
 import { logsApi } from '@/api/logs.api';
 import type { SystemLogEntry } from '@/api/logs.api';
+import { downloadBlob } from '@/utils/download';
 
 const LoginLogsPage = () => {
   const [logs, setLogs] = useState<SystemLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // 적용된 필터 상태 (실제 API 호출에 사용)
   const [appliedFilters, setAppliedFilters] = useState({
@@ -110,14 +111,7 @@ const LoginLogsPage = () => {
   const handleExport = async () => {
     try {
       const blob = await logsApi.exportLoginLogs(appliedFilters);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `login-logs-${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      downloadBlob(blob, `login-logs-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error) {
       console.error('엑셀 다운로드 실패:', error);
       alert('엑셀 파일 다운로드에 실패했습니다.');
@@ -160,7 +154,7 @@ const LoginLogsPage = () => {
     });
   };
 
-  const toggleRowExpansion = (id: number) => {
+  const toggleRowExpansion = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
@@ -328,15 +322,15 @@ const LoginLogsPage = () => {
               </TableRow>
             ) : (
               logs.map((log) => (
-                <Fragment key={log.id}>
+                <Fragment key={log.rowKey}>
                   <TableRow hover>
                     <TableCell>
                       {(log.beforeValue || log.afterValue) && (
                         <IconButton
                           size="small"
-                          onClick={() => toggleRowExpansion(log.id)}
+                          onClick={() => toggleRowExpansion(log.rowKey)}
                         >
-                          {expandedRow === log.id ? <ExpandLess /> : <ExpandMore />}
+                          {expandedRow === log.rowKey ? <ExpandLess /> : <ExpandMore />}
                         </IconButton>
                       )}
                     </TableCell>
@@ -362,8 +356,8 @@ const LoginLogsPage = () => {
                   {/* 변경 내역 확장 행 */}
                   {(log.beforeValue || log.afterValue) && (
                     <TableRow>
-                      <TableCell colSpan={6} sx={{ py: 0, borderBottom: expandedRow === log.id ? undefined : 'none' }}>
-                        <Collapse in={expandedRow === log.id} timeout="auto" unmountOnExit>
+                      <TableCell colSpan={6} sx={{ py: 0, borderBottom: expandedRow === log.rowKey ? undefined : 'none' }}>
+                        <Collapse in={expandedRow === log.rowKey} timeout="auto" unmountOnExit>
                           <Box sx={{ py: 2, px: 3, bgcolor: 'grey.50' }}>
                             <Typography variant="subtitle2" gutterBottom>
                               변경 내역

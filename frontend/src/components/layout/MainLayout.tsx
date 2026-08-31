@@ -2,7 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Button, Menu, MenuItem, Typography, Tooltip, IconButton } from '@mui/material';
 import { KeyboardArrowDown } from '@mui/icons-material';
 import GitHubIcon from '@mui/icons-material/GitHub';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
@@ -29,6 +29,8 @@ const MainLayout = () => {
   const [unreadNotices, setUnreadNotices] = useState<Notice[]>([]);
   const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
+  // 팝업은 세션당 1회만 자동 표시 (닫은 뒤 재표시되지 않도록)
+  const noticeAutoShownRef = useRef(false);
 
   // 최초 로그인 또는 비밀번호 만료 시 비밀번호 변경 강제
   useEffect(() => {
@@ -43,37 +45,28 @@ const MainLayout = () => {
     }
   }, [user?.isFirstLogin, user?.passwordExpired]);
 
-  // 읽지 않은 공지사항 조회 (슈퍼 관리자 제외)
+  // 읽지 않은 공지사항 조회 (슈퍼 관리자 제외) — 사용자당 1회
   useEffect(() => {
-    const fetchUnreadNotices = async () => {
-      if (!user) return;
+    if (!user || user.role?.toLowerCase() === 'super_admin') return;
 
-      const userRole = user.role?.toLowerCase();
-      // 슈퍼 관리자는 공지사항 팝업을 보지 않음
-      if (userRole === 'super_admin') return;
-
-      try {
-        const notices = await noticesApi.getUnreadNotices();
+    noticesApi
+      .getUnreadNotices()
+      .then((notices) => {
         if (notices.length > 0) {
           // 가장 최신 공지사항 1개만 표시
           setUnreadNotices([notices[0]]);
           setCurrentNoticeIndex(0);
-          // 비밀번호 변경 다이얼로그가 열려있지 않을 때만 공지사항 팝업 표시
-          if (!passwordDialogOpen) {
-            setNoticePopupOpen(true);
-          }
         }
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error('읽지 않은 공지사항 조회 실패:', error);
-      }
-    };
+      });
+  }, [user]);
 
-    fetchUnreadNotices();
-  }, [user, passwordDialogOpen]);
-
-  // 비밀번호 변경 후 공지사항 팝업이 있으면 표시
+  // 비밀번호 변경 다이얼로그가 없거나 닫힌 뒤에 공지 팝업을 1회만 표시
   useEffect(() => {
-    if (!passwordDialogOpen && unreadNotices.length > 0 && !noticePopupOpen) {
+    if (!passwordDialogOpen && unreadNotices.length > 0 && !noticeAutoShownRef.current) {
+      noticeAutoShownRef.current = true;
       setNoticePopupOpen(true);
     }
   }, [passwordDialogOpen, unreadNotices.length]);

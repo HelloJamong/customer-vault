@@ -1,5 +1,6 @@
 import api from './axios';
 import type { BackupLog, BackupLogsResponse } from '../types/backup.types';
+import { filenameFromContentDisposition, downloadBlob } from '../utils/download';
 
 export const backupApi = {
   runBackup: async (): Promise<BackupLog> => {
@@ -16,19 +17,10 @@ export const backupApi = {
     const response = await api.get(`/backup/logs/${id}/download`, {
       responseType: 'blob',
     });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const contentDisposition = response.headers['content-disposition'];
-    let filename = `backup_${id}.gz`;
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename[^;=\n]*=([^;\n]*)/);
-      if (match) filename = match[1].trim().replace(/['"]/g, '');
-    }
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    const filename = filenameFromContentDisposition(
+      response.headers['content-disposition'],
+      `backup_${id}.gz`,
+    );
+    downloadBlob(response.data, filename);
   },
 };

@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/api/auth.api';
 import { useAuthStore } from '@/store/authStore';
+import { queryClient } from '@/lib/queryClient';
 import type { LoginRequest } from '@/types/auth.types';
 
 interface LogoutOptions {
@@ -36,11 +37,13 @@ export const useAuth = () => {
     },
     onSuccess: (_data, variables) => {
       clearAuth();
+      queryClient.clear(); // 이전 사용자 데이터가 다음 로그인에 노출되지 않도록
       navigate('/login', { state: variables?.redirectState });
     },
     onError: (_error, variables) => {
       // 에러가 발생해도 로컬 스토리지는 클리어
       clearAuth();
+      queryClient.clear();
       navigate('/login', { state: variables?.redirectState });
     },
   });

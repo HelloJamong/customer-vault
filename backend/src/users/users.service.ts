@@ -165,7 +165,7 @@ export class UsersService {
 
     // 기본 비밀번호 가져오기
     const settings = await this.getSystemSettings();
-    const passwordHash = await bcrypt.hash(settings.defaultPassword, 10);
+    const passwordHash = await bcrypt.hash(settings.defaultPassword, 12);
 
     const user = await this.prisma.user.create({
       data: {
@@ -334,7 +334,7 @@ export class UsersService {
     }
 
     const settings = await this.getSystemSettings();
-    const passwordHash = await bcrypt.hash(settings.defaultPassword, 10);
+    const passwordHash = await bcrypt.hash(settings.defaultPassword, 12);
 
     await this.prisma.user.update({
       where: { id },

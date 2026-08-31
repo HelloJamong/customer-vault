@@ -1,173 +1,134 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import { ACCESS_TOKEN_KEY, API_BASE_URL } from '@/utils/constants';
 
 const isDevelopment = import.meta.env.DEV;
 
+// Access Token 만료(기본 1h) 전에 새 토큰으로 재연결
+const PROACTIVE_RECONNECT_MS = 50 * 60 * 1000;
+// 연결이 끊겼을 때 재시도 간격 (지수 백오프, 최대 30초)
+const RETRY_BASE_MS = 2000;
+const RETRY_MAX_MS = 30000;
+
+const log = (...args: unknown[]) => {
+  if (isDevelopment) console.log('[SSE]', ...args);
+};
+
+/**
+ * 서버가 보내는 세션 이벤트(다른 위치 로그인 → 강제 로그아웃)를 구독한다.
+ * EventSource는 Authorization 헤더를 못 붙이므로 fetch 스트림으로 직접 읽는다.
+ */
 export const useSessionEvents = () => {
   const { user } = useAuthStore();
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimerRef = useRef<number | null>(null);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
 
   useEffect(() => {
-    // 로그인 상태가 아니면 SSE 연결하지 않음
-    if (!user) {
-      if (isDevelopment) console.log('[SSE] 로그인 상태 아님 - SSE 연결 중지');
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      if (readerRef.current) {
-        readerRef.current.cancel();
-        readerRef.current = null;
-      }
-      return;
-    }
+    if (!user) return;
 
-    if (isDevelopment) console.log('[SSE] SSE 연결 시작 - 사용자:', user.username);
+    const abortController = new AbortController();
+    let proactiveTimer: number | undefined;
+    let retryTimer: number | undefined;
+    let retryAttempt = 0;
+    let stopped = false;
 
-    // SSE 연결 생성 (Authorization 헤더는 EventSource에서 직접 지원 안 됨)
-    // Nginx 프록시를 통한 상대 경로 사용으로 CSP 우회
-    const connectSSE = async () => {
-      try {
-        // 최신 AccessToken 가져오기 (재연결 시마다 갱신된 토큰 사용)
-        const accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-          if (isDevelopment) console.log('[SSE] AccessToken 없음 - SSE 연결 불가');
-          return;
-        }
-
-        const response = await fetch('/api/auth/session-events', {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'text/event-stream',
-          },
-        });
-
-        if (!response.ok) {
-          console.error('[SSE] 연결 실패:', response.status);
-          return;
-        }
-
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) {
-          console.error('[SSE] Reader 생성 실패');
-          return;
-        }
-
-        // Reader 참조 저장 (재연결 시 취소하기 위해)
-        readerRef.current = reader;
-
-        if (isDevelopment) console.log('[SSE] 연결 성공 - 이벤트 수신 대기 중');
-
-        // 50분 후 재연결 타이머 설정 (Access Token 만료 10분 전)
-        const RECONNECT_INTERVAL = 50 * 60 * 1000; // 50분
-        reconnectTimerRef.current = window.setTimeout(() => {
-          if (isDevelopment) console.log('[SSE] 토큰 갱신을 위한 재연결 시작');
-
-          // 기존 연결 종료
-          if (readerRef.current) {
-            readerRef.current.cancel();
-            readerRef.current = null;
-          }
-
-          // 새 연결 시작
-          connectSSE();
-        }, RECONNECT_INTERVAL);
-
-        if (isDevelopment) console.log(`[SSE] 재연결 타이머 설정 완료 (${RECONNECT_INTERVAL / 60000}분 후)`);
-
-        // 스트림 읽기
-        const readStream = async () => {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-
-              if (done) {
-                if (isDevelopment) console.log('[SSE] 스트림 종료');
-                break;
-              }
-
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.substring(6);
-
-                  try {
-                    const event = JSON.parse(data);
-                    if (isDevelopment) console.log('[SSE] 이벤트 수신:', event);
-
-                    // 로그아웃 이벤트 처리
-                    if (event.type === 'logout') {
-                      if (isDevelopment) console.warn('[SSE] 로그아웃 이벤트 - 즉시 로그아웃 처리');
-
-                      // 로컬 상태만 클리어
-                      useAuthStore.getState().logout();
-
-                      // 페이지 새로고침하여 로그인 페이지로 이동
-                      alert(event.message || '다른 위치에서 로그인되어 현재 세션이 종료되었습니다.');
-                      window.location.href = '/login';
-
-                      // 스트림 종료
-                      reader.cancel();
-
-                      // 재연결 타이머도 취소
-                      if (reconnectTimerRef.current) {
-                        clearTimeout(reconnectTimerRef.current);
-                        reconnectTimerRef.current = null;
-                      }
-
-                      break;
-                    }
-                  } catch (e) {
-                    // JSON 파싱 실패는 무시 (keepalive 등)
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            console.error('[SSE] 스트림 읽기 오류:', error);
-          }
-        };
-
-        readStream();
-
-      } catch (error) {
-        console.error('[SSE] 연결 오류:', error);
-      }
+    const scheduleRetry = () => {
+      if (stopped || abortController.signal.aborted) return;
+      const delay = Math.min(RETRY_BASE_MS * 2 ** retryAttempt, RETRY_MAX_MS);
+      retryAttempt += 1;
+      log(`재연결 예약 (${delay}ms 후)`);
+      retryTimer = window.setTimeout(connect, delay);
     };
 
-    connectSSE();
+    const handleLogout = (message?: string) => {
+      stopped = true;
+      abortController.abort();
+      useAuthStore.getState().logout();
+      alert(message || '다른 위치에서 로그인되어 현재 세션이 종료되었습니다.');
+      window.location.href = '/login';
+    };
 
-    // 클린업
+    async function connect() {
+      if (stopped) return;
+      window.clearTimeout(proactiveTimer);
+
+      const accessToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        log('AccessToken 없음 - 재시도 예약');
+        scheduleRetry();
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/session-events`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'text/event-stream',
+          },
+          signal: abortController.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          log('연결 실패:', response.status);
+          scheduleRetry();
+          return;
+        }
+
+        retryAttempt = 0;
+        log('연결 성공');
+
+        // 토큰 만료 전 선제적 재연결
+        proactiveTimer = window.setTimeout(() => {
+          log('토큰 갱신용 재연결');
+          connect();
+        }, PROACTIVE_RECONNECT_MS);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // 완성된 줄만 처리하고 나머지는 버퍼에 남긴다 (청크 경계 대응)
+          let newlineIdx: number;
+          while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, newlineIdx).trimEnd();
+            buffer = buffer.slice(newlineIdx + 1);
+            if (!line.startsWith('data:')) continue;
+
+            try {
+              const event = JSON.parse(line.slice(5).trim());
+              if (event.type === 'logout') {
+                handleLogout(event.message);
+                return;
+              }
+            } catch {
+              // keepalive 등 JSON이 아닌 라인은 무시
+            }
+          }
+        }
+
+        // 서버가 스트림을 닫음 → 재연결
+        if (!stopped) {
+          log('스트림 종료 - 재연결');
+          scheduleRetry();
+        }
+      } catch (error) {
+        if (abortController.signal.aborted) return;
+        log('연결 오류:', error);
+        scheduleRetry();
+      }
+    }
+
+    connect();
+
     return () => {
-      if (isDevelopment) console.log('[SSE] 클린업 - SSE 연결 및 타이머 종료');
-
-      // EventSource 종료
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-
-      // Reader 취소
-      if (readerRef.current) {
-        readerRef.current.cancel();
-        readerRef.current = null;
-      }
-
-      // 재연결 타이머 취소
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
+      stopped = true;
+      abortController.abort();
+      window.clearTimeout(proactiveTimer);
+      window.clearTimeout(retryTimer);
     };
   }, [user]);
 };

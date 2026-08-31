@@ -2,6 +2,8 @@ import apiClient from './axios';
 
 interface SystemLogEntry {
   id: number;
+  // serviceLog / loginAttempt는 PK가 겹칠 수 있으므로 렌더 key는 이 값을 사용
+  rowKey: string;
   timestamp: string;
   username: string;
   userId: number;

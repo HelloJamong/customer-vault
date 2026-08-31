@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '@/api/dashboard.api';
-import { isAuthenticated } from '@/store/authStore';
+import { useAuthStore } from '@/store/authStore';
 
 export const useDashboard = () => {
-  const authenticated = isAuthenticated();
+  // 반응형 구독: 세션 만료로 user가 null이 되면 쿼리를 즉시 중단
+  const authenticated = useAuthStore((state) => !!state.user);
 
   const {
     data: stats,

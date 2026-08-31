@@ -5,49 +5,32 @@ import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/utils/constants';
 
 interface AuthState {
   user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
 
   // Actions
   login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
   setUser: (user: User) => void;
-  updateAccessToken: (token: string) => void;
 }
 
+// 토큰의 단일 소스는 sessionStorage. 스토어에는 user만 둔다.
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      accessToken: null,
-      refreshToken: null,
 
       login: (accessToken, refreshToken, user) => {
         sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
         sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-        set({
-          user,
-          accessToken,
-          refreshToken,
-        });
+        set({ user });
       },
 
       logout: () => {
         sessionStorage.removeItem(ACCESS_TOKEN_KEY);
         sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-        set({
-          user: null,
-          accessToken: null,
-          refreshToken: null,
-        });
+        set({ user: null });
       },
 
       setUser: (user) => set({ user }),
-
-      updateAccessToken: (token) => {
-        sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-        set({ accessToken: token });
-      },
     }),
     {
       name: 'auth-storage',

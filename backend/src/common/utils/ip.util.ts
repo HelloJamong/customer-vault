@@ -20,27 +20,15 @@ export function cleanIpAddress(ipAddress?: string): string | undefined {
 
 /**
  * Request 객체에서 실제 클라이언트 IP를 추출합니다.
- * Docker/Proxy 환경에서 X-Forwarded-For, X-Real-IP 헤더를 우선적으로 확인합니다.
+ *
+ * Express의 `trust proxy` 설정(main.ts에서 신뢰 홉 수 고정)에 따라 계산된
+ * `request.ip`만 사용한다. X-Forwarded-For / X-Real-IP 헤더를 직접 파싱하면
+ * 클라이언트가 값을 위조해 감사 로그·레이트리밋을 조작할 수 있으므로 사용하지 않는다.
  *
  * @param request - Express Request 객체
  * @returns 클라이언트 IP 주소
  */
 export function getClientIp(request: any): string {
-  // 1. X-Forwarded-For 헤더 확인 (프록시/로드밸런서 환경)
-  const forwardedFor = request.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    // X-Forwarded-For는 "client, proxy1, proxy2" 형태일 수 있으므로 첫 번째 IP 추출
-    const ips = forwardedFor.split(',').map((ip: string) => ip.trim());
-    return cleanIpAddress(ips[0]) || ips[0];
-  }
-
-  // 2. X-Real-IP 헤더 확인 (Nginx 등)
-  const realIp = request.headers['x-real-ip'];
-  if (realIp) {
-    return cleanIpAddress(realIp) || realIp;
-  }
-
-  // 3. request.ip 사용 (기본)
-  const ip = request.ip || request.connection?.remoteAddress;
+  const ip = request.ip || request.socket?.remoteAddress || request.connection?.remoteAddress;
   return cleanIpAddress(ip) || ip || 'unknown';
 }

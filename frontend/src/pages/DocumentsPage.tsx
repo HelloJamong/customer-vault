@@ -30,18 +30,6 @@ const DocumentsPage = () => {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
 
-  // 사용자 계정이 아니면 접근 불가 메시지 표시
-  if (user?.role !== 'user') {
-    return (
-      <Box>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          점검서 업로드
-        </Typography>
-        <Alert severity="info">이 페이지는 사용자 계정만 접근할 수 있습니다.</Alert>
-      </Box>
-    );
-  }
-
   const [formData, setFormData] = useState({
     customerId: '',
     inspectionTargetId: '',
@@ -97,6 +85,18 @@ const DocumentsPage = () => {
       setSuccess('');
     },
   });
+
+  // 사용자 계정이 아니면 접근 불가 메시지 표시 (모든 훅 선언 이후에 분기)
+  if (user?.role !== 'user') {
+    return (
+      <Box>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+          점검서 업로드
+        </Typography>
+        <Alert severity="info">이 페이지는 사용자 계정만 접근할 수 있습니다.</Alert>
+      </Box>
+    );
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

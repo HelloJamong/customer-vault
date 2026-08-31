@@ -10,11 +10,13 @@ import { logsApi } from '@/api/logs.api';
 import ExcelJS from 'exceljs';
 import CustomerSummaryDialog from '@/components/CustomerSummaryDialog';
 import { useCustomersPageStore } from '@/store/customersPageStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const CustomersPage = () => {
   const navigate = useNavigate();
 
-  // Zustand 스토어에서 상태 가져오기
+  // Zustand 스토어 구독 — scrollPosition은 제외한다.
+  // (스크롤마다 저장되므로 구독하면 프레임마다 전체 리렌더가 발생)
   const {
     searchText,
     versionFilter,
@@ -23,7 +25,6 @@ const CustomersPage = () => {
     contractTypeFilter,
     pageSize,
     page,
-    scrollPosition,
     setSearchText: setStoreSearchText,
     setVersionFilter: setStoreVersionFilter,
     setInspectionCycleFilter: setStoreInspectionCycleFilter,
@@ -32,7 +33,25 @@ const CustomersPage = () => {
     setPageSize: setStorePageSize,
     setPage: setStorePage,
     setScrollPosition: setStoreScrollPosition,
-  } = useCustomersPageStore();
+  } = useCustomersPageStore(
+    useShallow((s) => ({
+      searchText: s.searchText,
+      versionFilter: s.versionFilter,
+      inspectionCycleFilter: s.inspectionCycleFilter,
+      inspectionStatusFilter: s.inspectionStatusFilter,
+      contractTypeFilter: s.contractTypeFilter,
+      pageSize: s.pageSize,
+      page: s.page,
+      setSearchText: s.setSearchText,
+      setVersionFilter: s.setVersionFilter,
+      setInspectionCycleFilter: s.setInspectionCycleFilter,
+      setInspectionStatusFilter: s.setInspectionStatusFilter,
+      setContractTypeFilter: s.setContractTypeFilter,
+      setPageSize: s.setPageSize,
+      setPage: s.setPage,
+      setScrollPosition: s.setScrollPosition,
+    })),
+  );
 
   const [filters, setFilters] = useState<{
     search?: string;
@@ -55,36 +74,35 @@ const CustomersPage = () => {
   const [summaryCustomers, setSummaryCustomers] = useState<any[]>([]);
   const [hoveredRowId, setHoveredRowId] = useState<number | null>(null);
 
-  // 컴포넌트 마운트 시 스크롤 위치 복원
+  // 데이터 로드 후 저장된 스크롤 위치를 1회 복원
   useEffect(() => {
-    if (scrollPosition > 0) {
-      const timer = setTimeout(() => {
-        const virtualScroller = document.querySelector('.MuiDataGrid-virtualScroller');
-        if (virtualScroller) {
-          virtualScroller.scrollTop = scrollPosition;
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [scrollPosition, isLoading]);
-
-  // 언마운트 시 스크롤 위치 저장
-  useEffect(() => {
-    const handleScroll = () => {
+    if (isLoading) return;
+    const saved = useCustomersPageStore.getState().scrollPosition;
+    if (saved <= 0) return;
+    const timer = setTimeout(() => {
       const virtualScroller = document.querySelector('.MuiDataGrid-virtualScroller');
-      if (virtualScroller) {
-        setStoreScrollPosition(virtualScroller.scrollTop);
-      }
-    };
+      if (virtualScroller) virtualScroller.scrollTop = saved;
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
+  // 스크롤 위치는 ref로만 추적하고, 정리(언마운트/재조회) 시점에 1회만 스토어에 기록
+  useEffect(() => {
+    if (isLoading) return;
     const virtualScroller = document.querySelector('.MuiDataGrid-virtualScroller');
-    if (virtualScroller) {
-      virtualScroller.addEventListener('scroll', handleScroll);
-      return () => {
-        virtualScroller.removeEventListener('scroll', handleScroll);
-      };
-    }
-  }, [setStoreScrollPosition, isLoading]);
+    if (!virtualScroller) return;
+
+    let latestTop = virtualScroller.scrollTop;
+    const handleScroll = () => {
+      latestTop = virtualScroller.scrollTop;
+    };
+    virtualScroller.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      virtualScroller.removeEventListener('scroll', handleScroll);
+      setStoreScrollPosition(latestTop);
+    };
+  }, [isLoading, setStoreScrollPosition]);
 
   // 검색 및 필터 핸들러
   const handleSearch = () => {

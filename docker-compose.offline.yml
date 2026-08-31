@@ -19,7 +19,8 @@ services:
     volumes:
       - ./data/mariadb:/var/lib/mysql
     ports:
-      - "${DB_PORT:-3306}:3306"
+      # 호스트 로컬에만 바인딩 (외부 네트워크에 DB를 노출하지 않음)
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
     networks:
       - customer_network
     healthcheck:
@@ -40,7 +41,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 5000
       DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:-customerpass}@db:3306/${DB_NAME:-customer_db}
-      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret-key-in-production-environment}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 64)}
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
       UPLOAD_DIR: /app/uploads
@@ -49,14 +50,13 @@ services:
       LOG_DIR: /app/logs
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       BACKUP_DIR: /app/backups
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env (openssl rand -hex 32)}
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./backups:/app/backups
-      - /sys:/host/sys:ro
+      # 대시보드 호스트 메모리 표시용. /sys, /etc는 사용하지 않으므로 마운트하지 않는다.
       - /proc:/host/proc:ro
-      - /etc:/host/etc:ro
     ports:
       - "${BACKEND_PORT:-5005}:5000"
     depends_on:

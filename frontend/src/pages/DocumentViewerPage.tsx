@@ -67,12 +67,9 @@ const DocumentViewerPage = () => {
           responseType: 'blob',
         });
 
-        // 3. Blob URL 생성
+        // 3. Blob URL 생성 (이전 URL은 아래 cleanup 이펙트에서 해제됨)
         const blob = new Blob([pdfResponse.data], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
-
-        console.log('[DocumentViewerPage] PDF loaded successfully');
+        setPdfUrl(URL.createObjectURL(blob));
       } catch (error) {
         console.error('문서 로드 실패:', error);
         setError('문서를 불러올 수 없습니다.');
@@ -84,17 +81,16 @@ const DocumentViewerPage = () => {
     if (documentId) {
       fetchDocumentAndPdf();
     }
+  }, [documentId]);
 
-    // Cleanup: Blob URL 해제
+  // Blob URL 해제: pdfUrl이 바뀌거나 컴포넌트가 unmount될 때 이전 URL revoke
+  useEffect(() => {
     return () => {
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
       }
     };
-  }, [documentId]);
-
-  console.log('[DocumentViewerPage] PDF URL:', pdfUrl);
-  console.log('[DocumentViewerPage] Document:', document);
+  }, [pdfUrl]);
 
   if (isLoading) {
     return (
