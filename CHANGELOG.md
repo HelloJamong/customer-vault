@@ -11,6 +11,26 @@
 
 ---
 
+## [26.7.1] - 2026-08-31
+
+오프라인(폐쇄망) 배포 편의성 개선 릴리즈입니다.
+
+### Added
+
+- **오프라인 이미지 번들을 GitHub Release에 자동 첨부**: 버전 태그 push 시 `backend`, `frontend`, `mariadb:10.11`, `nginx:alpine` 이미지를 `docker save` + gzip 하여 `customer-vault-images-<버전>.tar.gz`로 Release에 추가. 폐쇄망 서버에서 `docker load` 후 별도 이미지 리네임 없이 `docker compose up -d`로 바로 구동 가능
+
+### Changed
+
+- **`docker-compose.yml`에 온라인/오프라인 배포 안내 주석 추가**: 오프라인 환경에서는 이미지 번들을 `docker load` 후 그대로 사용하면 되며, `build:` 섹션은 `docker compose up`에서 무시되므로 소스 코드 없이 동작함을 명시. 옛 이미지 리네임(`customer_backend:...`) 주석 제거
+- **Release 본문에 배포 절차 정리**: 온라인 신규 설치 / 온라인 업그레이드 / 오프라인 폐쇄망 3가지 시나리오
+- **`scripts/export-package.sh`**: CHANGELOG 버전 추출 정규식을 `v` 접두사 없는 형식(`## [26.7.1]`)에 대응, 프론트엔드 빌드 인자에서 `v` 접두사 제거
+
+### Fixed
+
+- **Release의 `.env` 템플릿 파일명이 `default.env.example`로 바뀌어 다운로드 안내가 맞지 않던 문제 수정**: GitHub Release가 점(`.`)으로 시작하는 자산명을 허용하지 않아 발생. `env.example`이라는 이름으로 첨부하도록 변경
+
+---
+
 ## [26.7.0] - 2026-08-31
 
 전체 코드 리뷰 결과를 반영한 보안 강화·버그 수정 릴리즈입니다. 신규 기능은 없습니다.
