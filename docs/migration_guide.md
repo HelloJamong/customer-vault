@@ -2,6 +2,54 @@
 
 이 문서는 Customer Vault의 DB 스키마 변경, 오프라인 배포, 그리고 자동화된 마이그레이션 프로세스에 대해 설명합니다.
 
+## 기존 설치의 오프라인 업그레이드
+
+릴리스에서 받은 `docker-compose.yml`과
+`customer-vault-images-<버전>.tar.gz`가 준비되어 있다면, 기존 설치 디렉터리에서
+아래 스크립트로 이미지를 교체하고 데이터를 보존한 채 업그레이드할 수 있습니다.
+
+```bash
+./scripts/offline-upgrade.sh \
+  --app-dir /opt/customer-vault \
+  --package-dir /mnt/usb/customer-vault-26.7.3 \
+  --version 26.7.3
+```
+
+패키지 디렉터리에는 기본적으로 다음 두 파일이 있어야 합니다.
+
+```text
+docker-compose.yml
+customer-vault-images-26.7.3.tar.gz
+```
+
+스크립트는 실행 전 `.env`의 `JWT_SECRET`과 `ENCRYPTION_KEY`를 검증하고, 다음 순서로
+작업합니다.
+
+1. 이미지 아카이브 무결성 및 필수 이미지 확인
+2. MariaDB 전체 백업과 업로드·로그·백업·프록시 설정 백업
+3. 기존 Compose 서비스 종료(`down -v`는 사용하지 않음)
+4. 새 Compose 파일 적용 및 기존 `.env` 값 보존
+5. 이미지 pull 없이 서비스 기동 및 백엔드/프록시 헬스체크
+6. 기동 실패 시 Compose와 `.env`를 이전 상태로 복원
+
+백업은 애플리케이션 디렉터리 외부의 `../customer-vault-upgrade-backups/`에 생성됩니다.
+데이터베이스를 자동 복원하지 않는 이유는 새 버전이 기존 데이터를 변환하는 과정에서
+잘못된 자동 복원이 추가 손상을 만들 수 있기 때문입니다. 롤백이 필요한 경우 생성된
+`database.sql.gz`와 체크섬을 확인한 후 별도 복원 절차를 진행합니다.
+
+실행 전 검증만 하려면 다음과 같이 합니다.
+
+```bash
+./scripts/offline-upgrade.sh \
+  --app-dir /opt/customer-vault \
+  --package-dir /mnt/usb/customer-vault-26.7.3 \
+  --version 26.7.3 \
+  --dry-run
+```
+
+> ⚠️ 기존 `.env`, 특히 `ENCRYPTION_KEY`는 절대 새 값으로 교체하지 마세요. 키가 바뀌면
+> 기존에 암호화된 서버·SFTP 비밀번호를 복호화할 수 없습니다.
+
 ## 목차
 
 1. [버전별 마이그레이션 노트](#버전별-마이그레이션-노트)
