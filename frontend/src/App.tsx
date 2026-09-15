@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
@@ -56,7 +57,9 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>페이지를 불러오는 중입니다...</div>}>
+          <RouterProvider router={router} />
+        </Suspense>
       </QueryClientProvider>
     </ThemeProvider>
   );

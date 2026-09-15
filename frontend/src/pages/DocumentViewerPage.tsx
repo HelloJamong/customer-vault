@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/axios';
 import { documentsAPI } from '@/api/documents.api';
 import { useAuthStore } from '@/store/authStore';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 interface Document {
   id: number;
@@ -46,9 +47,9 @@ const DocumentViewerPage = () => {
         navigate(-1);
       }
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error('점검서 삭제 실패:', error);
-      setError(error.response?.data?.message || '점검서 삭제에 실패했습니다.');
+      setError(getApiErrorMessage(error, '점검서 삭제에 실패했습니다.'));
       setDeleteDialogOpen(false);
     },
   });

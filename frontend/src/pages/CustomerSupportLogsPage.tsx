@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -79,22 +79,7 @@ const CustomerSupportLogsPage = () => {
   const [filterEngineer, setFilterEngineer] = useState<string>('');
   const [filteredLogs, setFilteredLogs] = useState<SupportLog[]>([]);
 
-  useEffect(() => {
-    if (!customerId) return;
-    fetchData();
-    settingsApi.getJiraConfig().then((s) => {
-      setJiraEnabled(s.jiraEnabled);
-      setJiraBaseUrl(s.jiraBaseUrl ?? '');
-    }).catch(() => {
-      setJiraEnabled(false);
-    });
-  }, [customerId]);
-
-  useEffect(() => {
-    setFilteredLogs(supportLogs);
-  }, [supportLogs]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!customerId) return;
     try {
       setIsLoading(true);
@@ -110,7 +95,22 @@ const CustomerSupportLogsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!customerId) return;
+    void fetchData();
+    settingsApi.getJiraConfig().then((s) => {
+      setJiraEnabled(s.jiraEnabled);
+      setJiraBaseUrl(s.jiraBaseUrl ?? '');
+    }).catch(() => {
+      setJiraEnabled(false);
+    });
+  }, [customerId, fetchData]);
+
+  useEffect(() => {
+    setFilteredLogs(supportLogs);
+  }, [supportLogs]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

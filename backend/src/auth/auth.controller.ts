@@ -46,7 +46,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
   async logout(@Request() req) {
     const ipAddress = getClientIp(req);
-    return this.authService.logout(req.user.id, undefined, ipAddress);
+    return this.authService.logout(req.user.id, req.user.sessionId, ipAddress);
   }
 
   @Post('logout-beacon')

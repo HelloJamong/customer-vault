@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -42,6 +42,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
+import { getApiErrorMessage } from '@/utils/api-error';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useAuthStore } from '@/store/authStore';
 import { UserRole } from '@/types/auth.types';
@@ -86,12 +87,7 @@ const CustomerEditPage = () => {
   const [engineerOptions, setEngineerOptions] = useState<UserOption[]>([]);
   const [salesOptions, setSalesOptions] = useState<UserOption[]>([]);
 
-  useEffect(() => {
-    fetchCustomer();
-    fetchTeamMembers();
-  }, [customerId]);
-
-  const fetchCustomer = async () => {
+  const fetchCustomer = useCallback(async () => {
     try {
       const response = await apiClient.get(`/customers/${customerId}`);
       const data = response.data;
@@ -150,9 +146,9 @@ const CustomerEditPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerId]);
 
-  const fetchTeamMembers = async () => {
+  const fetchTeamMembers = useCallback(async () => {
     try {
       const response = await apiClient.get('/users/team-members/all');
       const { engineers, sales } = response.data;
@@ -161,19 +157,25 @@ const CustomerEditPage = () => {
     } catch (error) {
       console.error('사내 담당자 목록 조회 실패:', error);
     }
-  };
+  }, []);
 
-  const handleChange = (field: keyof UpdateCustomerDto, value: any) => {
+  useEffect(() => {
+    void fetchCustomer();
+    void fetchTeamMembers();
+  }, [fetchCustomer, fetchTeamMembers]);
+
+  const handleChange = (field: keyof UpdateCustomerDto, value: string | number | boolean | null) => {
+    const textValue = value == null ? '' : String(value);
     // 전화번호 필드 검증 (숫자, 하이픈만 허용)
     if (field.includes('Mobile') || field.includes('Phone')) {
-      const phoneValue = value.replace(/[^0-9-]/g, '');
+      const phoneValue = textValue.replace(/[^0-9-]/g, '');
       setFormData((prev) => ({ ...prev, [field]: phoneValue }));
       return;
     }
 
     // 이메일 필드 검증 (한글 입력 방지)
     if (field.includes('Email')) {
-      const emailValue = value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '');
+      const emailValue = textValue.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '');
       setFormData((prev) => ({ ...prev, [field]: emailValue }));
       return;
     }
@@ -213,11 +215,8 @@ const CustomerEditPage = () => {
     setIsSaving(true);
     try {
       // 빈 문자열, undefined, null을 null로 변환
-      const normalizeId = (value: any) => {
-        if (value === '' || value === undefined || value === null) {
-          return null;
-        }
-        return value;
+      const normalizeId = (value: number | null | undefined): number | undefined => {
+        return value ?? undefined;
       };
 
       // 빈 문자열을 null로 변환 (날짜 필드)
@@ -235,11 +234,9 @@ const CustomerEditPage = () => {
       await apiClient.patch(`/customers/${customerId}`, cleanedData);
       alert('저장되었습니다.');
       navigate(`/customers/${customerId}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('저장 실패:', error);
-      console.error('에러 응답:', error.response?.data);
-      const errorMessage = error.response?.data?.message || '저장에 실패했습니다.';
-      alert(errorMessage);
+      alert(getApiErrorMessage(error, '저장에 실패했습니다.'));
     } finally {
       setIsSaving(false);
     }
@@ -252,7 +249,7 @@ const CustomerEditPage = () => {
     }
 
     try {
-      const dto: any = {
+      const dto: { customerId: number; targetType: string; displayOrder: number; productName?: string } = {
         customerId: Number(customerId),
         targetType: newTarget.targetType.trim(),
         displayOrder: inspectionTargets.length,
@@ -268,10 +265,9 @@ const CustomerEditPage = () => {
       setNewTarget({ targetType: '', productName: '' });
       setOpenTargetDialog(false);
       fetchCustomer(); // 새로고침
-    } catch (error: any) {
+    } catch (error) {
       console.error('점검 대상 추가 실패:', error);
-      console.error('Error response:', error.response?.data);
-      alert(`추가에 실패했습니다.\n${error.response?.data?.message || error.message}`);
+      alert(`추가에 실패했습니다.\n${getApiErrorMessage(error, '알 수 없는 오류')}`);
     }
   };
 

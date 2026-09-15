@@ -77,6 +77,12 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // 로그인 중 비밀번호가 만료되어도 기존 강제 변경 다이얼로그를 표시한다.
+    if (error.response?.status === 403 && error.response.data?.code === 'PASSWORD_EXPIRED') {
+      const { user, setUser } = useAuthStore.getState();
+      if (user && !user.passwordExpired) setUser({ ...user, passwordExpired: true });
+    }
+
     // 401 에러 && 재시도 아닌 경우
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;

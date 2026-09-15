@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PrivateRoute } from './PrivateRoute';
 import { RoleRoute } from './RoleRoute';
@@ -6,31 +7,36 @@ import { UserRole } from '@/types/auth.types';
 // Layouts
 import MainLayout from '@/components/layout/MainLayout';
 
-// Pages
-import LoginPage from '@/pages/LoginPage';
-import DashboardPage from '@/pages/DashboardPage';
-import CustomersPage from '@/pages/CustomersPage';
-import CustomerDetailPage from '@/pages/CustomerDetailPage';
-import CustomerEditPage from '@/pages/CustomerEditPage';
-import CustomerDocumentsPage from '@/pages/CustomerDocumentsPage';
-import CustomerSourceManagementDetailPage from '@/pages/CustomerSourceManagementDetailPage';
-import CustomerSourceManagementEditPage from '@/pages/CustomerSourceManagementEditPage';
-import CustomerSupportLogsPage from '@/pages/CustomerSupportLogsPage';
-import CustomerMeetingMinutesPage from '@/pages/CustomerMeetingMinutesPage';
-import DocumentViewerPage from '@/pages/DocumentViewerPage';
-import SuperAdminsPage from '@/pages/SuperAdminsPage';
-import AdminsPage from '@/pages/AdminsPage';
-import UsersPage from '@/pages/UsersPage';
-import DocumentsPage from '@/pages/DocumentsPage';
-import SettingsPage from '@/pages/SettingsPage';
-import UnauthorizedPage from '@/pages/UnauthorizedPage';
-import SystemLogsPage from '@/pages/SystemLogsPage';
-import UploadLogsPage from '@/pages/UploadLogsPage';
-import LoginLogsPage from '@/pages/LoginLogsPage';
-import { InspectionStatusPage } from '@/pages/InspectionStatusPage';
-import { AssignmentStatusPage } from '@/pages/AssignmentStatusPage';
-import NoticesPage from '@/pages/NoticesPage';
-import BackupPage from '@/pages/BackupPage';
+// Pages are loaded on demand so large editor/export dependencies do not inflate
+// the initial application bundle.
+const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const CustomersPage = lazy(() => import('@/pages/CustomersPage'));
+const CustomerDetailPage = lazy(() => import('@/pages/CustomerDetailPage'));
+const CustomerEditPage = lazy(() => import('@/pages/CustomerEditPage'));
+const CustomerDocumentsPage = lazy(() => import('@/pages/CustomerDocumentsPage'));
+const CustomerSourceManagementDetailPage = lazy(() => import('@/pages/CustomerSourceManagementDetailPage'));
+const CustomerSourceManagementEditPage = lazy(() => import('@/pages/CustomerSourceManagementEditPage'));
+const CustomerSupportLogsPage = lazy(() => import('@/pages/CustomerSupportLogsPage'));
+const CustomerMeetingMinutesPage = lazy(() => import('@/pages/CustomerMeetingMinutesPage'));
+const DocumentViewerPage = lazy(() => import('@/pages/DocumentViewerPage'));
+const SuperAdminsPage = lazy(() => import('@/pages/SuperAdminsPage'));
+const AdminsPage = lazy(() => import('@/pages/AdminsPage'));
+const UsersPage = lazy(() => import('@/pages/UsersPage'));
+const DocumentsPage = lazy(() => import('@/pages/DocumentsPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const UnauthorizedPage = lazy(() => import('@/pages/UnauthorizedPage'));
+const SystemLogsPage = lazy(() => import('@/pages/SystemLogsPage'));
+const UploadLogsPage = lazy(() => import('@/pages/UploadLogsPage'));
+const LoginLogsPage = lazy(() => import('@/pages/LoginLogsPage'));
+const InspectionStatusPage = lazy(() =>
+  import('@/pages/InspectionStatusPage').then(({ InspectionStatusPage: page }) => ({ default: page })),
+);
+const AssignmentStatusPage = lazy(() =>
+  import('@/pages/AssignmentStatusPage').then(({ AssignmentStatusPage: page }) => ({ default: page })),
+);
+const NoticesPage = lazy(() => import('@/pages/NoticesPage'));
+const BackupPage = lazy(() => import('@/pages/BackupPage'));
 
 export const router = createBrowserRouter([
   {

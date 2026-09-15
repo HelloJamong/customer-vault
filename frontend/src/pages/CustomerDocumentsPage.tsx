@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -40,6 +40,7 @@ import type { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
+import { getApiErrorMessage } from '@/utils/api-error';
 import { documentsAPI, type InspectionTarget } from '@/api/documents.api';
 
 interface Document {
@@ -110,7 +111,7 @@ const CustomerDocumentsPage = () => {
     }
   };
 
-  const fetchInspectionTargets = async () => {
+  const fetchInspectionTargets = useCallback(async () => {
     if (!customerId) return;
     try {
       const targets = await documentsAPI.getInspectionTargets(parseInt(customerId));
@@ -118,7 +119,7 @@ const CustomerDocumentsPage = () => {
     } catch (error) {
       console.error('점검 항목 로드 실패:', error);
     }
-  };
+  }, [customerId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -143,7 +144,7 @@ const CustomerDocumentsPage = () => {
     if (customerId) {
       fetchData();
     }
-  }, [customerId]);
+  }, [customerId, fetchInspectionTargets]);
 
   const handleSearch = () => {
     if (startDate && endDate) {
@@ -196,7 +197,7 @@ const CustomerDocumentsPage = () => {
       // 해당 점검 항목에 이미 업로드된 양식이 있는지 확인
       const response = await apiClient.get(`/inspection-targets/${targetId}/template`);
       return response.data?.exists || false;
-    } catch (error) {
+    } catch {
       return false;
     }
   };
@@ -262,11 +263,11 @@ const CustomerDocumentsPage = () => {
       await fetchInspectionTargets();
 
       handleCloseUploadDialog();
-    } catch (error: any) {
+    } catch (error) {
       console.error('점검서 양식 업로드 실패:', error);
       setSnackbar({
         open: true,
-        message: error.response?.data?.message || '점검서 양식 업로드에 실패했습니다.',
+        message: getApiErrorMessage(error, '점검서 양식 업로드에 실패했습니다.'),
         severity: 'error',
       });
     }

@@ -6,11 +6,63 @@ import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
 import apiClient from '@/api/axios';
+import { getApiErrorMessage } from '@/utils/api-error';
 import { logsApi } from '@/api/logs.api';
 import ExcelJS from 'exceljs';
-import CustomerSummaryDialog from '@/components/CustomerSummaryDialog';
+import CustomerSummaryDialog, { type CustomerSummary } from '@/components/CustomerSummaryDialog';
 import { useCustomersPageStore } from '@/store/customersPageStore';
 import { useShallow } from 'zustand/react/shallow';
+
+type ExportRow = Array<string | number | boolean | null>;
+
+interface SourceExportServer {
+  serverType?: string;
+  manufacturer?: string;
+  modelName?: string;
+  hostname?: string;
+  serialNumber?: string;
+  osVersion?: string;
+  cpuType?: string;
+  memoryCapacity?: string;
+  diskCapacity?: string;
+  nicFiberCount?: number;
+  nicUtpCount?: number;
+  powerSupplyCount?: number;
+}
+
+interface SourceExportData {
+  id?: number;
+  clientVersion?: string;
+  clientCustomInfo?: string;
+  virtualPcOsVersion?: string;
+  virtualPcBuildVersion?: string;
+  virtualPcGuestAddition?: string;
+  virtualPcImageInfo?: string;
+  adminWebReleaseDate?: string;
+  adminWebCustomInfo?: string;
+  redundancyType?: string;
+  servers?: SourceExportServer[];
+  hrIntegration: {
+    enabled: boolean;
+    dbType?: string;
+    dbVersion?: string;
+  };
+}
+
+interface SupportExportLog {
+  supportDate?: string;
+  inquirer?: string;
+  target?: string;
+  category?: string;
+  userInfo?: string;
+  actionStatus?: string;
+  inquiryContent?: string;
+  actionContent?: string;
+  actionResult?: string;
+  remarks?: string;
+  creator?: { name?: string };
+  createdAt?: string;
+}
 
 const CustomersPage = () => {
   const navigate = useNavigate();
@@ -71,7 +123,7 @@ const CustomersPage = () => {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
-  const [summaryCustomers, setSummaryCustomers] = useState<any[]>([]);
+  const [summaryCustomers, setSummaryCustomers] = useState<CustomerSummary[]>([]);
   const [hoveredRowId, setHoveredRowId] = useState<number | null>(null);
 
   // 데이터 로드 후 저장된 스크롤 위치를 1회 복원
@@ -138,11 +190,10 @@ const CustomersPage = () => {
       setOpenAddDialog(false);
       setNewCustomerName('');
       alert('고객사가 추가되었습니다.');
-    } catch (error: any) {
+    } catch (error) {
       console.error('고객사 추가 실패:', error);
       // 에러 메시지 추출
-      const errorMessage = error.response?.data?.message || error.message || '고객사 추가에 실패했습니다.';
-      alert(errorMessage);
+      alert(getApiErrorMessage(error, '고객사 추가에 실패했습니다.'));
     }
   };
 
@@ -184,7 +235,7 @@ const CustomersPage = () => {
 
     // === 1. 형상관리 시트 ===
     try {
-      const sourceResponse = await apiClient.get(`/customers/${customer.id}/source-management`);
+      const sourceResponse = await apiClient.get<SourceExportData>(`/customers/${customer.id}/source-management`);
       const sourceData = sourceResponse.data;
 
       const sourceWorksheet = workbook.addWorksheet('형상관리');
@@ -195,7 +246,7 @@ const CustomersPage = () => {
         const emptySourceData = [['형상 관리 정보'], ['고객사명', customer.name], [''], ['등록된 형상 관리 정보가 없습니다.']];
         emptySourceData.forEach(row => sourceWorksheet.addRow(row));
       } else {
-        const sourceSheetData: any[][] = [
+        const sourceSheetData: ExportRow[] = [
           ['형상 관리 정보', ''],
           ['고객사명', customer.name],
           ['', ''],
@@ -235,7 +286,7 @@ const CustomersPage = () => {
             'UTP NIC',
             '전원 수량',
           ]);
-          sourceData.servers.forEach((server: any) => {
+          sourceData.servers.forEach((server) => {
             sourceSheetData.push([
               server.serverType || '-',
               server.manufacturer || '-',
@@ -268,7 +319,7 @@ const CustomersPage = () => {
           cell.alignment = { vertical: 'middle', wrapText: true };
         });
       });
-    } catch (error) {
+    } catch {
       // API 호출 실패 시 에러 시트 추가
       const sourceWorksheet = workbook.addWorksheet('형상관리');
       sourceWorksheet.columns = [{ width: 25 }, { width: 50 }];
@@ -284,7 +335,7 @@ const CustomersPage = () => {
 
     // === 2. 지원목록 시트 ===
     try {
-      const supportResponse = await apiClient.get(`/support-logs/customer/${customer.id}`);
+      const supportResponse = await apiClient.get<SupportExportLog[]>(`/support-logs/customer/${customer.id}`);
       const supportLogs = supportResponse.data;
 
       const supportWorksheet = workbook.addWorksheet('지원목록');
@@ -303,7 +354,7 @@ const CustomersPage = () => {
         { width: 12 },  // 등록일
       ];
 
-      const supportSheetData: any[][] = [
+      const supportSheetData: ExportRow[] = [
         ['지원 목록', '', '', '', '', '', '', '', '', '', '', ''],
         ['고객사명', customer.name, '', '', '', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', '', '', '', '', ''],
@@ -324,7 +375,7 @@ const CustomersPage = () => {
       ];
 
       if (supportLogs && supportLogs.length > 0) {
-        supportLogs.forEach((log: any) => {
+        supportLogs.forEach((log) => {
           supportSheetData.push([
             log.supportDate || '-',
             log.inquirer || '-',
@@ -352,7 +403,7 @@ const CustomersPage = () => {
           cell.alignment = { vertical: 'middle', wrapText: true };
         });
       });
-    } catch (error) {
+    } catch {
       // 지원목록 데이터가 없는 경우 빈 시트 추가
       const supportWorksheet = workbook.addWorksheet('지원목록');
       supportWorksheet.columns = [{ width: 25 }, { width: 50 }];

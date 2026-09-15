@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { settingsApi } from '../api/settings.api';
 import type {
   SystemSettings,
   UpdateSettingsRequest,
 } from '../types/settings.types';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 export const useSettings = () => {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
@@ -16,11 +18,11 @@ export const useSettings = () => {
       setError(null);
       const data = await settingsApi.getSettings();
       setSettings(data);
-    } catch (err: any) {
-      if (err.response?.status === 403) {
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 403) {
         setError('시스템 설정은 최고 관리자(SUPER_ADMIN)만 접근할 수 있습니다.');
       } else {
-        setError(err.response?.data?.message || '설정을 불러오는데 실패했습니다.');
+        setError(getApiErrorMessage(err, '설정을 불러오는데 실패했습니다.'));
       }
     } finally {
       setLoading(false);
@@ -33,9 +35,8 @@ export const useSettings = () => {
       const response = await settingsApi.updateSettings(data);
       await fetchSettings();
       return response;
-    } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || '설정 저장에 실패했습니다.';
+    } catch (err) {
+      const errorMessage = getApiErrorMessage(err, '설정 저장에 실패했습니다.');
       setError(errorMessage);
       throw new Error(errorMessage);
     }

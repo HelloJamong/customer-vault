@@ -22,6 +22,7 @@ import {
 import Grid from '@/mui-grid2';
 import { useSettings } from '../hooks/useSettings';
 import type { UpdateSettingsRequest } from '../types/settings.types';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 const SettingsPage = () => {
   const { settings, loading, error, updateSettings } = useSettings();
@@ -76,10 +77,10 @@ const SettingsPage = () => {
         message: '시스템 설정이 저장되었습니다.',
         severity: 'success',
       });
-    } catch (err: any) {
+    } catch (err) {
       setSnackbar({
         open: true,
-        message: err.message || '설정 저장에 실패했습니다.',
+        message: getApiErrorMessage(err, '설정 저장에 실패했습니다.'),
         severity: 'error',
       });
     } finally {

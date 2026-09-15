@@ -15,7 +15,7 @@
 1. `proxy` 디렉토리를 루트에 생성하고, `docs/nginx.conf.example` 내용을 복사해 `proxy/nginx.conf`로 저장합니다.
 2. 필요 시 포트/도메인만 수정합니다(기본은 모든 호스트 허용).
 
-## 2) docker-compose.yml 예시 변경
+## 2) docker-compose.yml 예시 확인
 ```yaml
 services:
   nginx:
@@ -34,14 +34,10 @@ services:
       - customer_network
 
   backend:
-    # 기존 설정 유지
-    # ports:           # 운영 시 비노출 권장
-    #   - "5005:5000"
+    # ports를 설정하지 않습니다. 백엔드는 customer_network 내부에서만 접근합니다.
 
   frontend:
-    # 기존 설정 유지
-    # ports:           # 운영 시 비노출 권장
-    #   - "3003:80"
+    # ports를 설정하지 않습니다. 프론트엔드는 proxy를 통해서만 접근합니다.
 
 networks:
   customer_network:

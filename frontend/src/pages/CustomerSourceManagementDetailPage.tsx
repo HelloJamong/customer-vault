@@ -74,6 +74,8 @@ interface SourceManagement {
   hrIntegration: HRIntegration;
 }
 
+type ExportRow = Array<string | number | boolean | null>;
+
 const CustomerSourceManagementDetailPage = () => {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
@@ -140,7 +142,7 @@ const CustomerSourceManagementDetailPage = () => {
     worksheet.columns = [{ width: 25 }, { width: 50 }];
 
     // 엑셀 데이터 준비
-    const data: any[][] = [
+    const data: ExportRow[] = [
       ['형상 관리 정보', ''],
       ['고객사명', customerName],
       ['', ''],

@@ -1,5 +1,8 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
+
+# Prisma needs OpenSSL available during client generation as well as at runtime.
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -20,7 +23,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install OpenSSL for Prisma + mariadb-client for mysqldump + gzip
 RUN apk add --no-cache openssl mariadb-client gzip

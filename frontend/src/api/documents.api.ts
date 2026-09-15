@@ -19,6 +19,10 @@ export interface UploadInspectionDocumentDto {
   file: File;
 }
 
+export interface UploadInspectionDocumentResponse {
+  message?: string;
+}
+
 export const documentsAPI = {
   // 고객사별 점검 대상 조회
   getInspectionTargets: async (customerId: number): Promise<InspectionTarget[]> => {
@@ -27,7 +31,9 @@ export const documentsAPI = {
   },
 
   // 사용자용 점검서 업로드
-  uploadInspectionDocument: async (dto: UploadInspectionDocumentDto): Promise<any> => {
+  uploadInspectionDocument: async (
+    dto: UploadInspectionDocumentDto,
+  ): Promise<UploadInspectionDocumentResponse> => {
     const formData = new FormData();
     formData.append('customerId', dto.customerId.toString());
     formData.append('inspectionTargetId', dto.inspectionTargetId.toString());

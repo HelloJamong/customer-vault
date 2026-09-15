@@ -52,7 +52,7 @@ docker compose logs backend --tail=30
 ```
 [entrypoint] Applying Prisma migrations...
 [entrypoint] Starting application...
-🚀 Application is running on: http://localhost:5005
+🚀 Application is running on: http://localhost:5000
 ```
 
 ### 2단계: 정상 동작 확인
@@ -136,8 +136,8 @@ docker compose logs backend --tail=30
 
 정상 기동 시 로그 예시:
 ```
-🚀 Application is running on: http://localhost:5005
-📚 API Documentation: http://localhost:5005/api/docs
+🚀 Application is running on: http://localhost:5000
+📚 API Documentation: http://localhost:5000/api/docs
 ```
 
 `ENCRYPTION_KEY` 또는 `JWT_SECRET` 오류 시:

@@ -27,6 +27,7 @@ import {
 import { Add, MoreVert } from '@mui/icons-material';
 import apiClient from '@/api/axios';
 import { useAuthStore } from '@/store/authStore';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 interface User {
   id: number;
@@ -135,10 +136,9 @@ const UsersPage = () => {
       alert(`${response.data.message}\n초기 패스워드: ${response.data.defaultPassword}`);
       handleCloseDialog();
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('사용자 생성 실패:', error);
-      const errorMessage = error.response?.data?.message || '사용자 생성에 실패했습니다.';
-      alert(errorMessage);
+      alert(getApiErrorMessage(error, '사용자 생성에 실패했습니다.'));
     }
   };
 
@@ -171,7 +171,7 @@ const UsersPage = () => {
       alert('사용자 정보가 수정되었습니다.');
       handleCloseDialog();
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('사용자 수정 실패:', error);
       alert('사용자 수정에 실패했습니다.');
     }
@@ -223,10 +223,9 @@ const UsersPage = () => {
       await apiClient.delete(`/users/${selectedUser.id}`);
       alert('사용자가 삭제되었습니다.');
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('사용자 삭제 실패:', error);
-      const errorMessage = error.response?.data?.message || '사용자 삭제에 실패했습니다.';
-      alert(errorMessage);
+      alert(getApiErrorMessage(error, '사용자 삭제에 실패했습니다.'));
     }
     handleMenuClose();
   };

@@ -12,11 +12,22 @@ npx prisma generate
 MIGRATIONS_DIR="/app/prisma/migrations"
 if [ -d "$MIGRATIONS_DIR" ] && [ "$(ls -A "$MIGRATIONS_DIR")" ]; then
   echo "[entrypoint] Applying Prisma migrations..."
-  # Try to apply migrations, if it fails with P3005 (database not empty), resolve and continue
-  if ! npx prisma migrate deploy 2>&1 | tee /tmp/migrate.log; then
+  # Capture the real migrate exit status without relying on non-POSIX pipefail.
+  set +e
+  npx prisma migrate deploy >/tmp/migrate.log 2>&1
+  migrate_status=$?
+  set -e
+  cat /tmp/migrate.log
+
+  if [ "$migrate_status" -ne 0 ]; then
     if grep -q "P3005" /tmp/migrate.log; then
-      echo "[entrypoint] Database is not empty. Marking initial migration as applied..."
-      npx prisma migrate resolve --applied 20260106000000_init
+      initial_migration=$(find "$MIGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | head -n 1)
+      if [ -z "$initial_migration" ]; then
+        echo "[entrypoint] Migration failed: no initial migration directory found for P3005 recovery." >&2
+        exit 1
+      fi
+      echo "[entrypoint] Database is not empty. Marking initial migration as applied: $initial_migration"
+      npx prisma migrate resolve --applied "$initial_migration"
       echo "[entrypoint] Retrying migration deployment..."
       npx prisma migrate deploy
     else

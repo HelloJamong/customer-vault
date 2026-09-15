@@ -22,6 +22,7 @@ import { Download, Refresh, PlayArrow } from '@mui/icons-material';
 import { backupApi } from '@/api/backup.api';
 import type { BackupLog } from '@/types/backup.types';
 import dayjs from 'dayjs';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 const statusLabel: Record<string, { label: string; color: 'success' | 'error' | 'info' | 'warning' }> = {
   success: { label: '성공', color: 'success' },
@@ -95,8 +96,8 @@ const BackupPage = () => {
       setSnackbar({ open: true, message: '백업이 완료되었습니다.', severity: 'success' });
       await fetchLogs(1);
       setPage(1);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || '백업 실행에 실패했습니다.';
+    } catch (err) {
+      const msg = getApiErrorMessage(err, '백업 실행에 실패했습니다.');
       setSnackbar({ open: true, message: msg, severity: 'error' });
     } finally {
       setRunning(false);

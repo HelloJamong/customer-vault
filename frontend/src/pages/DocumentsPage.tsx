@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -23,6 +23,7 @@ import { documentsAPI } from '@/api/documents.api';
 import type { Customer } from '@/types/customer.types';
 import type { InspectionTarget, UploadInspectionDocumentDto } from '@/api/documents.api';
 import { useAuthStore } from '@/store/authStore';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 dayjs.locale('ko');
 
@@ -53,11 +54,6 @@ const DocumentsPage = () => {
     enabled: !!formData.customerId,
   });
 
-  // 고객사 변경 시 점검 대상 초기화
-  useEffect(() => {
-    setFormData((prev) => ({ ...prev, inspectionTargetId: '' }));
-  }, [formData.customerId]);
-
   // 업로드 mutation
   const uploadMutation = useMutation({
     mutationFn: (dto: UploadInspectionDocumentDto) => documentsAPI.uploadInspectionDocument(dto),
@@ -80,8 +76,8 @@ const DocumentsPage = () => {
       const fileInput = document.getElementById('file-upload') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.message || '업로드에 실패했습니다.');
+    onError: (error) => {
+      setError(getApiErrorMessage(error, '업로드에 실패했습니다.'));
       setSuccess('');
     },
   });
@@ -166,7 +162,13 @@ const DocumentsPage = () => {
             <Select
               value={formData.customerId}
               label="고객사"
-              onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
+              onChange={(e) =>
+                setFormData({
+                  customerId: e.target.value,
+                  inspectionTargetId: '',
+                  inspectionType: formData.inspectionType,
+                })
+              }
               disabled={isLoadingCustomers}
             >
               {customers.map((customer) => (

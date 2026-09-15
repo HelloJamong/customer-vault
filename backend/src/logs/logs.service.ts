@@ -33,6 +33,18 @@ export interface SystemLogsResponse {
 export class LogsService {
   constructor(private prisma: PrismaService) {}
 
+  // JSON 변경 이력에는 접근 비밀번호/해시를 남기지 않는다. 일반 텍스트 이력은 보존한다.
+  private redactPasswords(value?: string): string | undefined {
+    if (!value) return value;
+    try {
+      return JSON.stringify(JSON.parse(value, (key, entry) =>
+        /password/i.test(key) ? undefined : entry,
+      ));
+    } catch {
+      return value;
+    }
+  }
+
   async createServiceLog(data: {
     userId?: number;
     logType: string;
@@ -48,8 +60,8 @@ export class LogsService {
         logType: data.logType,
         action: data.action,
         description: data.description,
-        beforeValue: data.beforeValue,
-        afterValue: data.afterValue,
+        beforeValue: this.redactPasswords(data.beforeValue),
+        afterValue: this.redactPasswords(data.afterValue),
         ipAddress: cleanIpAddress(data.ipAddress),
       },
     });

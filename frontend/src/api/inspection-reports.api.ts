@@ -70,8 +70,7 @@ export interface CreateInspectionReportDto {
   customerRequest?: string;
 }
 
-export interface UpdateInspectionReportDto
-  extends Partial<CreateInspectionReportDto> {}
+export type UpdateInspectionReportDto = Partial<CreateInspectionReportDto>;
 
 export const inspectionReportsApi = {
   // 점검서 목록 조회

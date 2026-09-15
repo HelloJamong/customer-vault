@@ -133,7 +133,7 @@ export interface CreateCustomerDto {
   salesId?: number;
 }
 
-export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}
+export type UpdateCustomerDto = Partial<CreateCustomerDto>;
 
 export interface CreateInspectionTargetDto {
   customerId: number;

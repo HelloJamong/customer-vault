@@ -158,6 +158,8 @@ export class BackupService implements OnModuleInit {
     const savedPaths: string[] = [];
 
     try {
+      this.validateBackupRequest(targets, destinations, settings);
+
       // 로컬 디렉토리 준비
       const dbBackupDir = path.join(this.backupDir, 'db-backup');
       const docBackupDir = path.join(this.backupDir, 'doc-backup');
@@ -187,7 +189,7 @@ export class BackupService implements OnModuleInit {
       }
 
       // 원격 SFTP 전송
-      if (destinations.includes('remote') && settings.sftpHost) {
+      if (destinations.includes('remote')) {
         if (localDbPath) {
           await this.transferToRemote(
             localDbPath,
@@ -244,6 +246,58 @@ export class BackupService implements OnModuleInit {
       });
 
       return { ...updated, fileSize: updated.fileSize?.toString() };
+    }
+  }
+
+  private validateBackupRequest(targets: string[], destinations: string[], settings: any) {
+    if (targets.length === 0) {
+      throw new Error('백업 대상이 선택되지 않았습니다.');
+    }
+
+    if (destinations.length === 0) {
+      throw new Error('백업 저장 위치가 선택되지 않았습니다.');
+    }
+
+    if (destinations.includes('remote')) {
+      this.validateRemoteBackupSettings(settings);
+    }
+  }
+
+  private validateRemoteBackupSettings(settings: any) {
+    const rawHost = typeof settings.sftpHost === 'string' ? settings.sftpHost.trim() : '';
+    if (!rawHost) {
+      throw new Error('SFTP host is required for remote backup.');
+    }
+
+    const [host, portStr] = rawHost.split(':');
+    if (!host?.trim()) {
+      throw new Error('SFTP host is required for remote backup.');
+    }
+
+    if (portStr) {
+      const port = Number(portStr);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error('SFTP port is invalid for remote backup.');
+      }
+    }
+
+    if (typeof settings.sftpUsername !== 'string' || !settings.sftpUsername.trim()) {
+      throw new Error('SFTP username is required for remote backup.');
+    }
+
+    const keyPath = typeof settings.sftpKeyPath === 'string' ? settings.sftpKeyPath.trim() : '';
+    const hasUsableKey = keyPath.length > 0 && fs.existsSync(keyPath);
+    const encryptedPassword = typeof settings.sftpPassword === 'string' ? settings.sftpPassword.trim() : '';
+
+    if (!hasUsableKey && !encryptedPassword) {
+      throw new Error('SFTP authentication is required for remote backup.');
+    }
+
+    if (!hasUsableKey && encryptedPassword) {
+      const password = this.cryptoService.safeDecrypt(encryptedPassword);
+      if (typeof password !== 'string' || password.length === 0) {
+        throw new Error('SFTP authentication is required for remote backup.');
+      }
     }
   }
 

@@ -17,6 +17,7 @@ import Grid from '@/mui-grid2';
 import { ArrowBack, Save, Add, Delete } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 interface ServerInfo {
   id?: number;
@@ -112,9 +113,9 @@ const CustomerSourceManagementEditPage = () => {
           if (sourceResponse.data) {
             setFormData(sourceResponse.data);
           }
-        } catch (error: any) {
+        } catch (error) {
           // 404인 경우 새로 생성
-          if (error.response?.status !== 404) {
+          if (!(error instanceof Error) || !('response' in error) || (error as { response?: { status?: number } }).response?.status !== 404) {
             throw error;
           }
         }
@@ -134,9 +135,11 @@ const CustomerSourceManagementEditPage = () => {
     setIsSaving(true);
     try {
       // customerId와 id를 제외한 데이터만 전송
-      const { id, customerId: _, ...dataToSend } = formData;
+      const dataToSend = Object.fromEntries(
+        Object.entries(formData).filter(([key]) => key !== 'id' && key !== 'customerId'),
+      );
 
-      if (id) {
+      if (formData.id) {
         // 수정
         await apiClient.put(`/customers/${customerId}/source-management`, dataToSend);
       } else {
@@ -147,7 +150,7 @@ const CustomerSourceManagementEditPage = () => {
       navigate(`/customers/${customerId}/source-management`);
     } catch (error) {
       console.error('저장 실패:', error);
-      alert('저장에 실패했습니다.');
+      alert(getApiErrorMessage(error, '저장에 실패했습니다.'));
     } finally {
       setIsSaving(false);
     }
@@ -197,7 +200,7 @@ const CustomerSourceManagementEditPage = () => {
     setFormData({ ...formData, servers: updatedServers });
   };
 
-  const handleServerChange = (index: number, field: keyof ServerInfo, value: any) => {
+  const handleServerChange = (index: number, field: keyof ServerInfo, value: string | number) => {
     const updatedServers = [...(formData.servers || [])];
     updatedServers[index] = {
       ...updatedServers[index],
@@ -232,7 +235,7 @@ const CustomerSourceManagementEditPage = () => {
     setFormData({ ...formData, accessInfo: updatedAccessInfo });
   };
 
-  const handleAccessInfoChange = (index: number, field: keyof ServerAccessInfo, value: any) => {
+  const handleAccessInfoChange = (index: number, field: keyof ServerAccessInfo, value: string | number) => {
     const updatedAccessInfo = [...(formData.accessInfo || [])];
     updatedAccessInfo[index] = {
       ...updatedAccessInfo[index],

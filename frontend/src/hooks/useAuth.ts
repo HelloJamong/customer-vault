@@ -4,6 +4,7 @@ import { authAPI } from '@/api/auth.api';
 import { useAuthStore } from '@/store/authStore';
 import { queryClient } from '@/lib/queryClient';
 import type { LoginRequest } from '@/types/auth.types';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 interface LogoutOptions {
   redirectState?: Record<string, unknown>;
@@ -50,10 +51,10 @@ export const useAuth = () => {
 
   const login = (credentials: LoginRequest, options?: LoginOptions) => {
     loginMutation.mutate(credentials, {
-      onError: (error: any) => {
+      onError: (error) => {
         console.error('Login failed:', error);
 
-        const message = error.response?.data?.message || '로그인에 실패했습니다.';
+        const message = getApiErrorMessage(error, '로그인에 실패했습니다.');
 
         // 중복 세션 에러인 경우
         if (message === 'DUPLICATE_SESSION') {

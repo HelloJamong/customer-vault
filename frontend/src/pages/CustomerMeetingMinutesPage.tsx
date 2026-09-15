@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, IconButton,
@@ -153,22 +153,21 @@ const CustomerMeetingMinutesPage = () => {
 
   const id = Number(customerId);
 
-  useEffect(() => {
-    fetchAll();
-    customersAPI.getById(id).then((c) => setCustomerName(c.name ?? '')).catch(() => {});
-  }, [id]);
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     try {
       const data = await meetingMinutesApi.getAll(id);
       setMinutes(data);
-    } catch (e) {
-      console.error(e);
+    } catch {
       alert('회의록을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    void fetchAll();
+    customersAPI.getById(id).then((c) => setCustomerName(c.name ?? '')).catch(() => {});
+  }, [id, fetchAll]);
 
   const handleView = (item: MeetingMinutes) => {
     setSelected(item);
@@ -195,7 +194,7 @@ const CustomerMeetingMinutesPage = () => {
     try {
       await meetingMinutesApi.remove(item.id);
       await fetchAll();
-    } catch (e) { alert('삭제에 실패했습니다.'); }
+    } catch { alert('삭제에 실패했습니다.'); }
   };
 
   const handleCreateOpen = () => {
@@ -215,7 +214,7 @@ const CustomerMeetingMinutesPage = () => {
       await meetingMinutesApi.create(id, buildPayload());
       setCreateOpen(false);
       await fetchAll();
-    } catch (e) { alert('저장에 실패했습니다.'); }
+    } catch { alert('저장에 실패했습니다.'); }
   };
 
   const handleUpdate = async () => {
@@ -224,7 +223,7 @@ const CustomerMeetingMinutesPage = () => {
       await meetingMinutesApi.update(selected.id, buildPayload());
       setEditOpen(false);
       await fetchAll();
-    } catch (e) { alert('수정에 실패했습니다.'); }
+    } catch { alert('수정에 실패했습니다.'); }
   };
 
   const formProps: MeetingFormProps = {

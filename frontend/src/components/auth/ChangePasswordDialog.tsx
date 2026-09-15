@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { Check, Close } from '@mui/icons-material';
 import apiClient from '@/api/axios';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -52,19 +53,19 @@ const ChangePasswordDialog = ({
   const [requirements, setRequirements] = useState<PasswordRequirements | null>(null);
 
   useEffect(() => {
-    if (open) {
-      fetchPasswordRequirements();
-    }
-  }, [open]);
+    if (!open) return;
 
-  const fetchPasswordRequirements = async () => {
-    try {
-      const { data } = await apiClient.get('/auth/password-requirements');
-      setRequirements(data);
-    } catch (error) {
-      console.error('비밀번호 요구사항 조회 실패:', error);
-    }
-  };
+    const fetchPasswordRequirements = async () => {
+      try {
+        const { data } = await apiClient.get('/auth/password-requirements');
+        setRequirements(data);
+      } catch (error) {
+        console.error('비밀번호 요구사항 조회 실패:', error);
+      }
+    };
+
+    void fetchPasswordRequirements();
+  }, [open]);
 
   const validatePassword = (): PasswordCheck[] => {
     if (!requirements) return [];
@@ -123,10 +124,9 @@ const ChangePasswordDialog = ({
       setNewPassword('');
       setConfirmPassword('');
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error('비밀번호 변경 실패:', error);
-      const errorMessage = error.response?.data?.message || '비밀번호 변경에 실패했습니다.';
-      setError(errorMessage);
+      setError(getApiErrorMessage(error, '비밀번호 변경에 실패했습니다.'));
     }
   };
 

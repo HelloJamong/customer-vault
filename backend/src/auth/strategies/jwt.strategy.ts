@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SESSION_EXPIRY_MS, isPasswordExpired } from '../session-policy';
 
 export interface JwtPayload {
   sub: number;
@@ -40,17 +41,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('사용자를 찾을 수 없거나 비활성화되었습니다.');
     }
 
-    // 세션 활동 시각 갱신 (5분 이상 지난 경우에만). 단일 UPDATE 문이며
-    // 세션이 이미 삭제된 경우(로그아웃/강제 종료)에는 아무 것도 하지 않는다.
-    if (payload.sessionId) {
-      await this.prisma.userSession.updateMany({
-        where: {
-          sessionId: payload.sessionId,
-          lastActivity: { lt: new Date(Date.now() - 5 * 60 * 1000) },
-        },
-        data: { lastActivity: new Date() },
-      });
+    if (!payload.sessionId) {
+      throw new UnauthorizedException('세션이 만료되었습니다.');
     }
+    const session = await this.prisma.userSession.findFirst({
+      where: {
+        userId: user.id,
+        sessionId: payload.sessionId,
+        lastActivity: { gte: new Date(Date.now() - SESSION_EXPIRY_MS) },
+      },
+    });
+    if (!session) {
+      throw new UnauthorizedException('세션이 만료되었습니다.');
+    }
+
+    // 유효한 세션만 활동 시각을 갱신한다. 삭제되거나 만료된 세션은 부활시키지 않는다.
+    await this.prisma.userSession.updateMany({
+      where: {
+        userId: user.id,
+        sessionId: payload.sessionId,
+        lastActivity: { lt: new Date(Date.now() - 5 * 60 * 1000) },
+      },
+      data: { lastActivity: new Date() },
+    });
+    const settings = await this.prisma.systemSettings.findFirst();
 
     return {
       id: user.id,
@@ -58,6 +72,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       name: user.name,
       role: user.role,
       isFirstLogin: user.isFirstLogin,
+      passwordExpired: isPasswordExpired(user.passwordChangedAt, settings),
       sessionId: payload.sessionId, // JWT에서 sessionId 전달
     };
   }

@@ -22,8 +22,12 @@ const MainLayout = () => {
   const [workStatusAnchor, setWorkStatusAnchor] = useState<null | HTMLElement>(null);
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
-  const [forcedPasswordMessage, setForcedPasswordMessage] = useState<string | undefined>(undefined);
+  const userRequiresPasswordChange = Boolean(user?.passwordExpired || user?.isFirstLogin);
+  const isForcedPasswordChange = userRequiresPasswordChange;
+  const forcedPasswordMessage = user?.passwordExpired
+    ? '비밀번호 사용 기간이 만료되었습니다. 계속하려면 비밀번호를 변경해야 합니다.'
+    : undefined;
+  const effectivePasswordDialogOpen = passwordDialogOpen || userRequiresPasswordChange;
 
   // 공지사항 팝업 관련 상태
   const [unreadNotices, setUnreadNotices] = useState<Notice[]>([]);
@@ -31,19 +35,6 @@ const MainLayout = () => {
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
   // 팝업은 세션당 1회만 자동 표시 (닫은 뒤 재표시되지 않도록)
   const noticeAutoShownRef = useRef(false);
-
-  // 최초 로그인 또는 비밀번호 만료 시 비밀번호 변경 강제
-  useEffect(() => {
-    if (user?.passwordExpired) {
-      setForcedPasswordMessage('비밀번호 사용 기간이 만료되었습니다. 계속하려면 비밀번호를 변경해야 합니다.');
-      setIsForcedPasswordChange(true);
-      setPasswordDialogOpen(true);
-    } else if (user?.isFirstLogin) {
-      setForcedPasswordMessage(undefined);
-      setIsForcedPasswordChange(true);
-      setPasswordDialogOpen(true);
-    }
-  }, [user?.isFirstLogin, user?.passwordExpired]);
 
   // 읽지 않은 공지사항 조회 (슈퍼 관리자 제외) — 사용자당 1회
   useEffect(() => {
@@ -65,11 +56,12 @@ const MainLayout = () => {
 
   // 비밀번호 변경 다이얼로그가 없거나 닫힌 뒤에 공지 팝업을 1회만 표시
   useEffect(() => {
-    if (!passwordDialogOpen && unreadNotices.length > 0 && !noticeAutoShownRef.current) {
+    if (!effectivePasswordDialogOpen && unreadNotices.length > 0 && !noticeAutoShownRef.current) {
       noticeAutoShownRef.current = true;
-      setNoticePopupOpen(true);
+      const timer = window.setTimeout(() => setNoticePopupOpen(true), 0);
+      return () => window.clearTimeout(timer);
     }
-  }, [passwordDialogOpen, unreadNotices.length]);
+  }, [effectivePasswordDialogOpen, unreadNotices.length]);
 
   const handleLogout = () => {
     setUserAnchor(null);
@@ -78,7 +70,6 @@ const MainLayout = () => {
 
   const handlePasswordDialogOpen = () => {
     setUserAnchor(null);
-    setIsForcedPasswordChange(false);
     setPasswordDialogOpen(true);
   };
 
@@ -567,7 +558,7 @@ const MainLayout = () => {
       </Box>
 
       <ChangePasswordDialog
-        open={passwordDialogOpen}
+        open={effectivePasswordDialogOpen}
         isForced={isForcedPasswordChange}
         forcedMessage={forcedPasswordMessage}
         onClose={handlePasswordDialogClose}

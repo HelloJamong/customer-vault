@@ -17,8 +17,7 @@ import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginDto, ChangePasswordDto } from './dto/login.dto';
 
-// 브라우저 종료 등으로 heartbeat가 끊긴 세션을 만료로 처리하는 기준 (30분)
-const SESSION_EXPIRY_MS = 30 * 60 * 1000;
+import { SESSION_EXPIRY_MS, isPasswordExpired } from './session-policy';
 
 // 비밀번호 최대 길이 (SystemSettings에 별도 컬럼이 없어 고정값 사용)
 const PASSWORD_MAX_LENGTH = 20;
@@ -246,7 +245,7 @@ export class AuthService {
         throw new UnauthorizedException('세션이 만료되었습니다.');
       }
       const session = await this.prisma.userSession.findFirst({
-        where: { userId: user.id, sessionId },
+        where: { userId: user.id, sessionId, lastActivity: { gte: new Date(Date.now() - SESSION_EXPIRY_MS) } },
       });
       if (!session) {
         throw new UnauthorizedException('세션이 만료되었습니다.');
@@ -308,18 +307,14 @@ export class AuthService {
   }
 
   async validateSession(userId: number, sessionId?: string) {
-    // 시스템 설정 확인
-    const settings = await this.getSystemSettings();
-
-    // 중복 로그인 방지가 비활성화되어 있으면 세션 검증 스킵
-    if (!settings.preventDuplicateLogin) {
-      return { valid: true, sessionCheckDisabled: true };
+    if (!sessionId) {
+      throw new UnauthorizedException('세션이 만료되었습니다.');
     }
-
-    // sessionId가 있으면 해당 세션만 확인, 없으면 userId로 확인 (하위 호환성)
-    const whereClause = sessionId
-      ? { userId, sessionId }
-      : { userId };
+    const whereClause = {
+      userId,
+      sessionId,
+      lastActivity: { gte: new Date(Date.now() - SESSION_EXPIRY_MS) },
+    };
 
     const session = await this.prisma.userSession.findFirst({
       where: whereClause,
@@ -399,11 +394,7 @@ export class AuthService {
       return true;
     }
 
-    const daysSinceChange = Math.floor(
-      (Date.now() - user.passwordChangedAt.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    return daysSinceChange >= settings.passwordExpiryDays;
+    return isPasswordExpired(user.passwordChangedAt, settings);
   }
 
   private async handleFailedLogin(userId: number, ipAddress: string) {
@@ -491,11 +482,10 @@ export class AuthService {
       select: { sessionId: true },
     });
 
-    // 항상 기존 세션을 삭제하고 새 세션을 생성
-    // (중복 로그인 체크는 이미 login 메서드에서 완료됨)
-    const deletedCount = await this.prisma.userSession.deleteMany({
-      where: { userId },
-    });
+    // 중복 로그인을 허용하면 기존 세션은 유지한다.
+    const deletedCount = settings.preventDuplicateLogin
+      ? await this.prisma.userSession.deleteMany({ where: { userId } })
+      : { count: 0 };
 
     if (deletedCount.count > 0) {
       // 강제 로그인인 경우 SSE 이벤트 전송 및 로그 기록

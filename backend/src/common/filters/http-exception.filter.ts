@@ -20,6 +20,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
+    let code: string | undefined;
     let logType = LogType.SYSTEM_ERROR;
 
     // HTTP 예외 처리
@@ -29,6 +30,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = typeof exceptionResponse === 'string'
         ? exceptionResponse
         : (exceptionResponse as any).message || message;
+
+      if (typeof exceptionResponse === 'object' && 'code' in exceptionResponse &&
+          typeof exceptionResponse.code === 'string') {
+        code = exceptionResponse.code;
+      }
 
       // 로그 타입 결정
       if (status === HttpStatus.UNAUTHORIZED || status === HttpStatus.FORBIDDEN) {
@@ -98,6 +104,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message: finalMessage,
+      ...(code && { code }),
       timestamp: new Date().toISOString(),
       path: request.url,
       // 개발 환경에서만 상세 정보 제공
@@ -153,6 +160,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private sanitizeBody(body: any): any {
     if (!body || typeof body !== 'object') return body;
 
+    if (Array.isArray(body)) return body.map((entry) => this.sanitizeBody(entry));
+
     // 키 이름에 password/token/secret/credential이 포함되면 마스킹
     // (currentPassword, newPassword, accessToken 등도 포함)
     const sensitive = /password|token|secret|credential|passwd/i;
@@ -161,6 +170,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     for (const key of Object.keys(sanitized)) {
       if (sensitive.test(key) && sanitized[key] !== undefined && sanitized[key] !== null) {
         sanitized[key] = '***REDACTED***';
+      } else {
+        sanitized[key] = this.sanitizeBody(sanitized[key]);
       }
     }
 

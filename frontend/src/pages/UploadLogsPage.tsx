@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,7 @@ import {
   IconButton,
   Collapse,
   Button,
+  type ChipProps,
 } from '@mui/material';
 import { ExpandMore, ExpandLess, Search, Refresh, Download } from '@mui/icons-material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -62,11 +63,7 @@ const UploadLogsPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    fetchLogs();
-  }, [appliedFilters, page, limit]);
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await logsApi.getUploadLogs({
@@ -83,7 +80,11 @@ const UploadLogsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [appliedFilters, page, limit]);
+
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -127,7 +128,7 @@ const UploadLogsPage = () => {
     setPage(1); // 페이지 크기 변경 시 첫 페이지로 이동
   };
 
-  const getLogTypeColor = (logType: string) => {
+  const getLogTypeColor = (logType: string): ChipProps['color'] => {
     switch (logType) {
       case '정상':
         return 'success';
@@ -339,7 +340,7 @@ const UploadLogsPage = () => {
                     <TableCell>
                       <Chip
                         label={log.logType}
-                        color={getLogTypeColor(log.logType) as any}
+                        color={getLogTypeColor(log.logType)}
                         size="small"
                       />
                     </TableCell>

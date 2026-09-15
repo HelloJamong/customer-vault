@@ -13,6 +13,30 @@ export default defineConfig({
       '@mui/material/Unstable_Grid2': path.resolve(__dirname, './src/mui-grid2'),
     },
   },
+  build: {
+    // ExcelJS is isolated in a lazy route chunk; allow that known export-only
+    // chunk without hiding oversized initial application bundles.
+    chunkSizeWarningLimit: 1024,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+
+          if (id.includes('/exceljs/')) return 'exceljs'
+          if (id.includes('/quill/') || id.includes('/react-quill-new/')) return 'quill'
+          if (id.includes('/@mui/x-data-grid/')) return 'mui-data-grid'
+          if (id.includes('/@mui/x-date-pickers/')) return 'mui-date-pickers'
+          if (id.includes('/@mui/icons-material/')) return 'mui-icons'
+          if (id.includes('/@mui/') || id.includes('/@emotion/')) return 'mui-core'
+          if (id.includes('/docx/')) return 'docx'
+          if (id.includes('/react-router')) return 'router'
+          if (id.includes('/@tanstack/')) return 'query'
+
+          return 'vendor'
+        },
+      },
+    },
+  },
   server: {
     port: Number(process.env.VITE_PORT) || 3003,
     host: true,

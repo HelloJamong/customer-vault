@@ -11,7 +11,7 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Close, Download } from '@mui/icons-material';
 import ExcelJS from 'exceljs';
 
-interface CustomerSummary {
+export interface CustomerSummary {
   id: number;
   name: string;
   version?: string;
@@ -32,6 +32,8 @@ interface CustomerSummaryDialogProps {
   onClose: () => void;
   customers: CustomerSummary[];
 }
+
+type ExportRow = Array<string | number | boolean | null>;
 
 const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDialogProps) => {
   const formatDate = (dateString: string | null): string => {
@@ -79,7 +81,7 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
       { width: 12 },
     ];
 
-    const sheetData: any[][] = [
+    const sheetData: ExportRow[] = [
       [
         '고객사명',
         '버전',

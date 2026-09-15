@@ -19,8 +19,10 @@
    - 퍼미션: `chmod -R 755 logs uploads data` (보다 엄격한 권한이 필요하면 운영 정책에 맞춰 조정)  
    - 소유자: 배포 계정 또는 `root:docker` 등 컨테이너가 쓸 수 있는 계정으로 설정
 4) 방화벽/포트  
-   - 기본 포트: 프론트 `3003`, 백엔드 `5005`, DB `3306` (docker-compose.yml의 포트 매핑에 따름)  
-   - 필요 시 보안 그룹/방화벽에 예외 등록
+   - 기본 외부 포트: 리버스 프록시 `2082`
+   - DB `3306`은 호스트 로컬(`127.0.0.1`)에만 바인딩됩니다.
+   - 백엔드 `5000`과 프론트엔드 `80`은 Docker 내부 네트워크에서만 접근합니다.
+   - 외부 방화벽에는 프록시 포트만 허용하세요.
 
 ## .env 설정
 루트의 `.env` 파일에 환경 변수를 설정합니다. 주요 항목:
@@ -40,16 +42,16 @@ JWT_SECRET=...              # 충분히 긴 랜덤 값
 JWT_ACCESS_EXPIRATION=1h
 JWT_REFRESH_EXPIRATION=7d
 
-# Backend
-BACKEND_PORT=5005
+# Proxy
+PROXY_PORT=2082
+# Backend는 Docker 내부 네트워크에서 5000번으로 고정됩니다.
 MAX_UPLOAD_SIZE=16777216
-CORS_ORIGIN=http://localhost:3003
+CORS_ORIGIN=http://localhost:2082
 LOG_DIR=./logs
 UPLOAD_DIR=./uploads
 
-# Frontend
-FRONTEND_PORT=3003
-VITE_API_BASE_URL=http://localhost:5005/api
+# Frontend는 프록시를 통해 제공되므로 상대 경로를 사용합니다.
+VITE_API_BASE_URL=/api
 VITE_ACCESS_TOKEN_KEY=access_token
 VITE_REFRESH_TOKEN_KEY=refresh_token
 ```
@@ -64,9 +66,8 @@ VITE_REFRESH_TOKEN_KEY=refresh_token
 
 ## 서비스 구동
 ```
-# 모든 서비스 (DB/백엔드, 프로필에 따라 프론트 포함)
-docker compose up -d          # 기본 프로필: db + backend
-docker compose --profile frontend up -d   # 프론트까지 포함
+# 모든 서비스 (DB/백엔드/프론트/리버스 프록시)
+docker compose up -d
 
 # 상태 확인
 docker compose ps
@@ -84,5 +85,5 @@ docker compose logs -f backend
 
 ## 문제 해결 팁
 - 퍼미션 오류 시: `sudo chown -R <deploy_user>:<deploy_group> logs uploads data`
-- 포트 충돌 시: `.env`의 `FRONTEND_PORT`/`BACKEND_PORT` 또는 `docker-compose.yml` 포트 매핑 수정
+- 포트 충돌 시: `.env`의 `PROXY_PORT` 또는 `DB_PORT`를 변경
 - 빌드 실패 시: `docker compose build --no-cache`로 캐시를 비우고 재시도, 로그를 확인해 원인 해결
