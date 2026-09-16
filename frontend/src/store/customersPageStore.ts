@@ -25,6 +25,7 @@ interface CustomersPageState {
   setPageSize: (size: number) => void;
   setPage: (page: number) => void;
   setScrollPosition: (position: number) => void;
+  resetFilters: () => void;
 }
 
 const initialState = {
@@ -51,6 +52,14 @@ export const useCustomersPageStore = create<CustomersPageState>()(
       setPageSize: (size) => set({ pageSize: size }),
       setPage: (page) => set({ page: page }),
       setScrollPosition: (position) => set({ scrollPosition: position }),
+      resetFilters: () => set({
+        searchText: initialState.searchText,
+        versionFilter: initialState.versionFilter,
+        inspectionCycleFilter: initialState.inspectionCycleFilter,
+        inspectionStatusFilter: initialState.inspectionStatusFilter,
+        contractTypeFilter: initialState.contractTypeFilter,
+        page: initialState.page,
+      }),
     }),
     {
       name: 'customers-page-state',

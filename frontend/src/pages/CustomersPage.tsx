@@ -156,6 +156,13 @@ const CustomersPage = () => {
     };
   }, [isLoading, setStoreScrollPosition]);
 
+  // 고객사 관리 페이지를 벗어나면 검색 및 필터 상태를 초기화한다.
+  useEffect(() => {
+    return () => {
+      useCustomersPageStore.getState().resetFilters();
+    };
+  }, []);
+
   // 검색 및 필터 핸들러
   const handleSearch = () => {
     const newFilters = {
