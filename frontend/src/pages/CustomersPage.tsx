@@ -38,7 +38,8 @@ interface SourceExportData {
   virtualPcBuildVersion?: string;
   virtualPcGuestAddition?: string;
   virtualPcImageInfo?: string;
-  adminWebReleaseDate?: string;
+  adminWebVersion?: string;
+  adminWebVersionDetail?: string;
   adminWebCustomInfo?: string;
   redundancyType?: string;
   servers?: SourceExportServer[];
@@ -216,8 +217,8 @@ const CustomersPage = () => {
   };
 
   const getInspectionCycleText = (customer: Customer) => {
-    // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
-    if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+    // POC와 만료인 경우 점검 주기를 "-"로 표시
+    if (['POC', '만료'].includes(customer.contractType || '')) {
       return '-';
     }
     if (customer.inspectionCycleType === '매월') return '매월';
@@ -227,9 +228,9 @@ const CustomersPage = () => {
     return customer.inspectionCycleType || '-';
   };
 
-  const getStatusColor = (status: string | undefined) => {
-    if (status === '점검 완료') return 'success';
-    if (status === '미완료') return 'error';
+  const getInspectionStatusColor = (status: string | undefined) => {
+    if (status === '완료') return 'success';
+    if (status === '미진행') return 'error';
     return 'default';
   };
 
@@ -268,7 +269,8 @@ const CustomersPage = () => {
           ['가상PC 이미지 정보', sourceData.virtualPcImageInfo || '-'],
           ['', ''],
           ['관리웹 정보', ''],
-          ['관리웹 소스 릴리즈 날짜', sourceData.adminWebReleaseDate ? `Release ${sourceData.adminWebReleaseDate}` : '-'],
+          ['관리웹 버전', sourceData.adminWebVersion || '-'],
+          ['관리웹 세부 버전', sourceData.adminWebVersionDetail || '-'],
           ['관리웹 커스텀 정보', sourceData.adminWebCustomInfo || '-'],
           ['', ''],
           ['서버 구성', ''],
@@ -426,8 +428,8 @@ const CustomersPage = () => {
 
     // === 3. 세부사항 시트 ===
     const getInspectionCycleText = () => {
-      // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
-      if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+      // POC와 만료인 경우 점검 주기를 "-"로 표시
+      if (['POC', '만료'].includes(customer.contractType || '')) {
         return '-';
       }
       if (customer.inspectionCycleType === '매월') return '매월';
@@ -502,7 +504,7 @@ const CustomersPage = () => {
     // 계약 정보
     detailSheetData.push(
       ['[계약 정보]'],
-      ['계약 상태', customer.contractType || ''],
+      ['계약 상태', customer.contractType || '만료'],
       ['계약 시작일', customer.contractStartDate || ''],
       ['계약 종료일', customer.contractEndDate || ''],
       []
@@ -593,8 +595,8 @@ const CustomersPage = () => {
     {
       field: 'version',
       headerName: '버전',
-      width: 100,
-      renderCell: (params) => params.value || '-',
+      width: 280,
+      renderCell: (params) => params.row.versionInfo || '-',
     },
     {
       field: 'inspectionCycleType',
@@ -609,7 +611,7 @@ const CustomersPage = () => {
       renderCell: (params) => (
         <Chip
           label={params.value || '대상아님'}
-          color={getStatusColor(params.value)}
+          color={getInspectionStatusColor(params.value)}
           size="small"
         />
       ),
@@ -618,7 +620,7 @@ const CustomersPage = () => {
       field: 'contractType',
       headerName: '계약 상태',
       width: 120,
-      renderCell: (params) => params.value || '미계약',
+      renderCell: (params) => params.value || '만료',
     },
     {
       field: 'exportFullData',
@@ -669,22 +671,6 @@ const CustomersPage = () => {
       ),
     },
     {
-      field: 'supportList',
-      headerName: '지원 목록',
-      width: 120,
-      sortable: false,
-      renderCell: (params) => (
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<SupportAgent />}
-          onClick={() => navigate(`/customers/${params.row.id}/support-logs`)}
-        >
-          지원 목록
-        </Button>
-      ),
-    },
-    {
       field: 'viewDetails',
       headerName: '세부사항',
       width: 130,
@@ -697,6 +683,22 @@ const CustomersPage = () => {
           onClick={() => navigate(`/customers/${params.row.id}`)}
         >
           세부사항
+        </Button>
+      ),
+    },
+    {
+      field: 'supportList',
+      headerName: '지원 목록',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<SupportAgent />}
+          onClick={() => navigate(`/customers/${params.row.id}/support-logs`)}
+        >
+          지원 목록
         </Button>
       ),
     },
@@ -790,15 +792,15 @@ const CustomersPage = () => {
 
             {/* 점검 상태 필터 */}
             <FormControl size="small" sx={{ flex: 1, maxWidth: 150 }}>
-              <InputLabel>상태</InputLabel>
+              <InputLabel>점검 상태</InputLabel>
               <Select
                 value={inspectionStatusFilter}
-                label="상태"
+                label="점검 상태"
                 onChange={(e) => setStoreInspectionStatusFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
-                <MenuItem value="점검 완료">점검 완료</MenuItem>
-                <MenuItem value="미완료">미완료</MenuItem>
+                <MenuItem value="완료">완료</MenuItem>
+                <MenuItem value="미진행">미진행</MenuItem>
                 <MenuItem value="대상아님">대상아님</MenuItem>
               </Select>
             </FormControl>
@@ -812,11 +814,10 @@ const CustomersPage = () => {
                 onChange={(e) => setStoreContractTypeFilter(e.target.value)}
               >
                 <MenuItem value="">전체</MenuItem>
-                <MenuItem value="미계약">미계약</MenuItem>
+                <MenuItem value="만료">만료</MenuItem>
                 <MenuItem value="POC">POC</MenuItem>
                 <MenuItem value="유상">유상</MenuItem>
                 <MenuItem value="무상">무상</MenuItem>
-                <MenuItem value="만료">만료</MenuItem>
               </Select>
             </FormControl>
           </Box>

@@ -45,10 +45,11 @@ export interface Customer {
   inspectionCycleType: string;
   inspectionCycleMonth: number | null;
   lastInspectionDate: string | null;
-  inspectionStatus?: string; // '점검 완료' | '미완료' | '대상아님'
+  inspectionStatus?: string; // '완료' | '미진행' | '대상아님'
 
   // 버전 정보
   version?: string; // '4.2' | '6.1'
+  versionInfo?: string; // '6.1 / 7.2.4.3010'
 
   // 비고
   notes: string | null;

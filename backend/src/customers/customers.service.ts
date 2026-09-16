@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
-import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
+import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto } from './dto/source-management.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { assertCustomerEditable, isAdminRole } from '../common/utils/customer-access.util';
 
@@ -24,7 +24,9 @@ export class CustomersService {
     const where: any = {};
 
     if (filters?.contractType) {
-      where.contractType = filters.contractType;
+      where.contractType = filters.contractType === '만료'
+        ? { in: ['만료', '미계약'] }
+        : filters.contractType;
     }
     if (filters?.inspectionCycleType) {
       where.inspectionCycleType = filters.inspectionCycleType;
@@ -55,7 +57,10 @@ export class CustomersService {
         },
         sourceManagement: {
           select: {
+            adminWebVersion: true,
             adminWebReleaseDate: true,
+            adminWebVersionDetail: true,
+            clientVersion: true,
           },
         },
       },
@@ -65,13 +70,19 @@ export class CustomersService {
     // 각 고객사의 점검 상태 및 버전 계산
     return customers.map((customer) => {
       const inspectionStatus = this.getInspectionStatus(customer);
-      const version = this.getVersion(customer.sourceManagement?.adminWebReleaseDate);
-      const { inspectionTargets, documents, sourceManagement, ...customerData } = customer;
+      const version = this.getVersion(
+        customer.sourceManagement?.adminWebVersion,
+        customer.sourceManagement?.adminWebReleaseDate,
+      );
+      const versionInfo = this.getVersionInfo(customer.sourceManagement);
+      const { inspectionTargets, documents, sourceManagement, operationalStatus: _operationalStatus, ...customerData } = customer;
 
       return {
         ...customerData,
+        contractType: this.normalizeContractType(customer.contractType),
         inspectionStatus,
         version,
+        versionInfo,
       };
     });
   }
@@ -84,8 +95,10 @@ export class CustomersService {
         sales: { select: { id: true, name: true } },
         sourceManagement: {
           select: {
+            adminWebVersion: true,
             adminWebReleaseDate: true,
             clientVersion: true,
+            adminWebVersionDetail: true,
           },
         },
       },
@@ -93,12 +106,18 @@ export class CustomersService {
     });
 
     return customers.map((customer) => {
-      const version = this.getVersion(customer.sourceManagement?.adminWebReleaseDate);
-      const { sourceManagement, ...customerData } = customer;
+      const version = this.getVersion(
+        customer.sourceManagement?.adminWebVersion,
+        customer.sourceManagement?.adminWebReleaseDate,
+      );
+      const versionInfo = this.getVersionInfo(customer.sourceManagement);
+      const { sourceManagement, operationalStatus: _operationalStatus, ...customerData } = customer;
 
       return {
         ...customerData,
+        contractType: this.normalizeContractType(customer.contractType),
         version,
+        versionInfo,
         clientVersion: sourceManagement?.clientVersion || null,
       };
     });
@@ -127,7 +146,10 @@ export class CustomersService {
         },
         sourceManagement: {
           select: {
+            adminWebVersion: true,
             adminWebReleaseDate: true,
+            adminWebVersionDetail: true,
+            clientVersion: true,
           },
         },
       },
@@ -137,13 +159,19 @@ export class CustomersService {
     // 각 고객사의 점검 상태 및 버전 계산
     return customers.map((customer) => {
       const inspectionStatus = this.getInspectionStatus(customer);
-      const version = this.getVersion(customer.sourceManagement?.adminWebReleaseDate);
-      const { inspectionTargets, documents, sourceManagement, ...customerData } = customer;
+      const version = this.getVersion(
+        customer.sourceManagement?.adminWebVersion,
+        customer.sourceManagement?.adminWebReleaseDate,
+      );
+      const versionInfo = this.getVersionInfo(customer.sourceManagement);
+      const { inspectionTargets, documents, sourceManagement, operationalStatus: _operationalStatus, ...customerData } = customer;
 
       return {
         ...customerData,
+        contractType: this.normalizeContractType(customer.contractType),
         inspectionStatus,
         version,
+        versionInfo,
       };
     });
   }
@@ -166,8 +194,10 @@ export class CustomersService {
     }
 
     // 날짜 필드를 YYYY-MM-DD 형식으로 변환
+    const { operationalStatus: _operationalStatus, ...customerData } = customer;
     return {
-      ...customer,
+      ...customerData,
+      contractType: this.normalizeContractType(customer.contractType),
       contractStartDate: customer.contractStartDate
         ? this.formatDate(customer.contractStartDate)
         : null,
@@ -202,6 +232,7 @@ export class CustomersService {
     const customer = await this.prisma.customer.create({
       data: {
         ...createCustomerDto,
+        contractType: this.normalizeContractType(createCustomerDto.contractType),
         contractStartDate: createCustomerDto.contractStartDate
           ? new Date(createCustomerDto.contractStartDate)
           : null,
@@ -259,6 +290,10 @@ export class CustomersService {
     // null 값 처리를 위한 데이터 준비
     const updateData: any = { ...updateCustomerDto };
 
+    if (updateCustomerDto.contractType !== undefined) {
+      updateData.contractType = this.normalizeContractType(updateCustomerDto.contractType);
+    }
+
     // 날짜 필드 처리
     if (updateCustomerDto.contractStartDate !== undefined) {
       updateData.contractStartDate = updateCustomerDto.contractStartDate
@@ -305,8 +340,12 @@ export class CustomersService {
     if (updateCustomerDto.name !== undefined && updateCustomerDto.name !== beforeCustomer.name) {
       changes.push(`고객사명: ${beforeCustomer.name} → ${updateCustomerDto.name}`);
     }
-    if (updateCustomerDto.contractType !== undefined && updateCustomerDto.contractType !== beforeCustomer.contractType) {
-      changes.push(`계약상태: ${beforeCustomer.contractType || '없음'} → ${updateCustomerDto.contractType}`);
+    const normalizedBeforeContractType = this.normalizeContractType(beforeCustomer.contractType);
+    const normalizedAfterContractType = updateCustomerDto.contractType !== undefined
+      ? this.normalizeContractType(updateCustomerDto.contractType)
+      : normalizedBeforeContractType;
+    if (normalizedAfterContractType !== normalizedBeforeContractType) {
+      changes.push(`계약상태: ${normalizedBeforeContractType || '없음'} → ${normalizedAfterContractType}`);
     }
     if (updateCustomerDto.engineerId !== undefined && updateCustomerDto.engineerId !== beforeCustomer.engineerId) {
       const beforeName = beforeCustomer.engineer?.name || '없음';
@@ -356,7 +395,7 @@ export class CustomersService {
     return { message: '고객사가 삭제되었습니다.' };
   }
 
-  // 점검 상태 계산 (점검 완료 / 미완료 / 대상아님)
+  // 점검 상태 계산 (완료 / 미진행 / 대상아님)
   getInspectionStatus(customer: any): string {
     // 계약 상태가 만료 또는 미계약인 경우
     if (['만료', '미계약'].includes(customer.contractType)) {
@@ -373,16 +412,16 @@ export class CustomersService {
       return '대상아님';
     }
 
-    // 점검 대상 항목이 없으면 미완료
+    // 점검 대상 항목이 없으면 미진행
     const targetIds = customer.inspectionTargets?.map((t: any) => t.id) || [];
     if (targetIds.length === 0) {
-      return '미완료';
+      return '미진행';
     }
 
     // 이번 달 점검 완료된 대상 확인
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const completedTargetIds = new Set(
       customer.documents
@@ -391,7 +430,7 @@ export class CustomersService {
           return (
             doc.inspectionTargetId &&
             inspectionDate >= startOfMonth &&
-            inspectionDate <= endOfMonth
+            inspectionDate < startOfNextMonth
           );
         })
         .map((doc: any) => doc.inspectionTargetId) || []
@@ -399,13 +438,33 @@ export class CustomersService {
 
     // 모든 점검 대상이 완료되었는지 확인
     const allCompleted = targetIds.every((id: number) => completedTargetIds.has(id));
-    return allCompleted ? '점검 완료' : '미완료';
+    return allCompleted ? '완료' : '미진행';
   }
 
-  // 버전 계산 (관리웹 소스 릴리즈 날짜 기반)
-  getVersion(adminWebReleaseDate: string | null | undefined): string {
-    // 관리웹 소스 릴리즈 날짜가 존재하면 6.1, 없으면 4.2
-    return adminWebReleaseDate ? '6.1' : '4.2';
+  normalizeContractType(contractType: string | null | undefined): string {
+    return contractType === '미계약' || !contractType ? '만료' : contractType;
+  }
+
+  // 버전 계산 (기존 데이터는 관리웹 릴리즈 날짜를 기준으로 호환)
+  getVersion(adminWebVersion: string | null | undefined, adminWebReleaseDate: string | null | undefined): string {
+    return adminWebVersion || (adminWebReleaseDate ? '6.1' : '4.2');
+  }
+
+  getVersionInfo(sourceManagement: {
+    adminWebVersion?: string | null;
+    adminWebReleaseDate?: string | null;
+    adminWebVersionDetail?: string | null;
+    clientVersion?: string | null;
+  } | null | undefined): string {
+    const adminWebVersion = this.getVersion(sourceManagement?.adminWebVersion, sourceManagement?.adminWebReleaseDate);
+    const adminWebDetail = sourceManagement?.adminWebVersionDetail || (
+      sourceManagement?.adminWebReleaseDate ? `Release ${sourceManagement.adminWebReleaseDate}` : null
+    );
+    const adminWeb = adminWebDetail
+      ? `${adminWebVersion} (${adminWebDetail})`
+      : adminWebVersion;
+    const client = sourceManagement?.clientVersion || '-';
+    return `${adminWeb} / ${client}`;
   }
 
   // 이번 달 점검 대상 여부 확인
@@ -467,7 +526,7 @@ export class CustomersService {
     return false;
   }
 
-  // 이번 달 점검 완료 여부 확인
+  // 이번 달 점검 대상 여부 확인
   async isInspectionCompletedThisMonth(customerId: number): Promise<boolean> {
     const customer = await this.findOne(customerId);
 
@@ -482,7 +541,7 @@ export class CustomersService {
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const completedTargets = await this.prisma.document.findMany({
       where: {
@@ -490,7 +549,7 @@ export class CustomersService {
         inspectionTargetId: { in: targetIds },
         inspectionDate: {
           gte: startOfMonth,
-          lte: endOfMonth,
+          lt: startOfNextMonth,
         },
       },
       select: { inspectionTargetId: true },
@@ -511,6 +570,16 @@ export class CustomersService {
         accessInfo: {
           orderBy: { id: 'asc' },
         },
+        virtualPcImages: {
+          orderBy: { id: 'asc' },
+          include: {
+            installedPrograms: { orderBy: { id: 'asc' } },
+            checklistItems: {
+              orderBy: { displayOrder: 'asc' },
+              include: { checkedBy: { select: { id: true, name: true } } },
+            },
+          },
+        },
       },
     });
 
@@ -525,7 +594,9 @@ export class CustomersService {
         virtualPcBuildVersion: null,
         virtualPcGuestAddition: null,
         virtualPcImageInfo: null,
-        adminWebReleaseDate: null,
+        virtualPcImages: [],
+        adminWebVersion: null,
+        adminWebVersionDetail: null,
         adminWebCustomInfo: null,
         redundancyType: null,
         servers: [],
@@ -548,7 +619,42 @@ export class CustomersService {
       virtualPcBuildVersion: sourceManagement.virtualPcBuildVersion,
       virtualPcGuestAddition: sourceManagement.virtualPcGuestAddition,
       virtualPcImageInfo: sourceManagement.virtualPcImageInfo,
-      adminWebReleaseDate: sourceManagement.adminWebReleaseDate,
+      virtualPcImages: sourceManagement.virtualPcImages.map(image => ({
+        id: image.id,
+        name: image.name,
+        osName: image.osName,
+        osEdition: image.osEdition,
+        osRelease: image.osRelease,
+        cDiskCapacity: image.cDiskCapacity,
+        dDiskCapacity: image.dDiskCapacity,
+        licenseStatus: image.licenseStatus,
+        licenseNote: image.licenseNote,
+        hashValue: image.hashValue,
+        installedPrograms: image.installedPrograms.map(program => ({
+          id: program.id,
+          name: program.name,
+          version: program.version,
+          description: program.description,
+        })),
+        checklistItems: image.checklistItems.map(item => ({
+          id: item.id,
+          category: item.category,
+          itemKey: item.itemKey,
+          checked: item.checked,
+          note: item.note,
+          checkedBy: item.checkedBy ? {
+            id: item.checkedBy.id,
+            name: item.checkedByName || item.checkedBy.name,
+          } : null,
+          checkedByName: item.checkedByName,
+          checkedAt: item.checkedAt,
+          displayOrder: item.displayOrder,
+        })),
+      })),
+      adminWebVersion: sourceManagement.adminWebVersion || this.getVersion(null, sourceManagement.adminWebReleaseDate),
+      adminWebVersionDetail: sourceManagement.adminWebVersionDetail || (
+        sourceManagement.adminWebReleaseDate ? `Release ${sourceManagement.adminWebReleaseDate}` : null
+      ),
       adminWebCustomInfo: sourceManagement.adminWebCustomInfo,
       redundancyType: sourceManagement.redundancyType,
       servers: sourceManagement.servers.map(server => ({
@@ -588,6 +694,63 @@ export class CustomersService {
     };
   }
 
+  private buildVirtualPcImageCreateData(
+    image: VirtualPcImageDto,
+    userId: number,
+    userName: string | null,
+    previousChecklistItems?: Map<string, { checked: boolean; checkedByUserId: number | null; checkedByName: string | null; checkedAt: Date | null }>,
+  ) {
+    return {
+      name: image.name,
+      osName: image.osName,
+      osEdition: image.osEdition,
+      osRelease: image.osRelease,
+      cDiskCapacity: image.cDiskCapacity,
+      dDiskCapacity: image.dDiskCapacity,
+      licenseStatus: image.licenseStatus,
+      licenseNote: image.licenseNote,
+      hashValue: image.hashValue,
+      installedPrograms: image.installedPrograms?.length ? {
+        create: image.installedPrograms.map(program => ({
+          name: program.name,
+          version: program.version,
+          description: program.description,
+        })),
+      } : undefined,
+      checklistItems: image.checklistItems?.length ? {
+        create: image.checklistItems.map((item, index) => {
+          const previous = previousChecklistItems?.get(item.itemKey);
+          const newlyChecked = item.checked && !previous?.checked;
+          return {
+            category: item.itemKey.startsWith('vmft_') ? 'VMFT 설정' : '구동 테스트',
+            itemKey: item.itemKey,
+            checked: item.checked,
+            note: item.note,
+            checkedByUserId: item.checked ? (newlyChecked ? userId : (previous?.checkedByUserId ?? userId)) : null,
+            checkedByName: item.checked ? (newlyChecked ? userName : (previous?.checkedByName || userName)) : null,
+            checkedAt: item.checked ? (newlyChecked ? new Date() : (previous?.checkedAt || new Date())) : null,
+            displayOrder: item.displayOrder ?? index,
+          };
+        }),
+      } : undefined,
+    };
+  }
+
+  private validateVirtualPcImages(images?: VirtualPcImageDto[]) {
+    if (!images) return;
+    if (images.length === 0) {
+      throw new BadRequestException('가상PC 이미지는 최소 1개 이상 등록해야 합니다');
+    }
+    if (images.length > 10) {
+      throw new BadRequestException('가상PC 이미지는 최대 10개까지 등록할 수 있습니다');
+    }
+    images.forEach((image, index) => {
+      if (image.licenseStatus === '미진행' && !image.licenseNote?.trim()) {
+        throw new BadRequestException(`가상PC 이미지 #${index + 1}의 정품 인증 미진행 비고를 입력해주세요`);
+      }
+    });
+  }
+
   async createSourceManagement(customerId: number, dto: CreateSourceManagementDto, userId: number, ipAddress: string) {
     // 고객사 존재 확인
     const customer = await this.prisma.customer.findUnique({
@@ -607,6 +770,13 @@ export class CustomersService {
       throw new ConflictException('이미 소스 관리 정보가 존재합니다');
     }
 
+    this.validateVirtualPcImages(dto.virtualPcImages);
+
+    const checker = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
     const sourceManagement = await this.prisma.sourceManagement.create({
       data: {
         customerId,
@@ -616,12 +786,16 @@ export class CustomersService {
         virtualPcBuildVersion: dto.virtualPcBuildVersion,
         virtualPcGuestAddition: dto.virtualPcGuestAddition,
         virtualPcImageInfo: dto.virtualPcImageInfo,
-        adminWebReleaseDate: dto.adminWebReleaseDate,
+        adminWebVersion: dto.adminWebVersion,
+        adminWebVersionDetail: dto.adminWebVersionDetail,
         adminWebCustomInfo: dto.adminWebCustomInfo,
         redundancyType: dto.redundancyType || '단일 구성',
         hrIntegrationEnabled: dto.hrIntegration?.enabled || false,
         hrDbType: dto.hrIntegration?.dbType,
         hrDbVersion: dto.hrIntegration?.dbVersion,
+        virtualPcImages: dto.virtualPcImages ? {
+          create: dto.virtualPcImages.map(image => this.buildVirtualPcImageCreateData(image, userId, checker?.name || null)),
+        } : undefined,
         servers: dto.servers ? {
           create: dto.servers.map(server => ({
             serverType: server.serverType,
@@ -683,12 +857,46 @@ export class CustomersService {
     // 기존 데이터 조회
     const existing = await this.prisma.sourceManagement.findUnique({
       where: { customerId },
-      include: { servers: true, accessInfo: true },
+      include: {
+        servers: true,
+        accessInfo: true,
+        virtualPcImages: {
+          include: {
+            checklistItems: {
+              include: { checkedBy: { select: { name: true } } },
+            },
+          },
+        },
+      },
     });
 
     if (!existing) {
       throw new NotFoundException('소스 관리 정보가 없습니다');
     }
+
+    this.validateVirtualPcImages(dto.virtualPcImages);
+
+    const checker = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+    const previousChecklistByImageId = new Map<number, Map<string, {
+      checked: boolean;
+      checkedByUserId: number | null;
+      checkedByName: string | null;
+      checkedAt: Date | null;
+    }>>();
+    existing.virtualPcImages.forEach((image) => {
+      previousChecklistByImageId.set(
+        image.id,
+        new Map(image.checklistItems.map((item) => [item.itemKey, {
+          checked: item.checked,
+          checkedByUserId: item.checkedByUserId,
+          checkedByName: item.checkedByName || item.checkedBy?.name || null,
+          checkedAt: item.checkedAt,
+        }])),
+      );
+    });
 
     // 트랜잭션으로 서버 정보 및 접근 정보 업데이트
     await this.prisma.$transaction(async (tx) => {
@@ -696,6 +904,12 @@ export class CustomersService {
       await tx.serverInfo.deleteMany({
         where: { sourceManagementId: existing.id },
       });
+
+      if (dto.virtualPcImages) {
+        await tx.virtualPcImage.deleteMany({
+          where: { sourceManagementId: existing.id },
+        });
+      }
 
       // 기존 접근 정보 삭제
       await (tx as any).serverAccessInfo.deleteMany({
@@ -712,12 +926,23 @@ export class CustomersService {
           virtualPcBuildVersion: dto.virtualPcBuildVersion,
           virtualPcGuestAddition: dto.virtualPcGuestAddition,
           virtualPcImageInfo: dto.virtualPcImageInfo,
-          adminWebReleaseDate: dto.adminWebReleaseDate,
+          ...(dto.adminWebVersion !== undefined ? { adminWebVersion: dto.adminWebVersion } : {}),
+          adminWebVersionDetail: dto.adminWebVersionDetail,
           adminWebCustomInfo: dto.adminWebCustomInfo,
           redundancyType: dto.redundancyType,
           hrIntegrationEnabled: dto.hrIntegration?.enabled,
           hrDbType: dto.hrIntegration?.dbType,
           hrDbVersion: dto.hrIntegration?.dbVersion,
+          ...(dto.virtualPcImages ? {
+            virtualPcImages: {
+              create: dto.virtualPcImages.map(image => this.buildVirtualPcImageCreateData(
+                image,
+                userId,
+                checker?.name || null,
+                image.id ? previousChecklistByImageId.get(image.id) : undefined,
+              )),
+            },
+          } : {}),
         },
       });
 

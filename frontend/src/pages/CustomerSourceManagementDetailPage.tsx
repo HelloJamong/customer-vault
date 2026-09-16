@@ -57,6 +57,39 @@ interface HRIntegration {
   dbVersion: string;
 }
 
+interface VirtualPcInstalledProgram {
+  id?: number;
+  name: string;
+  version?: string;
+  description?: string;
+}
+
+interface VirtualPcChecklistItem {
+  id?: number;
+  category?: string;
+  itemKey: string;
+  checked: boolean;
+  note?: string;
+  displayOrder?: number;
+  checkedBy?: { id: number; name: string } | null;
+  checkedByName?: string | null;
+  checkedAt?: string | null;
+}
+
+interface VirtualPcImage {
+  id?: number;
+  name: string;
+  osName: string;
+  osEdition: string;
+  osRelease: string;
+  cDiskCapacity: number | null;
+  dDiskCapacity?: number | null;
+  licenseStatus: string;
+  licenseNote?: string | null;
+  installedPrograms: VirtualPcInstalledProgram[];
+  checklistItems: VirtualPcChecklistItem[];
+}
+
 interface SourceManagement {
   id?: number;
   customerId: number;
@@ -66,13 +99,25 @@ interface SourceManagement {
   virtualPcBuildVersion: string;
   virtualPcGuestAddition: string;
   virtualPcImageInfo: string;
-  adminWebReleaseDate: string;
+  virtualPcImages?: VirtualPcImage[];
+  adminWebVersion?: string | null;
+  adminWebVersionDetail?: string | null;
   adminWebCustomInfo: string;
   redundancyType: '이중화 구성' | '단일 구성';
   servers?: ServerInfo[];
   accessInfo?: ServerAccessInfo[];
   hrIntegration: HRIntegration;
 }
+
+const CHECKLIST_LABELS: Record<string, string> = {
+  vmft_d_drive_type: 'D 드라이브 Type 확인',
+  vmft_3d_acceleration: '3D 가속 비활성화 확인',
+  vmft_nested_vt: 'Nested VT 비활성화 확인',
+  boot_server_install: '서버 설치 확인',
+  boot_cache_install: '캐시 설치 확인',
+  boot_network: '가상PC 네트워크 연결 확인',
+  boot_programs: '가상PC 내 설치 프로그램 정상 동작 확인',
+};
 
 type ExportRow = Array<string | number | boolean | null>;
 
@@ -124,10 +169,21 @@ const CustomerSourceManagementDetailPage = () => {
     </Grid>
   );
 
-  const formatReleaseDate = (value: string) => {
-    if (!value) return '-';
-    return `Release ${value}`;
-  };
+  const ImageInfoItem = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
+    <Box sx={{ height: '100%', minHeight: 64, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        fontWeight="bold"
+        sx={{ minHeight: 24, display: 'flex', alignItems: 'center', lineHeight: 1.5 }}
+      >
+        {label}
+      </Typography>
+      <Typography variant="body1" sx={{ minHeight: 24, lineHeight: 1.5, wordBreak: 'break-word' }}>
+        {value || '-'}
+      </Typography>
+    </Box>
+  );
 
   const handleExportToExcel = async () => {
     if (!sourceData) return;
@@ -157,7 +213,8 @@ const CustomerSourceManagementDetailPage = () => {
       ['가상PC 이미지 정보', sourceData.virtualPcImageInfo || '-'],
       ['', ''],
       ['관리웹 정보', ''],
-      ['관리웹 소스 릴리즈 날짜', formatReleaseDate(sourceData.adminWebReleaseDate)],
+      ['관리웹 버전', sourceData.adminWebVersion || '-'],
+      ['관리웹 세부 버전', sourceData.adminWebVersionDetail || '-'],
       ['관리웹 커스텀 정보', sourceData.adminWebCustomInfo || '-'],
       ['', ''],
       ['서버 구성', ''],
@@ -237,6 +294,77 @@ const CustomerSourceManagementDetailPage = () => {
     }
   };
 
+  const handleExportVirtualPcImages = async () => {
+    if (!sourceData?.virtualPcImages?.length) return;
+
+    const workbook = new ExcelJS.Workbook();
+    const usedSheetNames = new Set<string>();
+
+    sourceData.virtualPcImages.forEach((image, index) => {
+      const baseName = (image.name || `이미지 ${index + 1}`)
+        .replaceAll('/', '-').replaceAll('\\', '-').replaceAll(':', '-').replaceAll('?', '-').replaceAll('*', '-').replaceAll('[', '-').replaceAll(']', '-')
+        .slice(0, 31) || `이미지 ${index + 1}`;
+      let sheetName = baseName;
+      let suffix = 1;
+      while (usedSheetNames.has(sheetName)) {
+        const suffixText = `-${suffix++}`;
+        sheetName = `${baseName.slice(0, 31 - suffixText.length)}${suffixText}`;
+      }
+      usedSheetNames.add(sheetName);
+
+      const worksheet = workbook.addWorksheet(sheetName);
+      worksheet.columns = [{ width: 32 }, { width: 52 }, { width: 28 }, { width: 52 }];
+      worksheet.addRows([
+        ['가상PC 이미지 정보', '', ''],
+        ['이미지 이름', image.name, ''],
+        ['OS', image.osName, ''],
+        ['OS 에디션', image.osEdition, ''],
+        ['OS 릴리즈', image.osRelease, ''],
+        ['C 드라이브 용량(GB)', image.cDiskCapacity, ''],
+        ['D 드라이브 용량(GB)', image.dDiskCapacity ?? '-', ''],
+        ['정품 인증', image.licenseStatus, ''],
+        ['정품 인증 비고', image.licenseNote || '-', ''],
+        ['', '', ''],
+        ['설치 프로그램', '버전', '설명'],
+        ...(image.installedPrograms.length
+          ? image.installedPrograms.map((program) => [program.name, program.version || '-', program.description || '-'])
+          : [['등록된 프로그램 없음', '-', '-']]),
+        ['', '', ''],
+        ['체크리스트 항목', '확인', '점검자', '비고'],
+        ...(image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length
+          ? image.checklistItems
+            .filter((item) => item.itemKey !== 'vmft_hash_value')
+            .map((item) => [CHECKLIST_LABELS[item.itemKey] || item.itemKey, item.checked ? '확인 완료' : '미확인', item.checkedBy?.name || item.checkedByName || '-', item.note || '-'])
+          : [['등록된 체크리스트 없음', '-', '-', '-']]),
+      ]);
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+        });
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeCustomerName = customerName
+      .replaceAll('/', '-').replaceAll('\\', '-').replaceAll(':', '-').replaceAll('?', '-').replaceAll('*', '-').replaceAll('[', '-').replaceAll(']', '-');
+    link.download = `${safeCustomerName}-이미지정보.xlsx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    try {
+      await logsApi.logExcelExport({
+        action: '가상PC 이미지 정보 엑셀 내보내기',
+        description: `${customerName} 고객사의 가상PC 이미지 정보를 내보냄`,
+      });
+    } catch (error) {
+      console.error('로그 기록 실패:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -244,6 +372,23 @@ const CustomerSourceManagementDetailPage = () => {
       </Box>
     );
   }
+
+  const virtualPcImages = sourceData?.virtualPcImages?.length
+    ? sourceData.virtualPcImages
+    : (sourceData && (sourceData.virtualPcOsVersion || sourceData.virtualPcBuildVersion || sourceData.virtualPcImageInfo)
+      ? [{
+        name: '기존 이미지 정보',
+        osName: sourceData.virtualPcOsVersion || '-',
+        osEdition: '-',
+        osRelease: sourceData.virtualPcBuildVersion || '-',
+        cDiskCapacity: null,
+        dDiskCapacity: null,
+        licenseStatus: '-',
+        licenseNote: null,
+        installedPrograms: [],
+        checklistItems: [],
+      }]
+      : []);
 
   return (
     <Box>
@@ -269,6 +414,14 @@ const CustomerSourceManagementDetailPage = () => {
             disabled={!sourceData}
           >
             엑셀로 내보내기
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            onClick={handleExportVirtualPcImages}
+            disabled={!sourceData?.virtualPcImages?.length}
+          >
+            이미지 정보 엑셀
           </Button>
           <Button
             variant="contained"
@@ -317,55 +470,57 @@ const CustomerSourceManagementDetailPage = () => {
             </Grid>
           </Paper>
 
-          {/* 가상PC 정보 */}
+          {/* 가상PC 이미지 관리 */}
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              가상PC 정보
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                가상PC 이미지 관리
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                이미지 {virtualPcImages.length}개
+              </Typography>
+            </Box>
             <Divider sx={{ mb: 3 }} />
-
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid xs={12} sm={3}>
-                <Typography variant="body2" color="text.secondary" fontWeight="bold">
-                  버전 정보
+            {virtualPcImages.length === 0 ? (
+              <Typography color="text.secondary">등록된 가상PC 이미지가 없습니다.</Typography>
+            ) : virtualPcImages.map((image, imageIndex) => (
+              <Paper key={image.id || imageIndex} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  {image.name || `이미지 ${imageIndex + 1}`}
                 </Typography>
-              </Grid>
-              <Grid xs={12} sm={9}>
-                <Grid container spacing={2}>
-                  <Grid xs={12} sm={4}>
-                    <Typography variant="body2" color="text.secondary">
-                      OS 버전
-                    </Typography>
-                    <Typography variant="body1">{sourceData.virtualPcOsVersion || '-'}</Typography>
-                  </Grid>
-                  <Grid xs={12} sm={4}>
-                    <Typography variant="body2" color="text.secondary">
-                      빌드 버전
-                    </Typography>
-                    <Typography variant="body1">{sourceData.virtualPcBuildVersion || '-'}</Typography>
-                  </Grid>
-                  <Grid xs={12} sm={4}>
-                    <Typography variant="body2" color="text.secondary">
-                      GuestAddition 버전
-                    </Typography>
-                    <Typography variant="body1">{sourceData.virtualPcGuestAddition || '-'}</Typography>
-                  </Grid>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="OS" value={`${image.osName} / ${image.osEdition} / ${image.osRelease}`} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="C 드라이브" value={image.cDiskCapacity ? `${image.cDiskCapacity}GB` : '-'} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="D 드라이브" value={image.dDiskCapacity ? `${image.dDiskCapacity}GB` : '없음'} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="정품 인증" value={image.licenseStatus} /></Grid>
+                  <Grid xs={12} sm={8}><ImageInfoItem label="정품 인증 비고" value={image.licenseNote} /></Grid>
                 </Grid>
-              </Grid>
-            </Grid>
 
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid xs={12} sm={3}>
-                <Typography variant="body2" color="text.secondary" fontWeight="bold">
-                  가상PC 이미지 정보
-                </Typography>
-              </Grid>
-              <Grid xs={12} sm={9}>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {sourceData.virtualPcImageInfo || '-'}
-                </Typography>
-              </Grid>
-            </Grid>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>설치 프로그램</Typography>
+                {image.installedPrograms.length > 0 ? (
+                  <TableContainer sx={{ mb: 2 }}>
+                    <Table size="small">
+                      <TableHead><TableRow><TableCell>프로그램명</TableCell><TableCell>버전</TableCell><TableCell>설명</TableCell></TableRow></TableHead>
+                      <TableBody>{image.installedPrograms.map((program, programIndex) => (
+                        <TableRow key={program.id || programIndex}><TableCell>{program.name}</TableCell><TableCell>{program.version || '-'}</TableCell><TableCell>{program.description || '-'}</TableCell></TableRow>
+                      ))}</TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>등록된 설치 프로그램이 없습니다.</Typography>}
+
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>체크리스트</Typography>
+                {image.checklistItems.length > 0 ? (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead><TableRow><TableCell>항목</TableCell><TableCell>확인</TableCell><TableCell>점검자</TableCell><TableCell>비고</TableCell></TableRow></TableHead>
+                      <TableBody>{image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').map((item, itemIndex) => (
+                        <TableRow key={item.id || itemIndex}><TableCell>{CHECKLIST_LABELS[item.itemKey] || item.itemKey}</TableCell><TableCell>{item.checked ? '확인 완료' : '미확인'}</TableCell><TableCell>{item.checkedBy?.name || item.checkedByName || (item.checked ? '저장 시 기록' : '-')}</TableCell><TableCell>{item.note || '-'}</TableCell></TableRow>
+                      ))}</TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : <Typography variant="body2" color="text.secondary">등록된 체크리스트가 없습니다.</Typography>}
+              </Paper>
+            ))}
           </Paper>
 
           {/* 관리웹 정보 */}
@@ -376,9 +531,10 @@ const CustomerSourceManagementDetailPage = () => {
             <Divider sx={{ mb: 3 }} />
 
             <InfoItem
-              label="관리웹 소스 릴리즈 날짜"
-              value={formatReleaseDate(sourceData.adminWebReleaseDate)}
+              label="관리웹 버전"
+              value={sourceData.adminWebVersion || '4.2'}
             />
+            <InfoItem label="관리웹 세부 버전" value={sourceData.adminWebVersionDetail} />
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid xs={12} sm={3}>
                 <Typography variant="body2" color="text.secondary" fontWeight="bold">

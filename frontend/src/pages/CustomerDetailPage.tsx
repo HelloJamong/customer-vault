@@ -86,8 +86,8 @@ const CustomerDetailPage = () => {
   }
 
   const getInspectionCycleText = () => {
-    // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
-    if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+    // POC와 만료인 경우 점검 주기를 "-"로 표시
+    if (['POC', '만료'].includes(customer.contractType || '')) {
       return '-';
     }
     if (customer.inspectionCycleType === '매월') return '매월';
@@ -180,7 +180,7 @@ const CustomerDetailPage = () => {
 
     // 계약 정보
     data.push(['[계약 정보]']);
-    data.push(['계약 상태', customer.contractType || '']);
+    data.push(['계약 상태', customer.contractType || '만료']);
     data.push(['계약 시작일', customer.contractStartDate || '']);
     data.push(['계약 종료일', customer.contractEndDate || '']);
     data.push(['하드웨어 포함', customer.hardwareIncluded ? '포함' : '미포함']);
@@ -393,7 +393,7 @@ const CustomerDetailPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
 
-        <InfoItem label="계약 상태" value={customer.contractType} />
+        <InfoItem label="계약 상태" value={customer.contractType || '만료'} />
         <InfoItem label="계약 시작일" value={customer.contractStartDate} />
         <InfoItem label="계약 종료일" value={customer.contractEndDate} />
         <InfoItem label="하드웨어 포함" value={customer.hardwareIncluded ? '포함' : '미포함'} />
@@ -419,8 +419,8 @@ const CustomerDetailPage = () => {
               <Chip
                 label={customer.inspectionStatus}
                 color={
-                  customer.inspectionStatus === '점검 완료' ? 'success' :
-                  customer.inspectionStatus === '미완료' ? 'error' :
+                  customer.inspectionStatus === '완료' ? 'success' :
+                  customer.inspectionStatus === '미진행' ? 'error' :
                   'default'
                 }
                 size="small"

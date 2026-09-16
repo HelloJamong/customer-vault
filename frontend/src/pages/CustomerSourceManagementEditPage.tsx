@@ -12,6 +12,9 @@ import {
   FormControl,
   InputLabel,
   IconButton,
+  Checkbox,
+  FormControlLabel,
+  Alert,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
 import { ArrowBack, Save, Add, Delete } from '@mui/icons-material';
@@ -56,6 +59,38 @@ interface HRIntegration {
   dbVersion: string;
 }
 
+interface VirtualPcInstalledProgram {
+  id?: number;
+  name: string;
+  version?: string;
+  description?: string;
+}
+
+interface VirtualPcChecklistItem {
+  id?: number;
+  itemKey: string;
+  checked: boolean;
+  note?: string;
+  displayOrder?: number;
+  checkedBy?: { id: number; name: string } | null;
+  checkedByName?: string | null;
+  checkedAt?: string | null;
+}
+
+interface VirtualPcImage {
+  id?: number;
+  name: string;
+  osName: string;
+  osEdition: string;
+  osRelease: string;
+  cDiskCapacity: number | '';
+  dDiskCapacity?: number | '';
+  licenseStatus: '진행완료' | '미진행';
+  licenseNote?: string;
+  installedPrograms: VirtualPcInstalledProgram[];
+  checklistItems: VirtualPcChecklistItem[];
+}
+
 interface SourceManagement {
   id?: number;
   customerId: number;
@@ -65,13 +100,49 @@ interface SourceManagement {
   virtualPcBuildVersion: string;
   virtualPcGuestAddition: string;
   virtualPcImageInfo: string;
-  adminWebReleaseDate: string;
+  virtualPcImages: VirtualPcImage[];
+  adminWebVersion: string;
+  adminWebVersionDetail: string;
   adminWebCustomInfo: string;
   redundancyType: '이중화 구성' | '단일 구성';
   servers?: ServerInfo[];
   accessInfo?: ServerAccessInfo[];
   hrIntegration: HRIntegration;
 }
+
+const VMFT_CHECKLIST = [
+  { itemKey: 'vmft_d_drive_type', label: 'D 드라이브 Type 확인' },
+  { itemKey: 'vmft_3d_acceleration', label: '3D 가속 비활성화 확인' },
+  { itemKey: 'vmft_nested_vt', label: 'Nested VT 비활성화 확인' },
+];
+
+const BOOT_TEST_CHECKLIST = [
+  { itemKey: 'boot_server_install', label: '서버 설치 확인' },
+  { itemKey: 'boot_cache_install', label: '캐시 설치 확인' },
+  { itemKey: 'boot_network', label: '가상PC 네트워크 연결 확인' },
+  { itemKey: 'boot_programs', label: '가상PC 내 설치 프로그램 정상 동작 확인' },
+];
+
+const createChecklistItems = (): VirtualPcChecklistItem[] =>
+  [...VMFT_CHECKLIST, ...BOOT_TEST_CHECKLIST].map((item, index) => ({
+    itemKey: item.itemKey,
+    checked: false,
+    note: '',
+    displayOrder: index,
+  }));
+
+const createVirtualPcImage = (): VirtualPcImage => ({
+  name: '',
+  osName: '',
+  osEdition: '',
+  osRelease: '',
+  cDiskCapacity: '',
+  dDiskCapacity: '',
+  licenseStatus: '미진행',
+  licenseNote: '',
+  installedPrograms: [],
+  checklistItems: createChecklistItems(),
+});
 
 const CustomerSourceManagementEditPage = () => {
   const navigate = useNavigate();
@@ -88,7 +159,9 @@ const CustomerSourceManagementEditPage = () => {
     virtualPcBuildVersion: '',
     virtualPcGuestAddition: '',
     virtualPcImageInfo: '',
-    adminWebReleaseDate: '',
+    virtualPcImages: [createVirtualPcImage()],
+    adminWebVersion: '4.2',
+    adminWebVersionDetail: '',
     adminWebCustomInfo: '',
     redundancyType: '단일 구성',
     servers: [],
@@ -111,7 +184,28 @@ const CustomerSourceManagementEditPage = () => {
         try {
           const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management`);
           if (sourceResponse.data) {
-            setFormData(sourceResponse.data);
+            const sourceData = sourceResponse.data as SourceManagement;
+            const virtualPcImages = sourceData.virtualPcImages?.length
+              ? sourceData.virtualPcImages.map((image) => ({
+                ...image,
+                dDiskCapacity: image.dDiskCapacity ?? '',
+                installedPrograms: image.installedPrograms || [],
+                checklistItems: image.checklistItems?.length
+                  ? image.checklistItems
+                  : createChecklistItems(),
+              }))
+              : [{
+                ...createVirtualPcImage(),
+                name: sourceData.virtualPcImageInfo ? '기존 이미지 정보' : '',
+                osName: sourceData.virtualPcOsVersion || '',
+                osRelease: sourceData.virtualPcBuildVersion || '',
+              }];
+            setFormData({
+              ...sourceData,
+              adminWebVersion: sourceData.adminWebVersion || '4.2',
+              adminWebVersionDetail: sourceData.adminWebVersionDetail || '',
+              virtualPcImages,
+            });
           }
         } catch (error) {
           // 404인 경우 새로 생성
@@ -132,12 +226,56 @@ const CustomerSourceManagementEditPage = () => {
   }, [customerId]);
 
   const handleSave = async () => {
+    const invalidImageIndex = formData.virtualPcImages.findIndex((image) =>
+      !image.name.trim()
+      || !image.osName.trim()
+      || !image.osEdition.trim()
+      || !image.osRelease.trim()
+      || !image.cDiskCapacity
+      || (image.licenseStatus === '미진행' && !image.licenseNote?.trim()),
+    );
+
+    if (invalidImageIndex >= 0) {
+      alert(`가상PC 이미지 #${invalidImageIndex + 1}의 필수 정보를 확인해주세요. (C 드라이브 용량 및 정품 인증 비고 포함)`);
+      return;
+    }
+
     setIsSaving(true);
     try {
       // customerId와 id를 제외한 데이터만 전송
-      const dataToSend = Object.fromEntries(
-        Object.entries(formData).filter(([key]) => key !== 'id' && key !== 'customerId'),
-      );
+      const dataToSend = {
+        ...Object.fromEntries(
+          Object.entries(formData).filter(([key]) =>
+            !['id', 'customerId', 'virtualPcImages', 'clientVersionDetail', 'adminWebReleaseDate'].includes(key),
+          ),
+        ),
+        virtualPcImages: formData.virtualPcImages.map((image) => ({
+          id: image.id,
+          name: image.name.trim(),
+          osName: image.osName.trim(),
+          osEdition: image.osEdition.trim(),
+          osRelease: image.osRelease.trim(),
+          cDiskCapacity: Number(image.cDiskCapacity),
+          dDiskCapacity: image.dDiskCapacity === '' ? undefined : Number(image.dDiskCapacity),
+          licenseStatus: image.licenseStatus,
+          licenseNote: image.licenseNote?.trim() || undefined,
+          installedPrograms: image.installedPrograms
+            .filter((program) => program.name.trim())
+            .map((program) => ({
+              name: program.name.trim(),
+              version: program.version?.trim() || undefined,
+              description: program.description?.trim() || undefined,
+            })),
+          checklistItems: image.checklistItems
+            .filter((item) => item.itemKey !== 'vmft_hash_value')
+            .map((item) => ({
+              itemKey: item.itemKey,
+              checked: item.checked,
+              note: item.note?.trim() || undefined,
+              displayOrder: item.displayOrder,
+            })),
+        })),
+      };
 
       if (formData.id) {
         // 수정
@@ -154,23 +292,6 @@ const CustomerSourceManagementEditPage = () => {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const formatReleaseDate = (value: string) => {
-    // null, undefined 체크
-    if (!value) return '';
-    // 숫자만 추출
-    const numbers = value.replace(/\D/g, '');
-    // Release 접두사 추가
-    if (numbers.length === 0) return '';
-    return `Release ${numbers.slice(0, 6)}`;
-  };
-
-  const handleReleaseDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // "Release " 제거하고 숫자만 추출
-    const numbers = value.replace(/\D/g, '');
-    setFormData({ ...formData, adminWebReleaseDate: numbers });
   };
 
   const handleAddServer = () => {
@@ -244,6 +365,81 @@ const CustomerSourceManagementEditPage = () => {
     setFormData({ ...formData, accessInfo: updatedAccessInfo });
   };
 
+  const handleAddVirtualPcImage = () => {
+    if (formData.virtualPcImages.length >= 10) return;
+    setFormData({
+      ...formData,
+      virtualPcImages: [...formData.virtualPcImages, createVirtualPcImage()],
+    });
+  };
+
+  const handleRemoveVirtualPcImage = (index: number) => {
+    if (formData.virtualPcImages.length <= 1) return;
+    setFormData({
+      ...formData,
+      virtualPcImages: formData.virtualPcImages.filter((_, imageIndex) => imageIndex !== index),
+    });
+  };
+
+  const handleVirtualPcImageChange = <K extends keyof VirtualPcImage>(
+    index: number,
+    field: K,
+    value: VirtualPcImage[K],
+  ) => {
+    const virtualPcImages = [...formData.virtualPcImages];
+    virtualPcImages[index] = { ...virtualPcImages[index], [field]: value };
+    setFormData({ ...formData, virtualPcImages });
+  };
+
+  const handleProgramChange = (
+    imageIndex: number,
+    programIndex: number,
+    field: keyof VirtualPcInstalledProgram,
+    value: string,
+  ) => {
+    const virtualPcImages = [...formData.virtualPcImages];
+    const programs = [...virtualPcImages[imageIndex].installedPrograms];
+    programs[programIndex] = { ...programs[programIndex], [field]: value };
+    virtualPcImages[imageIndex] = { ...virtualPcImages[imageIndex], installedPrograms: programs };
+    setFormData({ ...formData, virtualPcImages });
+  };
+
+  const handleChecklistChange = (
+    imageIndex: number,
+    itemKey: string,
+    field: 'checked' | 'note',
+    value: boolean | string,
+  ) => {
+    const virtualPcImages = [...formData.virtualPcImages];
+    const image = virtualPcImages[imageIndex];
+    const checklistItems = image.checklistItems.map((item) =>
+      item.itemKey === itemKey ? { ...item, [field]: value } : item,
+    );
+    virtualPcImages[imageIndex] = { ...image, checklistItems };
+    setFormData({ ...formData, virtualPcImages });
+  };
+
+  const handleAddProgram = (imageIndex: number) => {
+    const virtualPcImages = [...formData.virtualPcImages];
+    virtualPcImages[imageIndex] = {
+      ...virtualPcImages[imageIndex],
+      installedPrograms: [
+        ...virtualPcImages[imageIndex].installedPrograms,
+        { name: '', version: '', description: '' },
+      ],
+    };
+    setFormData({ ...formData, virtualPcImages });
+  };
+
+  const handleRemoveProgram = (imageIndex: number, programIndex: number) => {
+    const virtualPcImages = [...formData.virtualPcImages];
+    virtualPcImages[imageIndex] = {
+      ...virtualPcImages[imageIndex],
+      installedPrograms: virtualPcImages[imageIndex].installedPrograms.filter((_, index) => index !== programIndex),
+    };
+    setFormData({ ...formData, virtualPcImages });
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -283,15 +479,17 @@ const CustomerSourceManagementEditPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
 
-        <Box sx={{ mb: 3 }}>
-          <TextField
-            fullWidth
-            label="클라이언트 버전"
-            value={formData.clientVersion}
-            onChange={(e) => setFormData({ ...formData, clientVersion: e.target.value })}
-            placeholder="예: v1.0.0"
-          />
-        </Box>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="클라이언트 버전"
+              value={formData.clientVersion}
+              onChange={(e) => setFormData({ ...formData, clientVersion: e.target.value })}
+              placeholder="예: 1.0"
+            />
+          </Grid>
+        </Grid>
         <Box>
           <TextField
             fullWidth
@@ -305,61 +503,223 @@ const CustomerSourceManagementEditPage = () => {
         </Box>
       </Paper>
 
-      {/* 가상PC 정보 */}
+      {/* 가상PC 이미지 관리 */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          가상PC 정보
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box>
+            <Typography variant="h6" fontWeight="bold">
+              가상PC 이미지 관리
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              이미지 {formData.virtualPcImages.length}/10개
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={<Add />}
+            onClick={handleAddVirtualPcImage}
+            disabled={formData.virtualPcImages.length >= 10}
+            size="small"
+          >
+            이미지 정보 추가
+          </Button>
+        </Box>
         <Divider sx={{ mb: 3 }} />
 
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid xs={12} sm={4}>
-            <FormControl fullWidth>
-              <InputLabel>OS 버전</InputLabel>
-              <Select
-                value={formData.virtualPcOsVersion}
-                label="OS 버전"
-                onChange={(e) => setFormData({ ...formData, virtualPcOsVersion: e.target.value })}
-              >
-                <MenuItem value="">선택 안 함</MenuItem>
-                <MenuItem value="Windows10">Windows10</MenuItem>
-                <MenuItem value="Windows11">Windows11</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
+        {formData.virtualPcImages.map((image, imageIndex) => {
+          const getChecklistItem = (itemKey: string) =>
+            image.checklistItems.find((item) => item.itemKey === itemKey) || {
+              itemKey,
+              checked: false,
+              note: '',
+              checkedBy: null,
+              checkedAt: null,
+            };
 
-          <Grid xs={12} sm={4}>
-            <TextField
-              fullWidth
-              label="빌드 버전"
-              value={formData.virtualPcBuildVersion}
-              onChange={(e) => setFormData({ ...formData, virtualPcBuildVersion: e.target.value })}
-              placeholder="예: 19045"
-            />
-          </Grid>
+          return (
+            <Paper key={image.id || imageIndex} variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  이미지 #{imageIndex + 1}
+                </Typography>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleRemoveVirtualPcImage(imageIndex)}
+                  disabled={formData.virtualPcImages.length <= 1}
+                  aria-label={`이미지 ${imageIndex + 1} 삭제`}
+                >
+                  <Delete />
+                </IconButton>
+              </Box>
 
-          <Grid xs={12} sm={4}>
-            <TextField
-              fullWidth
-              label="GuestAddition 버전"
-              value={formData.virtualPcGuestAddition}
-              onChange={(e) => setFormData({ ...formData, virtualPcGuestAddition: e.target.value })}
-              placeholder="예: 7.0.12"
-            />
-          </Grid>
-        </Grid>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    required
+                    label="가상PC 이름"
+                    value={image.name}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'name', e.target.value)}
+                    placeholder="예: 업무용 표준 이미지"
+                  />
+                </Grid>
+                <Grid xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    required
+                    label="OS"
+                    value={image.osName}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'osName', e.target.value)}
+                    placeholder="예: Win11"
+                  />
+                </Grid>
+                <Grid xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    required
+                    label="OS 에디션"
+                    value={image.osEdition}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'osEdition', e.target.value)}
+                    placeholder="예: Pro"
+                  />
+                </Grid>
+                <Grid xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    required
+                    label="OS 릴리즈"
+                    value={image.osRelease}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'osRelease', e.target.value)}
+                    placeholder="예: 25H2"
+                  />
+                </Grid>
+                <Grid xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    required
+                    type="number"
+                    label="C 드라이브 용량 (GB)"
+                    value={image.cDiskCapacity}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'cDiskCapacity', e.target.value === '' ? '' : Number(e.target.value))}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+                <Grid xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    label="D 드라이브 용량 (GB, 선택)"
+                    value={image.dDiskCapacity ?? ''}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'dDiskCapacity', e.target.value === '' ? '' : Number(e.target.value))}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+              </Grid>
 
-        <Box>
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="가상PC 이미지 정보"
-            value={formData.virtualPcImageInfo}
-            onChange={(e) => setFormData({ ...formData, virtualPcImageInfo: e.target.value })}
-            placeholder="가상PC 이미지 정보를 입력하세요"
-          />
-        </Box>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                정품 인증
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid xs={12} sm={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>정품 인증 상태</InputLabel>
+                    <Select
+                      value={image.licenseStatus}
+                      label="정품 인증 상태"
+                      onChange={(e) => handleVirtualPcImageChange(imageIndex, 'licenseStatus', e.target.value as VirtualPcImage['licenseStatus'])}
+                    >
+                      <MenuItem value="진행완료">진행완료</MenuItem>
+                      <MenuItem value="미진행">미진행</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid xs={12} sm={8}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    required={image.licenseStatus === '미진행'}
+                    label="정품 인증 비고"
+                    value={image.licenseNote || ''}
+                    onChange={(e) => handleVirtualPcImageChange(imageIndex, 'licenseNote', e.target.value)}
+                    placeholder={image.licenseStatus === '미진행' ? '미진행 사유를 입력하세요' : '비고 입력 (선택)'}
+                  />
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                설치 프로그램 리스트
+              </Typography>
+              {image.installedPrograms.map((program, programIndex) => (
+                <Grid container spacing={2} key={program.id || programIndex} sx={{ mb: 1 }} alignItems="center">
+                  <Grid xs={12} sm={4}>
+                    <TextField fullWidth size="small" label="프로그램명" value={program.name} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'name', e.target.value)} />
+                  </Grid>
+                  <Grid xs={12} sm={3}>
+                    <TextField fullWidth size="small" label="버전" value={program.version || ''} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'version', e.target.value)} />
+                  </Grid>
+                  <Grid xs={10} sm={4}>
+                    <TextField fullWidth size="small" label="설명" value={program.description || ''} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'description', e.target.value)} />
+                  </Grid>
+                  <Grid xs={2} sm={1}>
+                    <IconButton size="small" color="error" onClick={() => handleRemoveProgram(imageIndex, programIndex)} aria-label="설치 프로그램 삭제">
+                      <Delete />
+                    </IconButton>
+                  </Grid>
+                </Grid>
+              ))}
+              <Button size="small" startIcon={<Add />} onClick={() => handleAddProgram(imageIndex)} sx={{ mb: 3 }}>
+                설치 프로그램 추가
+              </Button>
+
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                VMFT 설정 확인
+              </Typography>
+              {image.dDiskCapacity !== '' && image.dDiskCapacity !== undefined && (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  D 드라이브가 입력되어 D 드라이브 Type 확인 항목이 활성화되었습니다.
+                </Alert>
+              )}
+              {[VMFT_CHECKLIST, BOOT_TEST_CHECKLIST].map((checklist, checklistIndex) => (
+                <Box key={checklistIndex} sx={{ mb: checklistIndex === 0 ? 3 : 0 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 1 }}>
+                    {checklistIndex === 0 ? 'VMFT 설정 확인' : '구동 테스트'}
+                  </Typography>
+                  {checklist.map((item) => {
+                    if (item.itemKey === 'vmft_d_drive_type' && (image.dDiskCapacity === '' || image.dDiskCapacity === undefined)) {
+                      return null;
+                    }
+                    const result = getChecklistItem(item.itemKey);
+                    return (
+                      <Grid container spacing={1} key={item.itemKey} alignItems="center" sx={{ mb: 1 }}>
+                        <Grid xs={12} sm={5}>
+                          <Box sx={{ minHeight: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <FormControlLabel
+                              control={<Checkbox checked={result.checked} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'checked', e.target.checked)} />}
+                              label={item.label}
+                            />
+                            <Typography variant="caption" color="text.secondary" sx={{ pl: 4.5 }}>
+                              점검자: {result.checked ? (result.checkedBy?.name || result.checkedByName || '저장 시 로그인 계정') : '-'}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid xs={12} sm={7}>
+                          <TextField fullWidth size="small" label="비고" value={result.note || ''} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'note', e.target.value)} />
+                        </Grid>
+                      </Grid>
+                    );
+                  })}
+                </Box>
+              ))}
+            </Paper>
+          );
+        })}
       </Paper>
 
       {/* 관리웹 정보 */}
@@ -369,16 +729,31 @@ const CustomerSourceManagementEditPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
 
-        <Box sx={{ mb: 3 }}>
-          <TextField
-            fullWidth
-            label="관리웹 소스 릴리즈 날짜"
-            value={formatReleaseDate(formData.adminWebReleaseDate)}
-            onChange={handleReleaseDateChange}
-            placeholder="Release 251219"
-            helperText="숫자 6자리 입력 (예: 251219 → Release 251219)"
-          />
-        </Box>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid xs={12} sm={6}>
+            <FormControl fullWidth>
+              <InputLabel>관리웹 버전</InputLabel>
+              <Select
+                value={formData.adminWebVersion}
+                label="관리웹 버전"
+                onChange={(e) => setFormData({ ...formData, adminWebVersion: e.target.value })}
+              >
+                <MenuItem value="4.2">4.2</MenuItem>
+                <MenuItem value="6.1">6.1</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="관리웹 세부 버전 (선택)"
+              value={formData.adminWebVersionDetail}
+              onChange={(e) => setFormData({ ...formData, adminWebVersionDetail: e.target.value })}
+              placeholder="예: 6.1.20260916"
+            />
+          </Grid>
+        </Grid>
+
         <Box>
           <TextField
             fullWidth

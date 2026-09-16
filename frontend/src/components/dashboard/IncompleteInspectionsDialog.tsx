@@ -66,7 +66,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
             color: '#1e293b',
           }}
         >
-          점검 미완료 고객사 목록
+          점검 미진행 고객사 목록
         </Typography>
         <IconButton
           onClick={onClose}

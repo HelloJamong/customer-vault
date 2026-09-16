@@ -30,7 +30,7 @@ export class DashboardService {
     // 이번 달 점검 통계
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     // 모든 고객사 조회
     const allCustomers = await this.prisma.customer.findMany({
@@ -64,7 +64,7 @@ export class DashboardService {
             return (
               doc.inspectionTargetId &&
               inspectionDate >= startOfMonth &&
-              inspectionDate <= endOfMonth
+              inspectionDate < startOfNextMonth
             );
           })
           .map((doc) => doc.inspectionTargetId) || []
@@ -80,7 +80,7 @@ export class DashboardService {
       console.log(`[DashboardService] - Total Documents: ${customer.documents?.length || 0}`);
       console.log(`[DashboardService] - This Month Documents: ${customer.documents?.filter((doc) => {
         const inspectionDate = new Date(doc.inspectionDate);
-        return inspectionDate >= startOfMonth && inspectionDate <= endOfMonth;
+        return inspectionDate >= startOfMonth && inspectionDate < startOfNextMonth;
       }).length || 0}`);
       console.log(`[DashboardService] - All Completed: ${allCompleted}`);
 
@@ -99,6 +99,12 @@ export class DashboardService {
       by: ['contractType'],
       _count: true,
     });
+
+    const normalizedContractStatus = contractStatus.reduce<Record<string, number>>((acc, item) => {
+      const contractType = item.contractType === '미계약' ? '만료' : item.contractType;
+      acc[contractType] = (acc[contractType] || 0) + item._count;
+      return acc;
+    }, {});
 
     const recentUploads = await this.prisma.document.findMany({
       take: 10,
@@ -130,10 +136,7 @@ export class DashboardService {
       // 시스템 리소스
       systemResources,
 
-      contractStatus: contractStatus.reduce((acc, item) => {
-        acc[item.contractType] = item._count;
-        return acc;
-      }, {}),
+      contractStatus: normalizedContractStatus,
       recentUploads: recentUploads.map((doc) => ({
         id: doc.id,
         title: doc.title,
@@ -371,7 +374,7 @@ export class DashboardService {
   async getIncompleteInspections() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     // 모든 고객사 조회 (사내 담당자 정보 포함)
     const allCustomers = await this.prisma.customer.findMany({
@@ -406,7 +409,7 @@ export class DashboardService {
             return (
               doc.inspectionTargetId &&
               inspectionDate >= startOfMonth &&
-              inspectionDate <= endOfMonth
+              inspectionDate < startOfNextMonth
             );
           })
           .map((doc) => doc.inspectionTargetId) || []

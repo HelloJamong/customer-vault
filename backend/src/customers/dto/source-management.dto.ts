@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject } from 'class-validator';
+import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject, IsIn, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -88,6 +88,108 @@ class HRIntegrationDto {
   dbVersion?: string;
 }
 
+export class VirtualPcInstalledProgramDto {
+  @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
+  @IsOptional()
+  @IsInt()
+  id?: number;
+
+  @ApiProperty({ required: true, description: '프로그램명' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ required: false, description: '프로그램 버전' })
+  @IsOptional()
+  @IsString()
+  version?: string;
+
+  @ApiProperty({ required: false, description: '설명' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class VirtualPcChecklistItemDto {
+  @ApiProperty({ required: true, description: '체크리스트 항목 키' })
+  @IsString()
+  itemKey: string;
+
+  @ApiProperty({ required: true, description: '확인 여부' })
+  @IsBoolean()
+  checked: boolean;
+
+  @ApiProperty({ required: false, description: '비고' })
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @ApiProperty({ required: false, description: '표시 순서' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  displayOrder?: number;
+}
+
+export class VirtualPcImageDto {
+  @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
+  @IsOptional()
+  @IsInt()
+  id?: number;
+
+  @ApiProperty({ required: true, description: '가상PC 이미지 이름' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ required: true, example: 'Windows 11' })
+  @IsString()
+  osName: string;
+
+  @ApiProperty({ required: true, example: 'Pro' })
+  @IsString()
+  osEdition: string;
+
+  @ApiProperty({ required: true, example: '25H2' })
+  @IsString()
+  osRelease: string;
+
+  @ApiProperty({ required: true, example: 80, description: 'C 드라이브 용량(GB)' })
+  @IsInt()
+  @Min(1)
+  cDiskCapacity: number;
+
+  @ApiProperty({ required: false, example: 30, description: 'D 드라이브 용량(GB)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dDiskCapacity?: number;
+
+  @ApiProperty({ required: true, enum: ['진행완료', '미진행'] })
+  @IsIn(['진행완료', '미진행'])
+  licenseStatus: string;
+
+  @ApiProperty({ required: false, description: '정품 인증 미진행 사유/비고' })
+  @IsOptional()
+  @IsString()
+  licenseNote?: string;
+
+  @ApiProperty({ required: false, description: 'Hash 값' })
+  @IsOptional()
+  @IsString()
+  hashValue?: string;
+
+  @ApiProperty({ required: false, type: [VirtualPcInstalledProgramDto] })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => VirtualPcInstalledProgramDto)
+  installedPrograms?: VirtualPcInstalledProgramDto[];
+
+  @ApiProperty({ required: false, type: [VirtualPcChecklistItemDto] })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => VirtualPcChecklistItemDto)
+  checklistItems?: VirtualPcChecklistItemDto[];
+}
+
 export class CreateSourceManagementDto {
   @ApiProperty({ required: false })
   @IsOptional()
@@ -119,10 +221,23 @@ export class CreateSourceManagementDto {
   @IsString()
   virtualPcImageInfo?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: [VirtualPcImageDto], description: '가상PC 이미지 목록 (최대 10개)' })
+  @IsOptional()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => VirtualPcImageDto)
+  virtualPcImages?: VirtualPcImageDto[];
+
+  @ApiProperty({ required: false, enum: ['4.2', '6.1'], description: '관리웹 기본 버전' })
+  @IsOptional()
+  @IsIn(['4.2', '6.1'])
+  adminWebVersion?: string;
+
+  @ApiProperty({ required: false, description: '관리웹 세부 버전' })
   @IsOptional()
   @IsString()
-  adminWebReleaseDate?: string;
+  adminWebVersionDetail?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

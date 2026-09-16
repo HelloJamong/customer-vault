@@ -293,7 +293,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                     color: '#64748b',
                   }}
                 >
-                  미완료
+                  미진행
                 </Typography>
                 {canViewIncompleteInspections && stats.inspection.incomplete > 0 && (
                   <Button
@@ -737,8 +737,8 @@ const UserDashboard = () => {
   // 점검 대상 고객사만 필터링 (대상아님 제외)
   const inspectionTargetCustomers = myCustomers.filter((customer) => customer.inspectionStatus !== '대상아님');
   const totalMyCustomers = inspectionTargetCustomers.length;
-  const completedCount = inspectionTargetCustomers.filter((customer) => customer.inspectionStatus === '점검 완료').length;
-  const incompleteCount = inspectionTargetCustomers.filter((customer) => customer.inspectionStatus === '미완료').length;
+  const completedCount = inspectionTargetCustomers.filter((customer) => customer.inspectionStatus === '완료').length;
+  const incompleteCount = inspectionTargetCustomers.filter((customer) => customer.inspectionStatus === '미진행').length;
   const completionRate = totalMyCustomers > 0 ? Math.round((completedCount / totalMyCustomers) * 100) : 0;
 
   const inspectionStats = [
@@ -757,7 +757,7 @@ const UserDashboard = () => {
       iconColor: '#16a34a',
     },
     {
-      title: '미완료 점검',
+      title: '미진행 점검',
       value: incompleteCount.toLocaleString(),
       icon: <PeopleOutline />,
       bgColor: '#fee2e2',
@@ -785,9 +785,9 @@ const UserDashboard = () => {
     if (!status) return null;
 
     const color =
-      status === '점검 완료'
+      status === '완료'
         ? 'success'
-        : status === '미완료'
+        : status === '미진행'
           ? 'error'
           : 'default';
 
@@ -958,7 +958,7 @@ const UserDashboard = () => {
                   color: '#64748b',
                 }}
               >
-                미완료
+                미진행
               </Typography>
               <Typography
                 sx={{

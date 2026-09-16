@@ -64,6 +64,9 @@ case "$*" in
     echo "db push should not run when migrations exist" >&2
     exit 97
     ;;
+  "prisma db execute --stdin")
+    exit 0
+    ;;
   *)
     echo "unexpected npx command: $*" >&2
     exit 99
@@ -143,6 +146,7 @@ test('entrypoint preserves successful migrate deploy exit status', () => {
   assert.deepEqual(result.commands, [
     'prisma generate',
     'prisma migrate deploy',
+    'prisma db execute --stdin',
   ]);
   assert.match(result.stdout, /deploy ok/);
   assert.match(result.stdout, /Starting application/);
@@ -168,6 +172,7 @@ test('entrypoint preserves P3005 fallback resolve and retry path', () => {
     'prisma migrate deploy',
     'prisma migrate resolve --applied 20260106000000_init',
     'prisma migrate deploy',
+    'prisma db execute --stdin',
   ]);
   assert.match(result.stdout, /P3005/);
   assert.match(result.stdout, /Retrying migration deployment/);

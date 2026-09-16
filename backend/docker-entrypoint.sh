@@ -40,5 +40,9 @@ else
   npx prisma db push
 fi
 
+echo "[entrypoint] Normalizing legacy contract types..."
+printf '%s\n' "UPDATE customers SET contract_type = '만료' WHERE contract_type = '미계약';" \
+  | npx prisma db execute --stdin
+
 echo "[entrypoint] Starting application..."
 exec "$@"

@@ -119,7 +119,7 @@ const CustomerEditPage = () => {
         contactMobileSub3: data.contactMobileSub3 || '',
         contactPhoneSub3: data.contactPhoneSub3 || '',
         contactEmailSub3: data.contactEmailSub3 || '',
-        contractType: data.contractType || '미계약',
+        contractType: data.contractType || '만료',
         contractStartDate: data.contractStartDate || '',
         contractEndDate: data.contractEndDate || '',
         hardwareIncluded: data.hardwareIncluded ?? true,
@@ -793,15 +793,14 @@ const CustomerEditPage = () => {
             <FormControl fullWidth>
               <InputLabel>계약 상태</InputLabel>
               <Select
-                value={formData.contractType || '미계약'}
+                value={formData.contractType || '만료'}
                 label="계약 상태"
                 onChange={(e) => handleChange('contractType', e.target.value)}
               >
-                <MenuItem value="미계약">미계약</MenuItem>
+                <MenuItem value="만료">만료</MenuItem>
                 <MenuItem value="POC">POC</MenuItem>
                 <MenuItem value="유상">유상</MenuItem>
                 <MenuItem value="무상">무상</MenuItem>
-                <MenuItem value="만료">만료</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -862,7 +861,7 @@ const CustomerEditPage = () => {
           점검 정보
         </Typography>
         <Divider sx={{ mb: 3 }} />
-        {['미계약', 'POC', '만료'].includes(formData.contractType || '') ? (
+        {['POC', '만료'].includes(formData.contractType || '') ? (
           <Typography variant="body2" color="text.secondary" textAlign="center" py={3}>
             계약 상태가 '{formData.contractType}'인 경우 점검 정보를 설정할 수 없습니다.
           </Typography>

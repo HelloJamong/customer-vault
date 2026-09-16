@@ -53,6 +53,7 @@ model User {
   noticeViews           UserNoticeView[] @relation("UserNoticeViews")
   backupLogs            BackupLog[]
   meetingMinutes        MeetingMinutes[] @relation("MeetingMinutesCreator")
+  checkedVirtualPcChecklistItems VirtualPcChecklistItem[] @relation("VirtualPcChecklistCheckedBy")
 
   @@index([isActive])
   @@map("users")
@@ -97,7 +98,7 @@ model Customer {
   contactEmailSub3        String?   @map("contact_email_sub3") @db.VarChar(120)
 
   // 계약 정보
-  contractType            String    @default("미계약") @map("contract_type") @db.VarChar(20)
+  contractType            String    @default("만료") @map("contract_type") @db.VarChar(20)
   contractStartDate       DateTime? @map("contract_start_date") @db.Date
   contractEndDate         DateTime? @map("contract_end_date") @db.Date
   hardwareIncluded        Boolean   @default(true) @map("hardware_included")
@@ -106,6 +107,9 @@ model Customer {
   inspectionCycleType     String    @default("매월") @map("inspection_cycle_type") @db.VarChar(20)
   inspectionCycleMonth    Int?      @map("inspection_cycle_month")
   lastInspectionDate      DateTime? @map("last_inspection_date") @db.Date
+
+  // 운영 상태
+  operationalStatus       String    @default("운영중") @map("operational_status") @db.VarChar(20)
 
   // 비고
   notes                   String?   @db.Text
@@ -298,6 +302,7 @@ model SourceManagement {
 
   // 클라이언트 정보
   clientVersion         String?  @map("client_version") @db.VarChar(100)
+  clientVersionDetail   String?  @map("client_version_detail") @db.VarChar(100)
   clientCustomInfo      String?  @map("client_custom_info") @db.Text
 
   // 가상PC 정보
@@ -307,6 +312,8 @@ model SourceManagement {
   virtualPcImageInfo    String?  @map("virtual_pc_image_info") @db.Text
 
   // 관리웹 정보
+  adminWebVersion       String?  @map("admin_web_version") @db.VarChar(20)
+  adminWebVersionDetail String?  @map("admin_web_version_detail") @db.VarChar(100)
   adminWebReleaseDate   String?  @map("admin_web_release_date") @db.VarChar(20)
   adminWebCustomInfo    String?  @map("admin_web_custom_info") @db.Text
 
@@ -324,6 +331,7 @@ model SourceManagement {
   customer              Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   servers               ServerInfo[]
   accessInfo            ServerAccessInfo[]
+  virtualPcImages       VirtualPcImage[]
 
   @@map("source_management")
 }
@@ -393,6 +401,70 @@ model ServerAccessInfo {
   sourceManagement      SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
 
   @@map("server_access_info")
+}
+
+// 가상PC 이미지 정보
+model VirtualPcImage {
+  id                 Int      @id @default(autoincrement())
+  sourceManagementId Int      @map("source_management_id")
+  name               String   @db.VarChar(100)
+  osName             String   @map("os_name") @db.VarChar(100)
+  osEdition          String   @map("os_edition") @db.VarChar(100)
+  osRelease          String   @map("os_release") @db.VarChar(50)
+  cDiskCapacity      Int      @map("c_disk_capacity")
+  dDiskCapacity      Int?     @map("d_disk_capacity")
+  licenseStatus      String   @default("미진행") @map("license_status") @db.VarChar(20)
+  licenseNote        String?  @map("license_note") @db.Text
+  hashValue          String?  @map("hash_value") @db.VarChar(255)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  sourceManagement  SourceManagement            @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+  installedPrograms VirtualPcInstalledProgram[]
+  checklistItems    VirtualPcChecklistItem[]
+
+  @@index([sourceManagementId])
+  @@map("virtual_pc_images")
+}
+
+// 가상PC 설치 프로그램
+model VirtualPcInstalledProgram {
+  id             Int         @id @default(autoincrement())
+  virtualPcImageId Int       @map("virtual_pc_image_id")
+  name           String      @db.VarChar(200)
+  version        String?     @db.VarChar(100)
+  description    String?     @db.Text
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  virtualPcImage VirtualPcImage @relation(fields: [virtualPcImageId], references: [id], onDelete: Cascade)
+
+  @@index([virtualPcImageId])
+  @@map("virtual_pc_installed_programs")
+}
+
+// 가상PC 설정/구동 테스트 체크리스트
+model VirtualPcChecklistItem {
+  id               Int         @id @default(autoincrement())
+  virtualPcImageId Int         @map("virtual_pc_image_id")
+  category         String      @db.VarChar(30)
+  itemKey          String      @map("item_key") @db.VarChar(50)
+  checked          Boolean     @default(false)
+  note             String?     @db.Text
+  checkedByUserId  Int?        @map("checked_by_user_id")
+  checkedByName    String?     @map("checked_by_name") @db.VarChar(100)
+  checkedAt        DateTime?   @map("checked_at")
+  displayOrder     Int         @default(0) @map("display_order")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  virtualPcImage VirtualPcImage @relation(fields: [virtualPcImageId], references: [id], onDelete: Cascade)
+  checkedBy      User?         @relation("VirtualPcChecklistCheckedBy", fields: [checkedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([virtualPcImageId, itemKey])
+  @@index([virtualPcImageId])
+  @@index([checkedByUserId])
+  @@map("virtual_pc_checklist_items")
 }
 
 // 고객사 지원 로그

@@ -15,6 +15,7 @@ export interface CustomerSummary {
   id: number;
   name: string;
   version?: string;
+  versionInfo?: string;
   inspectionCycleType: string;
   inspectionCycleMonth: number | null;
   contractType: string;
@@ -42,8 +43,8 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
   };
 
   const getInspectionCycleText = (customer: CustomerSummary) => {
-    // 미계약, POC, 만료인 경우 점검 주기를 "-"로 표시
-    if (['미계약', 'POC', '만료'].includes(customer.contractType || '')) {
+    // POC와 만료인 경우 점검 주기를 "-"로 표시
+    if (['POC', '만료'].includes(customer.contractType || '')) {
       return '-';
     }
     if (customer.inspectionCycleType === '매월') return '매월';
@@ -99,7 +100,7 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
     customers.forEach((customer) => {
       sheetData.push([
         customer.name,
-        customer.version || '-',
+        customer.versionInfo || '-',
         getInspectionCycleText(customer),
         customer.contractType || '-',
         getContractPeriodText(customer),
@@ -142,9 +143,9 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
     {
       field: 'version',
       headerName: '버전',
-      width: 100,
+      width: 280,
       valueGetter: (value: string | undefined) => value || '',
-      renderCell: (params) => params.value || '-',
+      renderCell: (params) => params.row.versionInfo || params.value || '-',
     },
     {
       field: 'inspectionCycleType',
@@ -157,7 +158,7 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
       headerName: '계약 상태',
       width: 120,
       valueGetter: (value: string | undefined) => value || '',
-      renderCell: (params) => params.value || '-',
+      renderCell: (params) => params.value || '만료',
     },
     {
       field: 'contractStartDate',
