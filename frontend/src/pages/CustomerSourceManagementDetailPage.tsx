@@ -12,9 +12,12 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Edit, Download } from '@mui/icons-material';
+import { ArrowBack, Edit, Download, ExpandMore } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
@@ -31,10 +34,28 @@ interface ServerInfo {
   cpuType?: string;
   memoryCapacity?: string;
   diskCapacity?: string;
+  diskGroups?: ServerDiskGroup[];
   nicFiberCount?: number;
   nicUtpCount?: number;
   powerSupplyCount?: number;
 }
+
+interface ServerDiskGroup {
+  raidType?: string | null;
+  diskType?: string | null;
+  diskCapacityGb?: number | null;
+  diskCapacityUnit?: string | null;
+}
+
+const formatDiskSummary = (server: ServerInfo) => {
+  const group = server.diskGroups?.[0];
+  const details = [
+    group?.diskCapacityGb ? `${group.diskCapacityGb}${group.diskCapacityUnit || 'GB'}` : null,
+    group?.raidType,
+    group?.diskType,
+  ].filter(Boolean);
+  return details.length > 0 ? details.join(' · ') : server.diskCapacity || '-';
+};
 
 interface ServerAccessInfo {
   id?: number;
@@ -55,6 +76,23 @@ interface HRIntegration {
   enabled: boolean;
   dbType: string;
   dbVersion: string;
+  dbName?: string | null;
+  dbHost?: string | null;
+  dbPort?: number | null;
+  dbUsername?: string | null;
+  dbPassword?: string | null;
+  mappings?: HRFieldMapping[];
+  userSyncQuery?: string | null;
+  departmentSyncQuery?: string | null;
+}
+
+interface HRFieldMapping {
+  category: '부서' | '사용자';
+  tableName: string;
+  dbFieldName: string;
+  vmfortFieldName: string;
+  isRequired: boolean;
+  description?: string | null;
 }
 
 interface VirtualPcInstalledProgram {
@@ -194,12 +232,12 @@ const CustomerSourceManagementDetailPage = () => {
     const filename = `${customerName}_운영정보_${dateStr}.xlsx`;
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('형상 관리');
+    const worksheet = workbook.addWorksheet('구성 정보');
     worksheet.columns = [{ width: 25 }, { width: 50 }];
 
     // 엑셀 데이터 준비
     const data: ExportRow[] = [
-      ['형상 관리 정보', ''],
+      ['구성 정보', ''],
       ['고객사명', customerName],
       ['', ''],
       ['클라이언트 정보', ''],
@@ -234,7 +272,7 @@ const CustomerSourceManagementDetailPage = () => {
         'OS 버전',
         'CPU 종류',
         '메모리 용량',
-        '디스크 용량',
+            '디스크 구성',
         'Fiber NIC',
         'UTP NIC',
         '전원 수량',
@@ -249,7 +287,7 @@ const CustomerSourceManagementDetailPage = () => {
           server.osVersion || '-',
           server.cpuType || '-',
           server.memoryCapacity || '-',
-          server.diskCapacity || '-',
+            formatDiskSummary(server),
           server.nicFiberCount || 0,
           server.nicUtpCount || 0,
           server.powerSupplyCount || 0,
@@ -260,8 +298,29 @@ const CustomerSourceManagementDetailPage = () => {
     data.push(['', '']);
     data.push(['인사연동', '']);
     data.push(['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용']);
-    data.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
-    data.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
+    if (sourceData.hrIntegration.enabled) {
+      data.push(['고객사 인사시스템 정보', '']);
+      data.push(['DB 종류', sourceData.hrIntegration.dbType || '-']);
+      data.push(['DB 버전', sourceData.hrIntegration.dbVersion || '-']);
+      data.push(['DB명', sourceData.hrIntegration.dbName || '-']);
+      data.push(['DB IP', sourceData.hrIntegration.dbHost || '-']);
+      data.push(['Port', sourceData.hrIntegration.dbPort || '-']);
+      data.push(['DB 접속 정보', `ID : ${sourceData.hrIntegration.dbUsername || '-'} / PW : ${sourceData.hrIntegration.dbPassword ? '********' : '-'}`]);
+      data.push(['DB 연동 테이블 정보', '']);
+      data.push(['구분', '테이블명', '인사DB 필드명', 'VMFort 필드명', '필수여부', '설명']);
+      (sourceData.hrIntegration.mappings || []).forEach((mapping) => {
+        data.push([
+          mapping.category,
+          mapping.tableName || '-',
+          mapping.dbFieldName || '-',
+          mapping.vmfortFieldName || '-',
+          mapping.isRequired ? 'O' : 'X',
+          mapping.description || '-',
+        ]);
+      });
+      data.push(['사용자 연동 쿼리', sourceData.hrIntegration.userSyncQuery || '-']);
+      data.push(['부서 연동 쿼리', sourceData.hrIntegration.departmentSyncQuery || '-']);
+    }
 
     // 데이터 추가
     data.forEach(row => worksheet.addRow(row));
@@ -286,8 +345,8 @@ const CustomerSourceManagementDetailPage = () => {
     // 로그 기록
     try {
       await logsApi.logExcelExport({
-        action: '형상 관리 정보 엑셀 내보내기',
-        description: `${customerName} 고객사 형상 관리 정보를 엑셀로 내보냄`,
+        action: '구성 정보 엑셀 내보내기',
+        description: `${customerName} 고객사 구성 정보를 엑셀로 내보냄`,
       });
     } catch (error) {
       console.error('로그 기록 실패:', error);
@@ -402,7 +461,7 @@ const CustomerSourceManagementDetailPage = () => {
               {customerName}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              형상 관리
+              구성 정보
             </Typography>
           </Box>
         </Box>
@@ -436,7 +495,7 @@ const CustomerSourceManagementDetailPage = () => {
       {!sourceData ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary" gutterBottom>
-            형상 관리 정보가 등록되지 않았습니다.
+            구성 정보가 등록되지 않았습니다.
           </Typography>
           <Button
             variant="contained"
@@ -496,29 +555,53 @@ const CustomerSourceManagementDetailPage = () => {
                   <Grid xs={12} sm={8}><ImageInfoItem label="정품 인증 비고" value={image.licenseNote} /></Grid>
                 </Grid>
 
-                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>설치 프로그램</Typography>
-                {image.installedPrograms.length > 0 ? (
-                  <TableContainer sx={{ mb: 2 }}>
-                    <Table size="small">
-                      <TableHead><TableRow><TableCell>프로그램명</TableCell><TableCell>버전</TableCell><TableCell>설명</TableCell></TableRow></TableHead>
-                      <TableBody>{image.installedPrograms.map((program, programIndex) => (
-                        <TableRow key={program.id || programIndex}><TableCell>{program.name}</TableCell><TableCell>{program.version || '-'}</TableCell><TableCell>{program.description || '-'}</TableCell></TableRow>
-                      ))}</TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>등록된 설치 프로그램이 없습니다.</Typography>}
+                <Accordion
+                  disableGutters
+                  elevation={0}
+                  sx={{ mb: 2, border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      설치 프로그램 ({image.installedPrograms.length})
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    {image.installedPrograms.length > 0 ? (
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead><TableRow><TableCell>프로그램명</TableCell><TableCell>버전</TableCell><TableCell>설명</TableCell></TableRow></TableHead>
+                          <TableBody>{image.installedPrograms.map((program, programIndex) => (
+                            <TableRow key={program.id || programIndex}><TableCell>{program.name}</TableCell><TableCell>{program.version || '-'}</TableCell><TableCell>{program.description || '-'}</TableCell></TableRow>
+                          ))}</TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : <Typography variant="body2" color="text.secondary">등록된 설치 프로그램이 없습니다.</Typography>}
+                  </AccordionDetails>
+                </Accordion>
 
-                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>체크리스트</Typography>
-                {image.checklistItems.length > 0 ? (
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead><TableRow><TableCell>항목</TableCell><TableCell>확인</TableCell><TableCell>점검자</TableCell><TableCell>비고</TableCell></TableRow></TableHead>
-                      <TableBody>{image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').map((item, itemIndex) => (
-                        <TableRow key={item.id || itemIndex}><TableCell>{CHECKLIST_LABELS[item.itemKey] || item.itemKey}</TableCell><TableCell>{item.checked ? '확인 완료' : '미확인'}</TableCell><TableCell>{item.checkedBy?.name || item.checkedByName || (item.checked ? '저장 시 기록' : '-')}</TableCell><TableCell>{item.note || '-'}</TableCell></TableRow>
-                      ))}</TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : <Typography variant="body2" color="text.secondary">등록된 체크리스트가 없습니다.</Typography>}
+                <Accordion
+                  disableGutters
+                  elevation={0}
+                  sx={{ border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      체크리스트 ({image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length})
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    {image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length > 0 ? (
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead><TableRow><TableCell>항목</TableCell><TableCell>확인</TableCell><TableCell>점검자</TableCell><TableCell>비고</TableCell></TableRow></TableHead>
+                          <TableBody>{image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').map((item, itemIndex) => (
+                            <TableRow key={item.id || itemIndex}><TableCell>{CHECKLIST_LABELS[item.itemKey] || item.itemKey}</TableCell><TableCell>{item.checked ? '확인 완료' : '미확인'}</TableCell><TableCell>{item.checkedBy?.name || item.checkedByName || (item.checked ? '저장 시 기록' : '-')}</TableCell><TableCell>{item.note || '-'}</TableCell></TableRow>
+                          ))}</TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : <Typography variant="body2" color="text.secondary">등록된 체크리스트가 없습니다.</Typography>}
+                  </AccordionDetails>
+                </Accordion>
               </Paper>
             ))}
           </Paper>
@@ -748,7 +831,7 @@ const CustomerSourceManagementDetailPage = () => {
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>OS 버전</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>CPU 종류</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>메모리</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>디스크</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>디스크 구성</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>Fiber NIC</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>UTP NIC</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>전원</TableCell>
@@ -765,7 +848,7 @@ const CustomerSourceManagementDetailPage = () => {
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.osVersion || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.cpuType || '-'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.memoryCapacity || '-'}</TableCell>
-                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.diskCapacity || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'pre-line' }}>{formatDiskSummary(server)}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.nicFiberCount || 0}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.nicUtpCount || 0}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{server.powerSupplyCount || 0}</TableCell>
@@ -793,8 +876,76 @@ const CustomerSourceManagementDetailPage = () => {
 
             {sourceData.hrIntegration.enabled && (
               <>
-                <InfoItem label="인사DB 종류" value={sourceData.hrIntegration.dbType} />
-                <InfoItem label="인사DB 버전" value={sourceData.hrIntegration.dbVersion} />
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                  고객사 인사시스템 정보
+                </Typography>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="DB 종류" value={sourceData.hrIntegration.dbType} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="DB 버전" value={sourceData.hrIntegration.dbVersion} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="DB명" value={sourceData.hrIntegration.dbName} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="DB IP" value={sourceData.hrIntegration.dbHost} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="Port" value={sourceData.hrIntegration.dbPort} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="DB 접속 ID" value={sourceData.hrIntegration.dbUsername} /></Grid>
+                  <Grid xs={12} sm={4}><ImageInfoItem label="DB 접속 PW" value={sourceData.hrIntegration.dbPassword ? '********' : '-'} /></Grid>
+                </Grid>
+
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+                  DB 연동 테이블 정보
+                </Typography>
+                {sourceData.hrIntegration.mappings?.length ? (
+                  <TableContainer sx={{ overflowX: 'auto', mb: 3 }}>
+                    <Table size="small" sx={{ minWidth: 850 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>구분</TableCell>
+                          <TableCell>테이블명</TableCell>
+                          <TableCell>인사DB 필드명</TableCell>
+                          <TableCell>VMFort 필드명</TableCell>
+                          <TableCell>필수여부</TableCell>
+                          <TableCell>설명</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {sourceData.hrIntegration.mappings.map((mapping, index) => (
+                          <TableRow key={`${mapping.category}-${mapping.dbFieldName}-${index}`}>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{mapping.category}</TableCell>
+                            <TableCell>{mapping.tableName || '-'}</TableCell>
+                            <TableCell>{mapping.dbFieldName || '-'}</TableCell>
+                            <TableCell>{mapping.vmfortFieldName || '-'}</TableCell>
+                            <TableCell>{mapping.isRequired ? 'O' : 'X'}</TableCell>
+                            <TableCell>{mapping.description || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    등록된 테이블 매핑 정보가 없습니다.
+                  </Typography>
+                )}
+
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+                  연동 쿼리
+                </Typography>
+                <Box sx={{ display: 'grid', gap: 2 }}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      사용자 연동 쿼리
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 1.5, whiteSpace: 'pre-wrap', overflowX: 'auto' }}>
+                      {sourceData.hrIntegration.userSyncQuery || '-'}
+                    </Paper>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      부서 연동 쿼리
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 1.5, whiteSpace: 'pre-wrap', overflowX: 'auto' }}>
+                      {sourceData.hrIntegration.departmentSyncQuery || '-'}
+                    </Paper>
+                  </Box>
+                </Box>
               </>
             )}
           </Paper>

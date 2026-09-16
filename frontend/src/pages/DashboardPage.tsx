@@ -1086,7 +1086,7 @@ const UserDashboard = () => {
             mt: 0.5,
           }}
         >
-          세부정보, 형상 관리, 지원 목록 또는 점검서를 바로 확인하세요.
+          유지보수 정보, 구성 정보, 지원 목록 또는 점검서를 바로 확인하세요.
         </Typography>
 
         <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1143,10 +1143,10 @@ const UserDashboard = () => {
                 </Box>
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
                   <Button variant="outlined" size="small" onClick={() => handleGoDetail(customer.id)}>
-                    세부정보
+                    유지보수 정보
                   </Button>
                   <Button variant="outlined" size="small" onClick={() => handleGoSourceManagement(customer.id)}>
-                    형상 관리
+                    구성 정보
                   </Button>
                   <Button variant="outlined" size="small" onClick={() => handleGoSupportLogs(customer.id)}>
                     지원 목록

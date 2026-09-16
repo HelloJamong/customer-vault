@@ -102,16 +102,16 @@ const CustomerDetailPage = () => {
 
     const today = new Date();
     const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    const filename = `${customer.name}_세부사항_${dateStr}.xlsx`;
+    const filename = `${customer.name}_유지보수정보_${dateStr}.xlsx`;
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('세부사항');
+    const worksheet = workbook.addWorksheet('유지보수 정보');
     worksheet.columns = [{ width: 25 }, { width: 50 }];
 
     const data: (string | number)[][] = [];
 
     // 헤더
-    data.push(['고객사 세부사항']);
+    data.push(['고객사 유지보수 정보']);
     data.push([]);
 
     // 기본 정보
@@ -229,8 +229,8 @@ const CustomerDetailPage = () => {
     // 로그 기록
     try {
       await logsApi.logExcelExport({
-        action: '고객사 세부사항 엑셀 내보내기',
-        description: `${customer.name} 고객사 세부사항을 엑셀로 내보냄`,
+        action: '고객사 유지보수 정보 엑셀 내보내기',
+        description: `${customer.name} 고객사 유지보수 정보를 엑셀로 내보냄`,
       });
     } catch (error) {
       console.error('로그 기록 실패:', error);
@@ -254,7 +254,7 @@ const CustomerDetailPage = () => {
               {customer.name}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              고객사 세부 정보
+              고객사 유지보수 정보
             </Typography>
           </Box>
         </Box>

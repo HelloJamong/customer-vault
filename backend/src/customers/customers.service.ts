@@ -59,7 +59,6 @@ export class CustomersService {
           select: {
             adminWebVersion: true,
             adminWebReleaseDate: true,
-            adminWebVersionDetail: true,
             clientVersion: true,
           },
         },
@@ -98,7 +97,6 @@ export class CustomersService {
             adminWebVersion: true,
             adminWebReleaseDate: true,
             clientVersion: true,
-            adminWebVersionDetail: true,
           },
         },
       },
@@ -148,7 +146,6 @@ export class CustomersService {
           select: {
             adminWebVersion: true,
             adminWebReleaseDate: true,
-            adminWebVersionDetail: true,
             clientVersion: true,
           },
         },
@@ -453,18 +450,11 @@ export class CustomersService {
   getVersionInfo(sourceManagement: {
     adminWebVersion?: string | null;
     adminWebReleaseDate?: string | null;
-    adminWebVersionDetail?: string | null;
     clientVersion?: string | null;
   } | null | undefined): string {
     const adminWebVersion = this.getVersion(sourceManagement?.adminWebVersion, sourceManagement?.adminWebReleaseDate);
-    const adminWebDetail = sourceManagement?.adminWebVersionDetail || (
-      sourceManagement?.adminWebReleaseDate ? `Release ${sourceManagement.adminWebReleaseDate}` : null
-    );
-    const adminWeb = adminWebDetail
-      ? `${adminWebVersion} (${adminWebDetail})`
-      : adminWebVersion;
     const client = sourceManagement?.clientVersion || '-';
-    return `${adminWeb} / ${client}`;
+    return `${adminWebVersion} / ${client}`;
   }
 
   // 이번 달 점검 대상 여부 확인
@@ -566,6 +556,9 @@ export class CustomersService {
       include: {
         servers: {
           orderBy: { id: 'asc' },
+          include: {
+            diskGroups: { orderBy: { id: 'asc' } },
+          },
         },
         accessInfo: {
           orderBy: { id: 'asc' },
@@ -580,6 +573,7 @@ export class CustomersService {
             },
           },
         },
+        hrMappings: { orderBy: { displayOrder: 'asc' } },
       },
     });
 
@@ -605,6 +599,14 @@ export class CustomersService {
           enabled: false,
           dbType: null,
           dbVersion: null,
+          dbName: null,
+          dbHost: null,
+          dbPort: null,
+          dbUsername: null,
+          dbPassword: null,
+          mappings: [],
+          userSyncQuery: null,
+          departmentSyncQuery: null,
         },
       };
     }
@@ -671,6 +673,13 @@ export class CustomersService {
         nicFiberCount: server.nicFiberCount,
         nicUtpCount: server.nicUtpCount,
         powerSupplyCount: server.powerSupplyCount,
+        diskGroups: server.diskGroups.map((group) => ({
+          id: group.id,
+          raidType: group.raidType,
+          diskType: group.diskType,
+          diskCapacityGb: group.diskCapacityGb,
+          diskCapacityUnit: group.diskCapacityUnit,
+        })),
       })),
       accessInfo: (sourceManagement as any).accessInfo?.map((access: any) => ({
         id: access.id,
@@ -690,6 +699,23 @@ export class CustomersService {
         enabled: sourceManagement.hrIntegrationEnabled,
         dbType: sourceManagement.hrDbType,
         dbVersion: sourceManagement.hrDbVersion,
+        dbName: sourceManagement.hrDbName,
+        dbHost: sourceManagement.hrDbHost,
+        dbPort: sourceManagement.hrDbPort,
+        dbUsername: sourceManagement.hrDbUsername,
+        dbPassword: this.cryptoService.safeDecrypt(sourceManagement.hrDbPassword),
+        mappings: sourceManagement.hrMappings.map((mapping) => ({
+          id: mapping.id,
+          category: mapping.category,
+          tableName: mapping.tableName,
+          dbFieldName: mapping.dbFieldName,
+          vmfortFieldName: mapping.vmfortFieldName,
+          isRequired: mapping.isRequired,
+          description: mapping.description,
+          displayOrder: mapping.displayOrder,
+        })),
+        userSyncQuery: sourceManagement.hrUserSyncQuery,
+        departmentSyncQuery: sourceManagement.hrDepartmentSyncQuery,
       },
     };
   }
@@ -793,6 +819,24 @@ export class CustomersService {
         hrIntegrationEnabled: dto.hrIntegration?.enabled || false,
         hrDbType: dto.hrIntegration?.dbType,
         hrDbVersion: dto.hrIntegration?.dbVersion,
+        hrDbName: dto.hrIntegration?.dbName,
+        hrDbHost: dto.hrIntegration?.dbHost,
+        hrDbPort: dto.hrIntegration?.dbPort,
+        hrDbUsername: dto.hrIntegration?.dbUsername,
+        hrDbPassword: dto.hrIntegration?.dbPassword ? this.cryptoService.encrypt(dto.hrIntegration.dbPassword) : null,
+        hrUserSyncQuery: dto.hrIntegration?.userSyncQuery,
+        hrDepartmentSyncQuery: dto.hrIntegration?.departmentSyncQuery,
+        hrMappings: dto.hrIntegration?.mappings?.length ? {
+          create: dto.hrIntegration.mappings.map((mapping, index) => ({
+            category: mapping.category,
+            tableName: mapping.tableName,
+            dbFieldName: mapping.dbFieldName,
+            vmfortFieldName: mapping.vmfortFieldName,
+            isRequired: mapping.isRequired,
+            description: mapping.description,
+            displayOrder: mapping.displayOrder ?? index,
+          })),
+        } : undefined,
         virtualPcImages: dto.virtualPcImages ? {
           create: dto.virtualPcImages.map(image => this.buildVirtualPcImageCreateData(image, userId, checker?.name || null)),
         } : undefined,
@@ -810,6 +854,14 @@ export class CustomersService {
             nicFiberCount: server.nicFiberCount || 0,
             nicUtpCount: server.nicUtpCount || 0,
             powerSupplyCount: server.powerSupplyCount || 0,
+            diskGroups: server.diskGroups?.length ? {
+              create: server.diskGroups.map((group) => ({
+                raidType: group.raidType,
+                diskType: group.diskType,
+                diskCapacityGb: group.diskCapacityGb,
+                diskCapacityUnit: group.diskCapacityUnit || 'GB',
+              })),
+            } : undefined,
           })),
         } : undefined,
         accessInfo: dto.accessInfo ? {
@@ -867,6 +919,7 @@ export class CustomersService {
             },
           },
         },
+        hrMappings: true,
       },
     });
 
@@ -916,6 +969,10 @@ export class CustomersService {
         where: { sourceManagementId: existing.id },
       });
 
+      await tx.hrIntegrationMapping.deleteMany({
+        where: { sourceManagementId: existing.id },
+      });
+
       // 소스 관리 정보 업데이트
       await tx.sourceManagement.update({
         where: { customerId },
@@ -933,6 +990,24 @@ export class CustomersService {
           hrIntegrationEnabled: dto.hrIntegration?.enabled,
           hrDbType: dto.hrIntegration?.dbType,
           hrDbVersion: dto.hrIntegration?.dbVersion,
+          hrDbName: dto.hrIntegration?.dbName,
+          hrDbHost: dto.hrIntegration?.dbHost,
+          hrDbPort: dto.hrIntegration?.dbPort,
+          hrDbUsername: dto.hrIntegration?.dbUsername,
+          hrDbPassword: dto.hrIntegration?.dbPassword ? this.cryptoService.encrypt(dto.hrIntegration.dbPassword) : null,
+          hrUserSyncQuery: dto.hrIntegration?.userSyncQuery,
+          hrDepartmentSyncQuery: dto.hrIntegration?.departmentSyncQuery,
+          hrMappings: dto.hrIntegration?.mappings ? {
+            create: dto.hrIntegration.mappings.map((mapping, index) => ({
+              category: mapping.category,
+              tableName: mapping.tableName,
+              dbFieldName: mapping.dbFieldName,
+              vmfortFieldName: mapping.vmfortFieldName,
+              isRequired: mapping.isRequired,
+              description: mapping.description,
+              displayOrder: mapping.displayOrder ?? index,
+            })),
+          } : undefined,
           ...(dto.virtualPcImages ? {
             virtualPcImages: {
               create: dto.virtualPcImages.map(image => this.buildVirtualPcImageCreateData(
@@ -948,8 +1023,9 @@ export class CustomersService {
 
       // 새로운 서버 정보 생성
       if (dto.servers && dto.servers.length > 0) {
-        await tx.serverInfo.createMany({
-          data: dto.servers.map(server => ({
+        for (const server of dto.servers) {
+          await tx.serverInfo.create({
+            data: {
             sourceManagementId: existing.id,
             serverType: server.serverType,
             manufacturer: server.manufacturer,
@@ -963,8 +1039,17 @@ export class CustomersService {
             nicFiberCount: server.nicFiberCount || 0,
             nicUtpCount: server.nicUtpCount || 0,
             powerSupplyCount: server.powerSupplyCount || 0,
-          })),
-        });
+            diskGroups: server.diskGroups?.length ? {
+              create: server.diskGroups.map((group) => ({
+                raidType: group.raidType,
+                diskType: group.diskType,
+                diskCapacityGb: group.diskCapacityGb,
+                diskCapacityUnit: group.diskCapacityUnit || 'GB',
+              })),
+            } : undefined,
+            },
+          });
+        }
       }
 
       // 새로운 접근 정보 생성

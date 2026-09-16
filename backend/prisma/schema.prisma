@@ -324,6 +324,13 @@ model SourceManagement {
   hrIntegrationEnabled  Boolean  @default(false) @map("hr_integration_enabled")
   hrDbType              String?  @map("hr_db_type") @db.VarChar(50)
   hrDbVersion           String?  @map("hr_db_version") @db.VarChar(50)
+  hrDbName               String?  @map("hr_db_name") @db.VarChar(100)
+  hrDbHost               String?  @map("hr_db_host") @db.VarChar(100)
+  hrDbPort               Int?     @map("hr_db_port")
+  hrDbUsername           String?  @map("hr_db_username") @db.VarChar(100)
+  hrDbPassword           String?  @map("hr_db_password") @db.VarChar(512)
+  hrUserSyncQuery        String?  @map("hr_user_sync_query") @db.Text
+  hrDepartmentSyncQuery String?  @map("hr_department_sync_query") @db.Text
 
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
@@ -332,8 +339,29 @@ model SourceManagement {
   servers               ServerInfo[]
   accessInfo            ServerAccessInfo[]
   virtualPcImages       VirtualPcImage[]
+  hrMappings            HrIntegrationMapping[]
 
   @@map("source_management")
+}
+
+// 인사시스템 View 테이블 필드 매핑
+model HrIntegrationMapping {
+  id                Int              @id @default(autoincrement())
+  sourceManagementId Int             @map("source_management_id")
+  category          String           @db.VarChar(20) // 부서, 사용자
+  tableName         String           @map("table_name") @db.VarChar(100)
+  dbFieldName      String           @map("db_field_name") @db.VarChar(100)
+  vmfortFieldName  String           @map("vmfort_field_name") @db.VarChar(100)
+  isRequired        Boolean          @default(false) @map("is_required")
+  description       String?          @db.VarChar(500)
+  displayOrder      Int              @default(0) @map("display_order")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  sourceManagement  SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+
+  @@index([sourceManagementId, category])
+  @@map("hr_integration_mapping")
 }
 
 // 서버 정보
@@ -369,8 +397,30 @@ model ServerInfo {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   sourceManagement      SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+  diskGroups            ServerDiskGroup[]
 
   @@map("server_info")
+}
+
+// 서버 디스크 구성
+model ServerDiskGroup {
+  id                Int        @id @default(autoincrement())
+  serverInfoId      Int        @map("server_info_id")
+  purpose           String?    @db.VarChar(50) // OS, 데이터, 백업 등
+  raidType          String     @default("미확인") @map("raid_type") @db.VarChar(20)
+  diskType          String?    @map("disk_type") @db.VarChar(30) // SSD, HDD, NVMe 등
+  diskCount         Int?       @map("disk_count")
+  diskCapacityGb    Int?       @map("disk_capacity_gb")
+  diskCapacityUnit  String     @default("GB") @map("disk_capacity_unit") @db.VarChar(2)
+  usableCapacityGb  Int?       @map("usable_capacity_gb")
+  note              String?    @db.VarChar(500)
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  serverInfo        ServerInfo @relation(fields: [serverInfoId], references: [id], onDelete: Cascade)
+
+  @@index([serverInfoId])
+  @@map("server_disk_group")
 }
 
 // 서버 접근 정보 (민감 정보 - Excel 내보내기 제외)

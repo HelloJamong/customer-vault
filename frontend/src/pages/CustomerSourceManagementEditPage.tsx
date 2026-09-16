@@ -15,12 +15,32 @@ import {
   Checkbox,
   FormControlLabel,
   Alert,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Save, Add, Delete } from '@mui/icons-material';
+import { ArrowBack, Save, Add, Delete, ExpandMore } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
+
+type RaidType = '미확인' | 'RAID 미사용' | 'RAID0' | 'RAID1' | 'RAID5' | 'RAID6' | 'RAID10' | '기타';
+type DiskCapacityUnit = 'GB' | 'TB';
+
+interface ServerDiskGroup {
+  id?: number;
+  raidType: RaidType;
+  diskType?: string;
+  diskCapacityGb?: number | '';
+  diskCapacityUnit: DiskCapacityUnit;
+}
 
 interface ServerInfo {
   id?: number;
@@ -33,6 +53,7 @@ interface ServerInfo {
   cpuType?: string;
   memoryCapacity?: string;
   diskCapacity?: string;
+  diskGroups?: ServerDiskGroup[];
   nicFiberCount?: number;
   nicUtpCount?: number;
   powerSupplyCount?: number;
@@ -57,6 +78,27 @@ interface HRIntegration {
   enabled: boolean;
   dbType: string;
   dbVersion: string;
+  dbName: string;
+  dbHost: string;
+  dbPort: number | '';
+  dbUsername: string;
+  dbPassword: string;
+  mappings: HRFieldMapping[];
+  userSyncQuery: string;
+  departmentSyncQuery: string;
+}
+
+type HRMappingCategory = '부서' | '사용자';
+
+interface HRFieldMapping {
+  id?: number;
+  category: HRMappingCategory;
+  tableName: string;
+  dbFieldName: string;
+  vmfortFieldName: string;
+  isRequired: boolean;
+  description: string;
+  displayOrder?: number;
 }
 
 interface VirtualPcInstalledProgram {
@@ -144,6 +186,38 @@ const createVirtualPcImage = (): VirtualPcImage => ({
   checklistItems: createChecklistItems(),
 });
 
+const createServerDiskGroup = (): ServerDiskGroup => ({
+  raidType: '미확인',
+  diskType: '',
+  diskCapacityGb: '',
+  diskCapacityUnit: 'GB',
+});
+
+const createHrMappings = (): HRFieldMapping[] => {
+  const rows: Array<[HRMappingCategory, string, string, string, boolean, string]> = [
+  ['부서', 'group_table(예시)', 'deptId', 'deptId', true, '부서 코드'],
+  ['부서', 'group_table(예시)', 'deptName', 'deptName', true, '부서 이름'],
+  ['부서', 'group_table(예시)', 'description', 'description', false, '부서 설명'],
+  ['부서', 'group_table(예시)', 'parentDeptId', 'parentDeptId', true, '상위부서 코드 (상위부서 코드가 NULL이거나 0 일 경우 최상위 부서로 판단함)'],
+  ['사용자', 'user_table(예시)', 'user_Id', 'user_Id', true, '사용자 계정 (VMFort 로그인 시 사용)'],
+  ['사용자', 'user_table(예시)', 'user_Name', 'user_Name', true, '사용자 이름'],
+  ['사용자', 'user_table(예시)', 'email', 'email', false, '이메일'],
+  ['사용자', 'user_table(예시)', 'position', 'position', false, '직급'],
+  ['사용자', 'user_table(예시)', 'deptId', 'deptId', true, '소속 부서 코드 (부서 코드가 존재하지 않을 경우, 미소속 사용자 부서로 이동됨)'],
+  ['사용자', 'user_table(예시)', 'officePhone', 'officePhone', false, '사무실 전화번호'],
+  ['사용자', 'user_table(예시)', 'smartPhone', 'smartPhone', false, '휴대폰 전화번호'],
+  ];
+  return rows.map(([category, tableName, dbFieldName, vmfortFieldName, isRequired, description], displayOrder) => ({
+    category,
+    tableName,
+    dbFieldName,
+    vmfortFieldName,
+    isRequired,
+    description,
+    displayOrder,
+  }));
+};
+
 const CustomerSourceManagementEditPage = () => {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
@@ -170,6 +244,14 @@ const CustomerSourceManagementEditPage = () => {
       enabled: false,
       dbType: '',
       dbVersion: '',
+      dbName: '',
+      dbHost: '',
+      dbPort: '',
+      dbUsername: '',
+      dbPassword: '',
+      mappings: createHrMappings(),
+      userSyncQuery: '',
+      departmentSyncQuery: '',
     },
   });
 
@@ -205,6 +287,31 @@ const CustomerSourceManagementEditPage = () => {
               adminWebVersion: sourceData.adminWebVersion || '4.2',
               adminWebVersionDetail: sourceData.adminWebVersionDetail || '',
               virtualPcImages,
+              hrIntegration: {
+                ...sourceData.hrIntegration,
+                dbType: sourceData.hrIntegration?.dbType || '',
+                dbVersion: sourceData.hrIntegration?.dbVersion || '',
+                dbName: sourceData.hrIntegration?.dbName || '',
+                dbHost: sourceData.hrIntegration?.dbHost || '',
+                dbPort: sourceData.hrIntegration?.dbPort ?? '',
+                dbUsername: sourceData.hrIntegration?.dbUsername || '',
+                dbPassword: sourceData.hrIntegration?.dbPassword || '',
+                mappings: sourceData.hrIntegration?.mappings?.length
+                  ? sourceData.hrIntegration.mappings
+                  : createHrMappings(),
+                userSyncQuery: sourceData.hrIntegration?.userSyncQuery || '',
+                departmentSyncQuery: sourceData.hrIntegration?.departmentSyncQuery || '',
+              },
+              servers: sourceData.servers?.map((server) => ({
+                ...server,
+                diskGroups: server.diskGroups?.slice(0, 1).map((group) => ({
+                  ...group,
+                  raidType: group.raidType || '미확인',
+                  diskType: group.diskType || '',
+                  diskCapacityGb: group.diskCapacityGb ?? '',
+                  diskCapacityUnit: group.diskCapacityUnit === 'TB' ? 'TB' : 'GB',
+                })) || [],
+              })) || [],
             });
           }
         } catch (error) {
@@ -275,6 +382,35 @@ const CustomerSourceManagementEditPage = () => {
               displayOrder: item.displayOrder,
             })),
         })),
+        servers: formData.servers?.map((server) => ({
+          ...server,
+          diskGroups: server.diskGroups?.slice(0, 1).map((group) => ({
+            id: group.id,
+            raidType: group.raidType,
+            diskType: group.diskType?.trim() || undefined,
+            diskCapacityGb: group.diskCapacityGb === '' || group.diskCapacityGb == null
+              ? undefined
+              : Number(group.diskCapacityGb),
+            diskCapacityUnit: group.diskCapacityUnit || 'GB',
+          })),
+        })),
+        hrIntegration: {
+          ...formData.hrIntegration,
+          dbPort: formData.hrIntegration.dbPort === '' ? undefined : Number(formData.hrIntegration.dbPort),
+          dbPassword: formData.hrIntegration.dbPassword.trim() || undefined,
+          mappings: formData.hrIntegration.mappings.map((mapping, displayOrder) => ({
+            id: mapping.id,
+            category: mapping.category,
+            tableName: mapping.tableName.trim(),
+            dbFieldName: mapping.dbFieldName.trim(),
+            vmfortFieldName: mapping.vmfortFieldName.trim(),
+            isRequired: mapping.isRequired,
+            description: mapping.description.trim() || undefined,
+            displayOrder,
+          })),
+          userSyncQuery: formData.hrIntegration.userSyncQuery.trim() || undefined,
+          departmentSyncQuery: formData.hrIntegration.departmentSyncQuery.trim() || undefined,
+        },
       };
 
       if (formData.id) {
@@ -305,6 +441,7 @@ const CustomerSourceManagementEditPage = () => {
       cpuType: '',
       memoryCapacity: '',
       diskCapacity: '',
+      diskGroups: [],
       nicFiberCount: 0,
       nicUtpCount: 0,
       powerSupplyCount: 0,
@@ -326,6 +463,59 @@ const CustomerSourceManagementEditPage = () => {
     updatedServers[index] = {
       ...updatedServers[index],
       [field]: value,
+    };
+    setFormData({ ...formData, servers: updatedServers });
+  };
+
+  const handleHrIntegrationChange = <K extends keyof HRIntegration>(field: K, value: HRIntegration[K]) => {
+    setFormData({
+      ...formData,
+      hrIntegration: { ...formData.hrIntegration, [field]: value },
+    });
+  };
+
+  const handleHrMappingChange = <K extends keyof HRFieldMapping>(
+    index: number,
+    field: K,
+    value: HRFieldMapping[K],
+  ) => {
+    const mappings = [...formData.hrIntegration.mappings];
+    mappings[index] = { ...mappings[index], [field]: value };
+    handleHrIntegrationChange('mappings', mappings);
+  };
+
+  const handleAddHrMapping = () => {
+    handleHrIntegrationChange('mappings', [
+      ...formData.hrIntegration.mappings,
+      {
+        category: '사용자',
+        tableName: '',
+        dbFieldName: '',
+        vmfortFieldName: '',
+        isRequired: false,
+        description: '',
+        displayOrder: formData.hrIntegration.mappings.length,
+      },
+    ]);
+  };
+
+  const handleRemoveHrMapping = (index: number) => {
+    handleHrIntegrationChange(
+      'mappings',
+      formData.hrIntegration.mappings.filter((_, mappingIndex) => mappingIndex !== index),
+    );
+  };
+
+  const handleDiskConfigChange = (
+    serverIndex: number,
+    field: keyof ServerDiskGroup,
+    value: string | number,
+  ) => {
+    const updatedServers = [...(formData.servers || [])];
+    const diskConfig = updatedServers[serverIndex].diskGroups?.[0] || createServerDiskGroup();
+    updatedServers[serverIndex] = {
+      ...updatedServers[serverIndex],
+      diskGroups: [{ ...diskConfig, [field]: value }],
     };
     setFormData({ ...formData, servers: updatedServers });
   };
@@ -463,7 +653,7 @@ const CustomerSourceManagementEditPage = () => {
               {customerName}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              형상 관리 {formData.id ? '수정' : '등록'}
+              구성 정보 {formData.id ? '수정' : '등록'}
             </Typography>
           </Box>
         </Box>
@@ -653,70 +843,90 @@ const CustomerSourceManagementEditPage = () => {
                 </Grid>
               </Grid>
 
-              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
-                설치 프로그램 리스트
-              </Typography>
-              {image.installedPrograms.map((program, programIndex) => (
-                <Grid container spacing={2} key={program.id || programIndex} sx={{ mb: 1 }} alignItems="center">
-                  <Grid xs={12} sm={4}>
-                    <TextField fullWidth size="small" label="프로그램명" value={program.name} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'name', e.target.value)} />
-                  </Grid>
-                  <Grid xs={12} sm={3}>
-                    <TextField fullWidth size="small" label="버전" value={program.version || ''} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'version', e.target.value)} />
-                  </Grid>
-                  <Grid xs={10} sm={4}>
-                    <TextField fullWidth size="small" label="설명" value={program.description || ''} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'description', e.target.value)} />
-                  </Grid>
-                  <Grid xs={2} sm={1}>
-                    <IconButton size="small" color="error" onClick={() => handleRemoveProgram(imageIndex, programIndex)} aria-label="설치 프로그램 삭제">
-                      <Delete />
-                    </IconButton>
-                  </Grid>
-                </Grid>
-              ))}
-              <Button size="small" startIcon={<Add />} onClick={() => handleAddProgram(imageIndex)} sx={{ mb: 3 }}>
-                설치 프로그램 추가
-              </Button>
-
-              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
-                VMFT 설정 확인
-              </Typography>
-              {image.dDiskCapacity !== '' && image.dDiskCapacity !== undefined && (
-                <Alert severity="info" sx={{ mb: 1 }}>
-                  D 드라이브가 입력되어 D 드라이브 Type 확인 항목이 활성화되었습니다.
-                </Alert>
-              )}
-              {[VMFT_CHECKLIST, BOOT_TEST_CHECKLIST].map((checklist, checklistIndex) => (
-                <Box key={checklistIndex} sx={{ mb: checklistIndex === 0 ? 3 : 0 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 1 }}>
-                    {checklistIndex === 0 ? 'VMFT 설정 확인' : '구동 테스트'}
+              <Accordion
+                disableGutters
+                elevation={0}
+                sx={{ mb: 2, border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    설치 프로그램 리스트 ({image.installedPrograms.length})
                   </Typography>
-                  {checklist.map((item) => {
-                    if (item.itemKey === 'vmft_d_drive_type' && (image.dDiskCapacity === '' || image.dDiskCapacity === undefined)) {
-                      return null;
-                    }
-                    const result = getChecklistItem(item.itemKey);
-                    return (
-                      <Grid container spacing={1} key={item.itemKey} alignItems="center" sx={{ mb: 1 }}>
-                        <Grid xs={12} sm={5}>
-                          <Box sx={{ minHeight: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <FormControlLabel
-                              control={<Checkbox checked={result.checked} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'checked', e.target.checked)} />}
-                              label={item.label}
-                            />
-                            <Typography variant="caption" color="text.secondary" sx={{ pl: 4.5 }}>
-                              점검자: {result.checked ? (result.checkedBy?.name || result.checkedByName || '저장 시 로그인 계정') : '-'}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid xs={12} sm={7}>
-                          <TextField fullWidth size="small" label="비고" value={result.note || ''} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'note', e.target.value)} />
-                        </Grid>
+                </AccordionSummary>
+                <AccordionDetails>
+                  {image.installedPrograms.map((program, programIndex) => (
+                    <Grid container spacing={2} key={program.id || programIndex} sx={{ mb: 1 }} alignItems="center">
+                      <Grid xs={12} sm={4}>
+                        <TextField fullWidth size="small" label="프로그램명" value={program.name} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'name', e.target.value)} />
                       </Grid>
-                    );
-                  })}
-                </Box>
-              ))}
+                      <Grid xs={12} sm={3}>
+                        <TextField fullWidth size="small" label="버전" value={program.version || ''} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'version', e.target.value)} />
+                      </Grid>
+                      <Grid xs={10} sm={4}>
+                        <TextField fullWidth size="small" label="설명" value={program.description || ''} onChange={(e) => handleProgramChange(imageIndex, programIndex, 'description', e.target.value)} />
+                      </Grid>
+                      <Grid xs={2} sm={1}>
+                        <IconButton size="small" color="error" onClick={() => handleRemoveProgram(imageIndex, programIndex)} aria-label="설치 프로그램 삭제">
+                          <Delete />
+                        </IconButton>
+                      </Grid>
+                    </Grid>
+                  ))}
+                  <Button size="small" startIcon={<Add />} onClick={() => handleAddProgram(imageIndex)}>
+                    설치 프로그램 추가
+                  </Button>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion
+                disableGutters
+                elevation={0}
+                sx={{ border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    체크리스트 ({image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length})
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  {image.dDiskCapacity !== '' && image.dDiskCapacity !== undefined && (
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      D 드라이브가 입력되어 D 드라이브 Type 확인 항목이 활성화되었습니다.
+                    </Alert>
+                  )}
+                  {[VMFT_CHECKLIST, BOOT_TEST_CHECKLIST].map((checklist, checklistIndex) => (
+                    <Box key={checklistIndex} sx={{ mb: checklistIndex === 0 ? 3 : 0 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 1 }}>
+                        {checklistIndex === 0 ? 'VMFT 설정 확인' : '구동 테스트'}
+                      </Typography>
+                      {checklist.map((item) => {
+                        if (item.itemKey === 'vmft_d_drive_type' && (image.dDiskCapacity === '' || image.dDiskCapacity === undefined)) {
+                          return null;
+                        }
+                        const result = getChecklistItem(item.itemKey);
+                        return (
+                          <Grid container spacing={1} key={item.itemKey} alignItems="center" sx={{ mb: 1 }}>
+                            <Grid xs={12} sm={5}>
+                              <Box sx={{ minHeight: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <FormControlLabel
+                                  control={<Checkbox checked={result.checked} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'checked', e.target.checked)} />}
+                                  label={item.label}
+                                />
+                                <Typography variant="caption" color="text.secondary" sx={{ pl: 4.5 }}>
+                                  점검자: {result.checked ? (result.checkedBy?.name || result.checkedByName || '저장 시 로그인 계정') : '-'}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                            <Grid xs={12} sm={7}>
+                              <TextField fullWidth size="small" label="비고" value={result.note || ''} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'note', e.target.value)} />
+                            </Grid>
+                          </Grid>
+                        );
+                      })}
+                    </Box>
+                  ))}
+                </AccordionDetails>
+              </Accordion>
             </Paper>
           );
         })}
@@ -1074,15 +1284,77 @@ const CustomerSourceManagementEditPage = () => {
                       placeholder="예: 32GB, 64GB"
                     />
                   </Grid>
-                  <Grid xs={12} sm={4}>
+                  {server.diskCapacity && !server.diskGroups?.[0] && (
+                    <Grid xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="기존 디스크 정보 (호환)"
+                        value={server.diskCapacity}
+                        onChange={(e) => handleServerChange(index, 'diskCapacity', e.target.value)}
+                        helperText="새 디스크 정보를 입력하면 이 값은 함께 보존됩니다."
+                      />
+                    </Grid>
+                  )}
+                  <Grid xs={12} sm={3}>
                     <TextField
                       fullWidth
                       size="small"
-                      label="디스크 용량"
-                      value={server.diskCapacity || ''}
-                      onChange={(e) => handleServerChange(index, 'diskCapacity', e.target.value)}
-                      placeholder="예: 1TB, 2TB SSD"
+                      type="number"
+                      label="현재 디스크 용량"
+                      value={server.diskGroups?.[0]?.diskCapacityGb ?? ''}
+                      onChange={(e) => handleDiskConfigChange(index, 'diskCapacityGb', e.target.value === '' ? '' : Number(e.target.value))}
+                      inputProps={{ min: 1 }}
+                      placeholder="예: 480, 2"
                     />
+                  </Grid>
+                  <Grid xs={12} sm={2}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>단위</InputLabel>
+                      <Select
+                        value={server.diskGroups?.[0]?.diskCapacityUnit || 'GB'}
+                        label="단위"
+                        onChange={(e) => handleDiskConfigChange(index, 'diskCapacityUnit', e.target.value as DiskCapacityUnit)}
+                      >
+                        <MenuItem value="GB">GB</MenuItem>
+                        <MenuItem value="TB">TB</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid xs={12} sm={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>RAID 구성</InputLabel>
+                      <Select
+                        value={server.diskGroups?.[0]?.raidType || '미확인'}
+                        label="RAID 구성"
+                        onChange={(e) => handleDiskConfigChange(index, 'raidType', e.target.value as RaidType)}
+                      >
+                        <MenuItem value="미확인">구성 미확인</MenuItem>
+                        <MenuItem value="RAID 미사용">RAID 미사용</MenuItem>
+                        <MenuItem value="RAID0">RAID0</MenuItem>
+                        <MenuItem value="RAID1">RAID1</MenuItem>
+                        <MenuItem value="RAID5">RAID5</MenuItem>
+                        <MenuItem value="RAID6">RAID6</MenuItem>
+                        <MenuItem value="RAID10">RAID10</MenuItem>
+                        <MenuItem value="기타">기타</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid xs={12} sm={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>디스크 유형</InputLabel>
+                      <Select
+                        value={server.diskGroups?.[0]?.diskType || ''}
+                        label="디스크 유형"
+                        onChange={(e) => handleDiskConfigChange(index, 'diskType', e.target.value)}
+                      >
+                        <MenuItem value=""><em>미입력</em></MenuItem>
+                        <MenuItem value="HDD">HDD</MenuItem>
+                        <MenuItem value="SSD">SSD</MenuItem>
+                        <MenuItem value="NVMe">NVMe</MenuItem>
+                        <MenuItem value="기타">기타</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Grid>
                   <Grid xs={12} sm={4}>
                     <TextField
@@ -1145,13 +1417,7 @@ const CustomerSourceManagementEditPage = () => {
                 value={formData.hrIntegration.enabled ? '사용' : '미사용'}
                 label="인사연동 여부"
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    hrIntegration: {
-                      ...formData.hrIntegration,
-                      enabled: e.target.value === '사용',
-                    },
-                  })
+                  handleHrIntegrationChange('enabled', e.target.value === '사용')
                 }
               >
                 <MenuItem value="미사용">미사용</MenuItem>
@@ -1162,38 +1428,198 @@ const CustomerSourceManagementEditPage = () => {
 
           {formData.hrIntegration.enabled && (
             <>
-              <Grid xs={12} sm={6}>
+              <Grid xs={12}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  고객사 인사시스템 정보
+                </Typography>
+              </Grid>
+              <Grid xs={12} sm={4}>
                 <TextField
                   fullWidth
+                  size="small"
                   label="인사DB 종류"
                   value={formData.hrIntegration.dbType}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      hrIntegration: {
-                        ...formData.hrIntegration,
-                        dbType: e.target.value,
-                      },
-                    })
-                  }
+                  onChange={(e) => handleHrIntegrationChange('dbType', e.target.value)}
                   placeholder="예: Oracle, MySQL, MS-SQL"
                 />
               </Grid>
-              <Grid xs={12} sm={6}>
+              <Grid xs={12} sm={4}>
                 <TextField
                   fullWidth
+                  size="small"
                   label="인사DB 버전"
                   value={formData.hrIntegration.dbVersion}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      hrIntegration: {
-                        ...formData.hrIntegration,
-                        dbVersion: e.target.value,
-                      },
-                    })
-                  }
+                  onChange={(e) => handleHrIntegrationChange('dbVersion', e.target.value)}
                   placeholder="예: 19c, 8.0, 2019"
+                />
+              </Grid>
+              <Grid xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="DB명"
+                  value={formData.hrIntegration.dbName}
+                  onChange={(e) => handleHrIntegrationChange('dbName', e.target.value)}
+                />
+              </Grid>
+              <Grid xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="DB IP"
+                  value={formData.hrIntegration.dbHost}
+                  onChange={(e) => handleHrIntegrationChange('dbHost', e.target.value)}
+                  placeholder="예: 192.168.0.10"
+                />
+              </Grid>
+              <Grid xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label="Port"
+                  value={formData.hrIntegration.dbPort}
+                  onChange={(e) => handleHrIntegrationChange('dbPort', e.target.value === '' ? '' : Number(e.target.value))}
+                  inputProps={{ min: 1, max: 65535 }}
+                />
+              </Grid>
+              <Grid xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="DB 접속 ID"
+                  value={formData.hrIntegration.dbUsername}
+                  onChange={(e) => handleHrIntegrationChange('dbUsername', e.target.value)}
+                />
+              </Grid>
+              <Grid xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="password"
+                  label="DB 접속 PW"
+                  value={formData.hrIntegration.dbPassword}
+                  onChange={(e) => handleHrIntegrationChange('dbPassword', e.target.value)}
+                />
+              </Grid>
+
+              <Grid xs={12}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 1 }}>
+                  DB 연동 테이블 정보
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  View table의 실제 테이블명과 필드명으로 수정해주세요.
+                </Typography>
+                <TableContainer sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 1250 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>구분</TableCell>
+                        <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>테이블명</TableCell>
+                        <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>인사DB 필드명</TableCell>
+                        <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>VMFort 필드명</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>필수여부</TableCell>
+                        <TableCell sx={{ minWidth: 320, whiteSpace: 'nowrap' }}>설명</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>작업</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {formData.hrIntegration.mappings.map((mapping, mappingIndex) => (
+                        <TableRow key={mapping.id || mappingIndex}>
+                          <TableCell sx={{ minWidth: 100 }}>
+                            <Select
+                              size="small"
+                              value={mapping.category}
+                              onChange={(e) => handleHrMappingChange(mappingIndex, 'category', e.target.value as HRMappingCategory)}
+                            >
+                              <MenuItem value="부서">부서</MenuItem>
+                              <MenuItem value="사용자">사용자</MenuItem>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.tableName}
+                              onChange={(e) => handleHrMappingChange(mappingIndex, 'tableName', e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.dbFieldName}
+                              onChange={(e) => handleHrMappingChange(mappingIndex, 'dbFieldName', e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.vmfortFieldName}
+                              onChange={(e) => handleHrMappingChange(mappingIndex, 'vmfortFieldName', e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Checkbox
+                              checked={mapping.isRequired}
+                              onChange={(e) => handleHrMappingChange(mappingIndex, 'isRequired', e.target.checked)}
+                              inputProps={{ 'aria-label': `${mapping.dbFieldName || '필드'} 필수여부` }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.description}
+                              onChange={(e) => handleHrMappingChange(mappingIndex, 'description', e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleRemoveHrMapping(mappingIndex)}
+                              aria-label={`${mappingIndex + 1}번째 매핑 삭제`}
+                            >
+                              <Delete />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <Button size="small" startIcon={<Add />} onClick={handleAddHrMapping} sx={{ mt: 1 }}>
+                  매핑 추가
+                </Button>
+              </Grid>
+
+              <Grid xs={12}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 1 }}>
+                  연동 쿼리
+                </Typography>
+              </Grid>
+              <Grid xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={4}
+                  label="사용자 연동 쿼리"
+                  value={formData.hrIntegration.userSyncQuery}
+                  onChange={(e) => handleHrIntegrationChange('userSyncQuery', e.target.value)}
+                  placeholder="사용자 정보를 조회하는 쿼리를 입력하세요."
+                />
+              </Grid>
+              <Grid xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={4}
+                  label="부서 연동 쿼리"
+                  value={formData.hrIntegration.departmentSyncQuery}
+                  onChange={(e) => handleHrIntegrationChange('departmentSyncQuery', e.target.value)}
+                  placeholder="부서 정보를 조회하는 쿼리를 입력하세요."
                 />
               </Grid>
             </>

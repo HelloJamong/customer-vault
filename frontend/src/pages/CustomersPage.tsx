@@ -25,10 +25,28 @@ interface SourceExportServer {
   cpuType?: string;
   memoryCapacity?: string;
   diskCapacity?: string;
+  diskGroups?: SourceExportDiskGroup[];
   nicFiberCount?: number;
   nicUtpCount?: number;
   powerSupplyCount?: number;
 }
+
+interface SourceExportDiskGroup {
+  raidType?: string | null;
+  diskType?: string | null;
+  diskCapacityGb?: number | null;
+  diskCapacityUnit?: string | null;
+}
+
+const formatDiskSummary = (server: SourceExportServer) => {
+  const group = server.diskGroups?.[0];
+  const details = [
+    group?.diskCapacityGb ? `${group.diskCapacityGb}${group.diskCapacityUnit || 'GB'}` : null,
+    group?.raidType,
+    group?.diskType,
+  ].filter(Boolean);
+  return details.length > 0 ? details.join(' · ') : server.diskCapacity || '-';
+};
 
 interface SourceExportData {
   id?: number;
@@ -47,6 +65,21 @@ interface SourceExportData {
     enabled: boolean;
     dbType?: string;
     dbVersion?: string;
+    dbName?: string;
+    dbHost?: string;
+    dbPort?: number;
+    dbUsername?: string;
+    dbPassword?: string;
+    mappings?: Array<{
+      category: '부서' | '사용자';
+      tableName: string;
+      dbFieldName: string;
+      vmfortFieldName: string;
+      isRequired: boolean;
+      description?: string;
+    }>;
+    userSyncQuery?: string;
+    departmentSyncQuery?: string;
   };
 }
 
@@ -241,21 +274,21 @@ const CustomersPage = () => {
 
     const workbook = new ExcelJS.Workbook();
 
-    // === 1. 형상관리 시트 ===
+    // === 1. 구성 정보 시트 ===
     try {
       const sourceResponse = await apiClient.get<SourceExportData>(`/customers/${customer.id}/source-management`);
       const sourceData = sourceResponse.data;
 
-      const sourceWorksheet = workbook.addWorksheet('형상관리');
+      const sourceWorksheet = workbook.addWorksheet('구성 정보');
       sourceWorksheet.columns = [{ width: 25 }, { width: 50 }];
 
       // 소스 관리 정보가 등록되지 않은 경우 (id가 null)
       if (!sourceData.id) {
-        const emptySourceData = [['형상 관리 정보'], ['고객사명', customer.name], [''], ['등록된 형상 관리 정보가 없습니다.']];
+        const emptySourceData = [['구성 정보'], ['고객사명', customer.name], [''], ['등록된 구성 정보가 없습니다.']];
         emptySourceData.forEach(row => sourceWorksheet.addRow(row));
       } else {
         const sourceSheetData: ExportRow[] = [
-          ['형상 관리 정보', ''],
+          ['구성 정보', ''],
           ['고객사명', customer.name],
           ['', ''],
           ['클라이언트 정보', ''],
@@ -290,7 +323,7 @@ const CustomersPage = () => {
             'OS 버전',
             'CPU 종류',
             '메모리 용량',
-            '디스크 용량',
+            '디스크 구성',
             'Fiber NIC',
             'UTP NIC',
             '전원 수량',
@@ -305,7 +338,7 @@ const CustomersPage = () => {
               server.osVersion || '-',
               server.cpuType || '-',
               server.memoryCapacity || '-',
-              server.diskCapacity || '-',
+              formatDiskSummary(server),
               server.nicFiberCount || 0,
               server.nicUtpCount || 0,
               server.powerSupplyCount || 0,
@@ -316,8 +349,29 @@ const CustomersPage = () => {
         sourceSheetData.push(['', '']);
         sourceSheetData.push(['인사연동', '']);
         sourceSheetData.push(['인사연동 사용 여부', sourceData.hrIntegration.enabled ? '사용' : '미사용']);
-        sourceSheetData.push(['인사 DB 종류', sourceData.hrIntegration.dbType || '-']);
-        sourceSheetData.push(['인사 DB 버전', sourceData.hrIntegration.dbVersion || '-']);
+        if (sourceData.hrIntegration.enabled) {
+          sourceSheetData.push(['고객사 인사시스템 정보', '']);
+          sourceSheetData.push(['DB 종류', sourceData.hrIntegration.dbType || '-']);
+          sourceSheetData.push(['DB 버전', sourceData.hrIntegration.dbVersion || '-']);
+          sourceSheetData.push(['DB명', sourceData.hrIntegration.dbName || '-']);
+          sourceSheetData.push(['DB IP', sourceData.hrIntegration.dbHost || '-']);
+          sourceSheetData.push(['Port', sourceData.hrIntegration.dbPort || '-']);
+          sourceSheetData.push(['DB 접속 정보', `ID : ${sourceData.hrIntegration.dbUsername || '-'} / PW : ${sourceData.hrIntegration.dbPassword ? '********' : '-'}`]);
+          sourceSheetData.push(['DB 연동 테이블 정보', '']);
+          sourceSheetData.push(['구분', '테이블명', '인사DB 필드명', 'VMFort 필드명', '필수여부', '설명']);
+          (sourceData.hrIntegration.mappings || []).forEach((mapping) => {
+            sourceSheetData.push([
+              mapping.category,
+              mapping.tableName || '-',
+              mapping.dbFieldName || '-',
+              mapping.vmfortFieldName || '-',
+              mapping.isRequired ? 'O' : 'X',
+              mapping.description || '-',
+            ]);
+          });
+          sourceSheetData.push(['사용자 연동 쿼리', sourceData.hrIntegration.userSyncQuery || '-']);
+          sourceSheetData.push(['부서 연동 쿼리', sourceData.hrIntegration.departmentSyncQuery || '-']);
+        }
 
         sourceSheetData.forEach(row => sourceWorksheet.addRow(row));
       }
@@ -330,9 +384,9 @@ const CustomersPage = () => {
       });
     } catch {
       // API 호출 실패 시 에러 시트 추가
-      const sourceWorksheet = workbook.addWorksheet('형상관리');
+      const sourceWorksheet = workbook.addWorksheet('구성 정보');
       sourceWorksheet.columns = [{ width: 25 }, { width: 50 }];
-      const errorSourceData = [['형상 관리 정보'], [''], ['형상 관리 정보를 불러오는데 실패했습니다.']];
+      const errorSourceData = [['구성 정보'], [''], ['구성 정보를 불러오는데 실패했습니다.']];
       errorSourceData.forEach(row => sourceWorksheet.addRow(row));
 
       sourceWorksheet.eachRow((row) => {
@@ -426,7 +480,7 @@ const CustomersPage = () => {
       });
     }
 
-    // === 3. 세부사항 시트 ===
+    // === 3. 유지보수 정보 시트 ===
     const getInspectionCycleText = () => {
       // POC와 만료인 경우 점검 주기를 "-"로 표시
       if (['POC', '만료'].includes(customer.contractType || '')) {
@@ -439,11 +493,11 @@ const CustomersPage = () => {
       return customer.inspectionCycleType || '-';
     };
 
-    const detailWorksheet = workbook.addWorksheet('세부사항');
+    const detailWorksheet = workbook.addWorksheet('유지보수 정보');
     detailWorksheet.columns = [{ width: 25 }, { width: 50 }];
 
     const detailSheetData: (string | number)[][] = [
-      ['고객사 세부사항'],
+      ['고객사 유지보수 정보'],
       [],
       ['[기본 정보]'],
       ['고객사명', customer.name || ''],
@@ -556,7 +610,7 @@ const CustomersPage = () => {
     try {
       await logsApi.logExcelExport({
         action: '고객사 전체정보 엑셀 내보내기',
-        description: `${customer.name} 고객사 전체정보(형상관리, 지원목록, 세부사항)를 엑셀로 내보냄`,
+        description: `${customer.name} 고객사 전체정보(구성 정보, 지원 목록, 유지보수 정보)를 엑셀로 내보냄`,
       });
     } catch (error) {
       console.error('로그 기록 실패:', error);
@@ -567,7 +621,7 @@ const CustomersPage = () => {
     {
       field: 'name',
       headerName: '고객사명',
-      width: 200,
+      minWidth: 160,
       flex: 1,
       renderCell: (params) => (
         <Box
@@ -595,19 +649,22 @@ const CustomersPage = () => {
     {
       field: 'version',
       headerName: '버전',
-      width: 280,
+      minWidth: 140,
+      flex: 1.2,
       renderCell: (params) => params.row.versionInfo || '-',
     },
     {
       field: 'inspectionCycleType',
       headerName: '점검주기',
-      width: 150,
+      minWidth: 90,
+      flex: 0.8,
       renderCell: (params) => getInspectionCycleText(params.row),
     },
     {
       field: 'inspectionStatus',
       headerName: '상태',
-      width: 120,
+      minWidth: 90,
+      flex: 0.7,
       renderCell: (params) => (
         <Chip
           label={params.value || '대상아님'}
@@ -619,19 +676,22 @@ const CustomersPage = () => {
     {
       field: 'contractType',
       headerName: '계약 상태',
-      width: 120,
+      minWidth: 90,
+      flex: 0.7,
       renderCell: (params) => params.value || '만료',
     },
     {
       field: 'exportFullData',
       headerName: '회의록',
-      width: 120,
+      minWidth: 100,
+      flex: 0.75,
       sortable: false,
       renderCell: (params) => (
         <Button
           size="small"
           variant="outlined"
           startIcon={<Visibility />}
+          sx={{ fontSize: '0.7rem', px: 0.5, minWidth: 0, whiteSpace: 'nowrap' }}
           onClick={() => navigate(`/customers/${params.row.id}/meeting-minutes`)}
         >
           보기
@@ -641,13 +701,15 @@ const CustomersPage = () => {
     {
       field: 'viewDocuments',
       headerName: '점검서',
-      width: 120,
+      minWidth: 100,
+      flex: 0.75,
       sortable: false,
       renderCell: (params) => (
         <Button
           size="small"
           variant="outlined"
           startIcon={<Visibility />}
+          sx={{ fontSize: '0.7rem', px: 0.5, minWidth: 0, whiteSpace: 'nowrap' }}
           onClick={() => navigate(`/customers/${params.row.id}/documents`)}
         >
           보기
@@ -656,46 +718,52 @@ const CustomersPage = () => {
     },
     {
       field: 'sourceManagement',
-      headerName: '형상 관리',
-      width: 120,
+      headerName: '구성 정보',
+      minWidth: 110,
+      flex: 0.9,
       sortable: false,
       renderCell: (params) => (
         <Button
           size="small"
           variant="outlined"
           startIcon={<Code />}
+          sx={{ fontSize: '0.7rem', px: 0.5, minWidth: 0, whiteSpace: 'nowrap' }}
           onClick={() => navigate(`/customers/${params.row.id}/source-management`)}
         >
-          형상 관리
+          구성 정보
         </Button>
       ),
     },
     {
       field: 'viewDetails',
-      headerName: '세부사항',
-      width: 130,
+      headerName: '유지보수 정보',
+      minWidth: 140,
+      flex: 1,
       sortable: false,
       renderCell: (params) => (
         <Button
           size="small"
           variant="outlined"
           startIcon={<Info />}
+          sx={{ fontSize: '0.7rem', px: 0.5, minWidth: 0, whiteSpace: 'nowrap' }}
           onClick={() => navigate(`/customers/${params.row.id}`)}
         >
-          세부사항
+          유지보수 정보
         </Button>
       ),
     },
     {
       field: 'supportList',
       headerName: '지원 목록',
-      width: 120,
+      minWidth: 110,
+      flex: 0.85,
       sortable: false,
       renderCell: (params) => (
         <Button
           size="small"
           variant="outlined"
           startIcon={<SupportAgent />}
+          sx={{ fontSize: '0.7rem', px: 0.5, minWidth: 0, whiteSpace: 'nowrap' }}
           onClick={() => navigate(`/customers/${params.row.id}/support-logs`)}
         >
           지원 목록

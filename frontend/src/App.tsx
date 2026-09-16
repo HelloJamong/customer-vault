@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { router } from './routes';
 import { queryClient } from '@/lib/queryClient';
 import { useAutoLogoutOnClose } from '@/hooks/useAutoLogoutOnClose';
@@ -57,7 +57,23 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
-        <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>페이지를 불러오는 중입니다...</div>}>
+        <Suspense
+          fallback={(
+            <Box
+              role="status"
+              aria-label="페이지를 불러오는 중"
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CircularProgress size={44} />
+            </Box>
+          )}
+        >
           <RouterProvider router={router} />
         </Suspense>
       </QueryClientProvider>

@@ -2,6 +2,36 @@ import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject, 
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
+export class ServerDiskGroupDto {
+  @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
+  @IsOptional()
+  @IsInt()
+  id?: number;
+
+  @ApiProperty({
+    required: true,
+    enum: ['미확인', 'RAID 미사용', 'RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10', '기타'],
+  })
+  @IsIn(['미확인', 'RAID 미사용', 'RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10', '기타'])
+  raidType: string;
+
+  @ApiProperty({ required: false, example: 'SSD', description: '디스크 유형' })
+  @IsOptional()
+  @IsString()
+  diskType?: string;
+
+  @ApiProperty({ required: false, example: 480, description: '현재 디스크 용량(GB)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  diskCapacityGb?: number;
+
+  @ApiProperty({ required: false, enum: ['GB', 'TB'], default: 'GB', description: '디스크 용량 단위' })
+  @IsOptional()
+  @IsIn(['GB', 'TB'])
+  diskCapacityUnit?: string;
+}
+
 export class ServerInfoDto {
   @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
@@ -52,6 +82,12 @@ export class ServerInfoDto {
   @IsString()
   diskCapacity?: string;
 
+  @ApiProperty({ required: false, type: [ServerDiskGroupDto], description: '디스크 구성 목록' })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ServerDiskGroupDto)
+  diskGroups?: ServerDiskGroupDto[];
+
   @ApiProperty({ required: false, default: 0, description: 'Fiber NIC 수량' })
   @IsOptional()
   @IsInt()
@@ -86,6 +122,48 @@ class HRIntegrationDto {
   @IsOptional()
   @IsString()
   dbVersion?: string;
+
+  @ApiProperty({ required: false, description: '인사DB명' })
+  @IsOptional()
+  @IsString()
+  dbName?: string;
+
+  @ApiProperty({ required: false, description: '인사DB IP 또는 호스트명' })
+  @IsOptional()
+  @IsString()
+  dbHost?: string;
+
+  @ApiProperty({ required: false, description: '인사DB 포트' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dbPort?: number;
+
+  @ApiProperty({ required: false, description: '인사DB 접속 ID' })
+  @IsOptional()
+  @IsString()
+  dbUsername?: string;
+
+  @ApiProperty({ required: false, description: '인사DB 접속 비밀번호' })
+  @IsOptional()
+  @IsString()
+  dbPassword?: string;
+
+  @ApiProperty({ required: false, type: [Object], description: '부서/사용자 View 필드 매핑' })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => HrIntegrationMappingDto)
+  mappings?: HrIntegrationMappingDto[];
+
+  @ApiProperty({ required: false, description: '사용자 연동 쿼리' })
+  @IsOptional()
+  @IsString()
+  userSyncQuery?: string;
+
+  @ApiProperty({ required: false, description: '부서 연동 쿼리' })
+  @IsOptional()
+  @IsString()
+  departmentSyncQuery?: string;
 }
 
 export class VirtualPcInstalledProgramDto {
@@ -122,6 +200,44 @@ export class VirtualPcChecklistItemDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @ApiProperty({ required: false, description: '표시 순서' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  displayOrder?: number;
+}
+
+export class HrIntegrationMappingDto {
+  @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
+  @IsOptional()
+  @IsInt()
+  id?: number;
+
+  @ApiProperty({ required: true, enum: ['부서', '사용자'] })
+  @IsIn(['부서', '사용자'])
+  category: string;
+
+  @ApiProperty({ required: true, description: 'View 테이블명' })
+  @IsString()
+  tableName: string;
+
+  @ApiProperty({ required: true, description: '인사DB 필드명' })
+  @IsString()
+  dbFieldName: string;
+
+  @ApiProperty({ required: true, description: 'VMFort 필드명' })
+  @IsString()
+  vmfortFieldName: string;
+
+  @ApiProperty({ required: true, description: '필수 여부' })
+  @IsBoolean()
+  isRequired: boolean;
+
+  @ApiProperty({ required: false, description: '설명' })
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @ApiProperty({ required: false, description: '표시 순서' })
   @IsOptional()
