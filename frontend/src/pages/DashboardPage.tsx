@@ -781,6 +781,10 @@ const UserDashboard = () => {
     navigate(`/customers/${customerId}/support-logs`);
   };
 
+  const handleGoMeetingMinutes = (customerId: number) => {
+    navigate(`/customers/${customerId}/meeting-minutes`);
+  };
+
   const renderStatusChip = (status?: string) => {
     if (!status) return null;
 
@@ -1086,7 +1090,7 @@ const UserDashboard = () => {
             mt: 0.5,
           }}
         >
-          유지보수 정보, 구성 정보, 지원 목록 또는 점검서를 바로 확인하세요.
+          유지보수 정보, 구성 정보, 지원 목록, 회의록 또는 점검서를 바로 확인하세요.
         </Typography>
 
         <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1150,6 +1154,9 @@ const UserDashboard = () => {
                   </Button>
                   <Button variant="outlined" size="small" onClick={() => handleGoSupportLogs(customer.id)}>
                     지원 목록
+                  </Button>
+                  <Button variant="outlined" size="small" onClick={() => handleGoMeetingMinutes(customer.id)}>
+                    회의록 보기
                   </Button>
                   <Button variant="contained" size="small" onClick={() => handleGoDocuments(customer.id)}>
                     점검서 보기

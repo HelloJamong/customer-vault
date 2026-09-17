@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { getInspectionPeriodStart } from '../common/utils/inspection-period.util';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as si from 'systeminformation';
@@ -29,7 +30,6 @@ export class DashboardService {
 
     // 이번 달 점검 통계
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     // 모든 고객사 조회
@@ -57,13 +57,14 @@ export class DashboardService {
       const targetIds = customer.inspectionTargets?.map((t) => t.id) || [];
       if (targetIds.length === 0) return; // 점검 대상 항목이 없으면 미완료
 
+      const periodStart = getInspectionPeriodStart(customer.inspectionCycleType, now);
       const completedTargetIds = new Set(
         customer.documents
           ?.filter((doc) => {
             const inspectionDate = new Date(doc.inspectionDate);
             return (
               doc.inspectionTargetId &&
-              inspectionDate >= startOfMonth &&
+              inspectionDate >= periodStart &&
               inspectionDate < startOfNextMonth
             );
           })
@@ -72,17 +73,6 @@ export class DashboardService {
 
       // 모든 점검 대상이 완료되었는지 확인
       const allCompleted = targetIds.every((id) => completedTargetIds.has(id));
-
-      // 디버깅 로그
-      console.log(`[DashboardService] Customer: ${customer.name} (ID: ${customer.id})`);
-      console.log(`[DashboardService] - Target IDs: ${JSON.stringify(targetIds)}`);
-      console.log(`[DashboardService] - Completed Target IDs: ${JSON.stringify([...completedTargetIds])}`);
-      console.log(`[DashboardService] - Total Documents: ${customer.documents?.length || 0}`);
-      console.log(`[DashboardService] - This Month Documents: ${customer.documents?.filter((doc) => {
-        const inspectionDate = new Date(doc.inspectionDate);
-        return inspectionDate >= startOfMonth && inspectionDate < startOfNextMonth;
-      }).length || 0}`);
-      console.log(`[DashboardService] - All Completed: ${allCompleted}`);
 
       if (allCompleted) {
         completedInspections++;
@@ -373,7 +363,6 @@ export class DashboardService {
   // 점검 미완료 고객사 목록 조회 (super_admin, admin만 사용)
   async getIncompleteInspections() {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     // 모든 고객사 조회 (사내 담당자 정보 포함)
@@ -402,13 +391,14 @@ export class DashboardService {
       const targetIds = customer.inspectionTargets?.map((t) => t.id) || [];
       if (targetIds.length === 0) return true; // 점검 대상 항목이 없으면 미완료
 
+      const periodStart = getInspectionPeriodStart(customer.inspectionCycleType, now);
       const completedTargetIds = new Set(
         customer.documents
           ?.filter((doc) => {
             const inspectionDate = new Date(doc.inspectionDate);
             return (
               doc.inspectionTargetId &&
-              inspectionDate >= startOfMonth &&
+              inspectionDate >= periodStart &&
               inspectionDate < startOfNextMonth
             );
           })

@@ -6,6 +6,7 @@ import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto
 import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeConsiderationDto } from './dto/upgrade-plan.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { assertCustomerEditable, isAdminRole } from '../common/utils/customer-access.util';
+import { getInspectionPeriodStart } from '../common/utils/inspection-period.util';
 
 @Injectable()
 export class CustomersService {
@@ -420,9 +421,9 @@ export class CustomersService {
       return '미진행';
     }
 
-    // 이번 달 점검 완료된 대상 확인
+    // 점검 기간(주기별) 내 완료된 대상 확인 - 예정 월보다 앞당겨 점검한 경우도 인정
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodStart = getInspectionPeriodStart(customer.inspectionCycleType, now);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const completedTargetIds = new Set(
@@ -431,7 +432,7 @@ export class CustomersService {
           const inspectionDate = new Date(doc.inspectionDate);
           return (
             doc.inspectionTargetId &&
-            inspectionDate >= startOfMonth &&
+            inspectionDate >= periodStart &&
             inspectionDate < startOfNextMonth
           );
         })
@@ -535,7 +536,7 @@ export class CustomersService {
     }
 
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodStart = getInspectionPeriodStart(customer.inspectionCycleType, now);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const completedTargets = await this.prisma.document.findMany({
@@ -543,7 +544,7 @@ export class CustomersService {
         customerId,
         inspectionTargetId: { in: targetIds },
         inspectionDate: {
-          gte: startOfMonth,
+          gte: periodStart,
           lt: startOfNextMonth,
         },
       },
