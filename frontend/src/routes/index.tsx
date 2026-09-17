@@ -15,6 +15,8 @@ const CustomersPage = lazy(() => import('@/pages/CustomersPage'));
 const CustomerDetailPage = lazy(() => import('@/pages/CustomerDetailPage'));
 const CustomerEditPage = lazy(() => import('@/pages/CustomerEditPage'));
 const CustomerDocumentsPage = lazy(() => import('@/pages/CustomerDocumentsPage'));
+const CustomerUpgradePlanPage = lazy(() => import('@/pages/CustomerUpgradePlanPage'));
+const CustomerUpgradePlanEditPage = lazy(() => import('@/pages/CustomerUpgradePlanEditPage'));
 const CustomerSourceManagementDetailPage = lazy(() => import('@/pages/CustomerSourceManagementDetailPage'));
 const CustomerSourceManagementEditPage = lazy(() => import('@/pages/CustomerSourceManagementEditPage'));
 const CustomerSupportLogsPage = lazy(() => import('@/pages/CustomerSupportLogsPage'));
@@ -88,6 +90,22 @@ export const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
             <CustomerDocumentsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId/upgrade-plan',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
+            <CustomerUpgradePlanPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'customers/:customerId/upgrade-plan/edit',
+        element: (
+          <RoleRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}>
+            <CustomerUpgradePlanEditPage />
           </RoleRoute>
         ),
       },

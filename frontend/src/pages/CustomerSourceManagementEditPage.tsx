@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
+  Stack,
   Typography,
   Button,
   Paper,
@@ -484,11 +485,11 @@ const CustomerSourceManagementEditPage = () => {
     handleHrIntegrationChange('mappings', mappings);
   };
 
-  const handleAddHrMapping = () => {
+  const handleAddHrMapping = (category: HRMappingCategory) => {
     handleHrIntegrationChange('mappings', [
       ...formData.hrIntegration.mappings,
       {
-        category: '사용자',
+        category,
         tableName: '',
         dbFieldName: '',
         vmfortFieldName: '',
@@ -1128,18 +1129,16 @@ const CustomerSourceManagementEditPage = () => {
                           placeholder="예: password123 또는 담당자를 통해 확인 필요"
                         />
                       </Grid>
-                      {access.serverRootAccessible === '가능' && (
-                        <Grid xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="root 패스워드"
-                            value={access.serverRootPassword || ''}
-                            onChange={(e) => handleAccessInfoChange(index, 'serverRootPassword', e.target.value)}
-                            placeholder="예: rootpass123 또는 담당자를 통해 확인 필요"
-                          />
-                        </Grid>
-                      )}
+                      <Grid xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="root 패스워드"
+                          value={access.serverRootPassword || ''}
+                          onChange={(e) => handleAccessInfoChange(index, 'serverRootPassword', e.target.value)}
+                          placeholder="예: rootpass123 또는 담당자를 통해 확인 필요"
+                        />
+                      </Grid>
                     </>
                   )}
                 </Grid>
@@ -1510,117 +1509,133 @@ const CustomerSourceManagementEditPage = () => {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   View table의 실제 테이블명과 필드명으로 수정해주세요.
                 </Typography>
-                <TableContainer sx={{ overflowX: 'auto' }}>
-                  <Table size="small" sx={{ minWidth: 1250 }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>구분</TableCell>
-                        <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>테이블명</TableCell>
-                        <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>인사DB 필드명</TableCell>
-                        <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>VMFort 필드명</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>필수여부</TableCell>
-                        <TableCell sx={{ minWidth: 320, whiteSpace: 'nowrap' }}>설명</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>작업</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {formData.hrIntegration.mappings.map((mapping, mappingIndex) => (
-                        <TableRow key={mapping.id || mappingIndex}>
-                          <TableCell sx={{ minWidth: 100 }}>
-                            <Select
-                              size="small"
-                              value={mapping.category}
-                              onChange={(e) => handleHrMappingChange(mappingIndex, 'category', e.target.value as HRMappingCategory)}
-                            >
-                              <MenuItem value="부서">부서</MenuItem>
-                              <MenuItem value="사용자">사용자</MenuItem>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={mapping.tableName}
-                              onChange={(e) => handleHrMappingChange(mappingIndex, 'tableName', e.target.value)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={mapping.dbFieldName}
-                              onChange={(e) => handleHrMappingChange(mappingIndex, 'dbFieldName', e.target.value)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={mapping.vmfortFieldName}
-                              onChange={(e) => handleHrMappingChange(mappingIndex, 'vmfortFieldName', e.target.value)}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Checkbox
-                              checked={mapping.isRequired}
-                              onChange={(e) => handleHrMappingChange(mappingIndex, 'isRequired', e.target.checked)}
-                              inputProps={{ 'aria-label': `${mapping.dbFieldName || '필드'} 필수여부` }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={mapping.description}
-                              onChange={(e) => handleHrMappingChange(mappingIndex, 'description', e.target.value)}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveHrMapping(mappingIndex)}
-                              aria-label={`${mappingIndex + 1}번째 매핑 삭제`}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <Button size="small" startIcon={<Add />} onClick={handleAddHrMapping} sx={{ mt: 1 }}>
-                  매핑 추가
-                </Button>
+                {([['부서', '부서 매핑'], ['사용자', '사용자 매핑']] as [HRMappingCategory, string][]).map(
+                  ([category, title], categoryIndex) => {
+                    const items = formData.hrIntegration.mappings
+                      .map((mapping, originalIndex) => ({ mapping, originalIndex }))
+                      .filter(({ mapping }) => mapping.category === category);
+
+                    return (
+                      <Accordion
+                        key={category}
+                        disableGutters
+                        elevation={0}
+                        sx={{
+                          mb: categoryIndex === 0 ? 2 : 0,
+                          border: 1,
+                          borderColor: 'divider',
+                          '&:before': { display: 'none' },
+                        }}
+                      >
+                        <AccordionSummary expandIcon={<ExpandMore />}>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {title} ({items.length})
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <TableContainer sx={{ overflowX: 'auto' }}>
+                            <Table size="small" sx={{ minWidth: 1100 }}>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>테이블명</TableCell>
+                                  <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>인사DB 필드명</TableCell>
+                                  <TableCell sx={{ minWidth: 150, whiteSpace: 'nowrap' }}>VMFort 필드명</TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>필수여부</TableCell>
+                                  <TableCell sx={{ minWidth: 320, whiteSpace: 'nowrap' }}>설명</TableCell>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>작업</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {items.map(({ mapping, originalIndex }) => (
+                                  <TableRow key={mapping.id || originalIndex}>
+                                    <TableCell>
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        value={mapping.tableName}
+                                        onChange={(e) => handleHrMappingChange(originalIndex, 'tableName', e.target.value)}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        value={mapping.dbFieldName}
+                                        onChange={(e) => handleHrMappingChange(originalIndex, 'dbFieldName', e.target.value)}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        value={mapping.vmfortFieldName}
+                                        onChange={(e) => handleHrMappingChange(originalIndex, 'vmfortFieldName', e.target.value)}
+                                      />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Checkbox
+                                        checked={mapping.isRequired}
+                                        onChange={(e) => handleHrMappingChange(originalIndex, 'isRequired', e.target.checked)}
+                                        inputProps={{ 'aria-label': `${mapping.dbFieldName || '필드'} 필수여부` }}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        value={mapping.description}
+                                        onChange={(e) => handleHrMappingChange(originalIndex, 'description', e.target.value)}
+                                      />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => handleRemoveHrMapping(originalIndex)}
+                                        aria-label={`${title} ${originalIndex + 1}번째 매핑 삭제`}
+                                      >
+                                        <Delete />
+                                      </IconButton>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                          <Button size="small" startIcon={<Add />} onClick={() => handleAddHrMapping(category)} sx={{ mt: 1 }}>
+                            {title} 추가
+                          </Button>
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  },
+                )}
               </Grid>
 
               <Grid xs={12}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 1 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 1, mb: 2 }}>
                   연동 쿼리
                 </Typography>
-              </Grid>
-              <Grid xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={4}
-                  label="사용자 연동 쿼리"
-                  value={formData.hrIntegration.userSyncQuery}
-                  onChange={(e) => handleHrIntegrationChange('userSyncQuery', e.target.value)}
-                  placeholder="사용자 정보를 조회하는 쿼리를 입력하세요."
-                />
-              </Grid>
-              <Grid xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={4}
-                  label="부서 연동 쿼리"
-                  value={formData.hrIntegration.departmentSyncQuery}
-                  onChange={(e) => handleHrIntegrationChange('departmentSyncQuery', e.target.value)}
-                  placeholder="부서 정보를 조회하는 쿼리를 입력하세요."
-                />
+                <Stack spacing={3}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={4}
+                    label="사용자 연동 쿼리"
+                    value={formData.hrIntegration.userSyncQuery}
+                    onChange={(e) => handleHrIntegrationChange('userSyncQuery', e.target.value)}
+                    placeholder="사용자 정보를 조회하는 쿼리를 입력하세요."
+                  />
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={4}
+                    label="부서 연동 쿼리"
+                    value={formData.hrIntegration.departmentSyncQuery}
+                    onChange={(e) => handleHrIntegrationChange('departmentSyncQuery', e.target.value)}
+                    placeholder="부서 정보를 조회하는 쿼리를 입력하세요."
+                  />
+                </Stack>
               </Grid>
             </>
           )}

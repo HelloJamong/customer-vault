@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto } from './dto/source-management.dto';
+import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeConsiderationDto } from './dto/upgrade-plan.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { assertCustomerEditable, isAdminRole } from '../common/utils/customer-access.util';
 
@@ -62,6 +63,9 @@ export class CustomersService {
             clientVersion: true,
           },
         },
+        upgradePlan: {
+          select: { status: true },
+        },
       },
       orderBy: { name: 'asc' },
     });
@@ -74,7 +78,7 @@ export class CustomersService {
         customer.sourceManagement?.adminWebReleaseDate,
       );
       const versionInfo = this.getVersionInfo(customer.sourceManagement);
-      const { inspectionTargets, documents, sourceManagement, operationalStatus: _operationalStatus, ...customerData } = customer;
+      const { inspectionTargets, documents, sourceManagement, upgradePlan, operationalStatus: _operationalStatus, ...customerData } = customer;
 
       return {
         ...customerData,
@@ -82,6 +86,7 @@ export class CustomersService {
         inspectionStatus,
         version,
         versionInfo,
+        upgradePlanStatus: upgradePlan?.status || '미정',
       };
     });
   }
@@ -1085,6 +1090,173 @@ export class CustomersService {
     });
 
     return this.getSourceManagement(customerId);
+  }
+
+  private buildConsiderationCreateData(
+    item: UpgradeConsiderationDto,
+    userId: number,
+    userName: string | null,
+    index: number,
+    previous?: Map<number, { checked: boolean; checkedByUserId: number | null; checkedByName: string | null; checkedAt: Date | null }>,
+  ) {
+    const prev = item.id ? previous?.get(item.id) : undefined;
+    const newlyChecked = !!item.checked && !prev?.checked;
+    return {
+      category: item.category,
+      feature: item.feature,
+      description: item.description,
+      checked: !!item.checked,
+      note: item.note,
+      checkedByUserId: item.checked ? (newlyChecked ? userId : (prev?.checkedByUserId ?? userId)) : null,
+      checkedByName: item.checked ? (newlyChecked ? userName : (prev?.checkedByName || userName)) : null,
+      checkedAt: item.checked ? (newlyChecked ? new Date() : (prev?.checkedAt || new Date())) : null,
+      displayOrder: item.displayOrder ?? index,
+    };
+  }
+
+  async getUpgradePlan(customerId: number) {
+    const upgradePlan = await this.prisma.upgradePlan.findUnique({
+      where: { customerId },
+      include: {
+        considerations: {
+          orderBy: { displayOrder: 'asc' },
+          include: { checkedBy: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    if (!upgradePlan) {
+      return {
+        id: null,
+        customerId,
+        status: '미정',
+        currentVersion: null,
+        targetVersion: null,
+        scheduleEstimate: null,
+        considerations: [],
+      };
+    }
+
+    return {
+      id: upgradePlan.id,
+      customerId: upgradePlan.customerId,
+      status: upgradePlan.status,
+      currentVersion: upgradePlan.currentVersion,
+      targetVersion: upgradePlan.targetVersion,
+      scheduleEstimate: upgradePlan.scheduleEstimate,
+      considerations: upgradePlan.considerations.map((item) => ({
+        id: item.id,
+        category: item.category,
+        feature: item.feature,
+        description: item.description,
+        checked: item.checked,
+        note: item.note,
+        checkedBy: item.checkedBy ? {
+          id: item.checkedBy.id,
+          name: item.checkedByName || item.checkedBy.name,
+        } : null,
+        checkedByName: item.checkedByName,
+        checkedAt: item.checkedAt,
+        displayOrder: item.displayOrder,
+      })),
+    };
+  }
+
+  async createUpgradePlan(customerId: number, dto: CreateUpgradePlanDto, userId: number, ipAddress: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다');
+    }
+
+    const existing = await this.prisma.upgradePlan.findUnique({ where: { customerId } });
+    if (existing) {
+      throw new ConflictException('이미 업그레이드 계획이 존재합니다');
+    }
+
+    const checker = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+
+    const upgradePlan = await this.prisma.upgradePlan.create({
+      data: {
+        customerId,
+        status: dto.status || '미정',
+        currentVersion: dto.currentVersion,
+        targetVersion: dto.targetVersion,
+        scheduleEstimate: dto.scheduleEstimate,
+        considerations: dto.considerations?.length ? {
+          create: dto.considerations.map((item, index) =>
+            this.buildConsiderationCreateData(item, userId, checker?.name || null, index),
+          ),
+        } : undefined,
+      },
+    });
+
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정보',
+      action: '업그레이드 계획 생성',
+      description: `고객사 ${customer.name}의 업그레이드 계획을 생성했습니다`,
+      beforeValue: null,
+      afterValue: JSON.stringify(upgradePlan),
+      ipAddress,
+    });
+
+    return this.getUpgradePlan(customerId);
+  }
+
+  async updateUpgradePlan(customerId: number, dto: UpdateUpgradePlanDto, userId: number, ipAddress: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다');
+    }
+
+    const existing = await this.prisma.upgradePlan.findUnique({
+      where: { customerId },
+      include: { considerations: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('업그레이드 계획이 없습니다');
+    }
+
+    const checker = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const previousByConsiderationId = new Map(
+      existing.considerations.map((item) => [item.id, {
+        checked: item.checked,
+        checkedByUserId: item.checkedByUserId,
+        checkedByName: item.checkedByName,
+        checkedAt: item.checkedAt,
+      }]),
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.upgradeConsideration.deleteMany({ where: { upgradePlanId: existing.id } });
+
+      await tx.upgradePlan.update({
+        where: { customerId },
+        data: {
+          status: dto.status,
+          currentVersion: dto.currentVersion,
+          targetVersion: dto.targetVersion,
+          scheduleEstimate: dto.scheduleEstimate,
+          considerations: dto.considerations?.length ? {
+            create: dto.considerations.map((item, index) =>
+              this.buildConsiderationCreateData(item, userId, checker?.name || null, index, previousByConsiderationId),
+            ),
+          } : undefined,
+        },
+      });
+    });
+
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정보',
+      action: '업그레이드 계획 수정',
+      description: `고객사 ${customer.name}의 업그레이드 계획을 수정했습니다`,
+      beforeValue: JSON.stringify(existing),
+      afterValue: JSON.stringify(dto),
+      ipAddress,
+    });
+
+    return this.getUpgradePlan(customerId);
   }
 
   // 편집 권한: 관리자는 제한 없음, 일반 사용자는 담당(정/부 엔지니어, 영업) 고객사만.

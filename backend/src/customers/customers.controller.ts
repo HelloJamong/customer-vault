@@ -16,6 +16,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
+import { CreateUpgradePlanDto, UpdateUpgradePlanDto } from './dto/upgrade-plan.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -128,5 +129,40 @@ export class CustomersController {
     await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.updateSourceManagement(id, dto, req.user.id, ipAddress);
+  }
+
+  // 업그레이드 계획
+  @Get(':id/upgrade-plan')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '업그레이드 계획 조회' })
+  getUpgradePlan(@Param('id', ParseIntPipe) id: number) {
+    // 조회는 로그인한 모든 내부 사용자에게 허용 (담당 여부 무관)
+    return this.customersService.getUpgradePlan(id);
+  }
+
+  @Post(':id/upgrade-plan')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '업그레이드 계획 생성' })
+  async createUpgradePlan(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateUpgradePlanDto,
+    @Request() req: any,
+  ) {
+    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
+    const ipAddress = getClientIp(req);
+    return this.customersService.createUpgradePlan(id, dto, req.user.id, ipAddress);
+  }
+
+  @Put(':id/upgrade-plan')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '업그레이드 계획 수정' })
+  async updateUpgradePlan(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUpgradePlanDto,
+    @Request() req: any,
+  ) {
+    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
+    const ipAddress = getClientIp(req);
+    return this.customersService.updateUpgradePlan(id, dto, req.user.id, ipAddress);
   }
 }

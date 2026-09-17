@@ -54,6 +54,7 @@ model User {
   backupLogs            BackupLog[]
   meetingMinutes        MeetingMinutes[] @relation("MeetingMinutesCreator")
   checkedVirtualPcChecklistItems VirtualPcChecklistItem[] @relation("VirtualPcChecklistCheckedBy")
+  checkedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationCheckedBy")
 
   @@index([isActive])
   @@map("users")
@@ -131,6 +132,7 @@ model Customer {
   documents               Document[]
   inspectionTargets       InspectionTarget[]
   sourceManagement        SourceManagement?
+  upgradePlan             UpgradePlan?
   supportLogs             SupportLog[]
   meetingMinutes          MeetingMinutes[]
 
@@ -515,6 +517,47 @@ model VirtualPcChecklistItem {
   @@index([virtualPcImageId])
   @@index([checkedByUserId])
   @@map("virtual_pc_checklist_items")
+}
+
+// 업그레이드 계획
+model UpgradePlan {
+  id               Int      @id @default(autoincrement())
+  customerId       Int      @unique @map("customer_id")
+  status           String   @default("미정") @db.VarChar(10) // 예정, 미정, 완료
+  currentVersion   String?  @map("current_version") @db.VarChar(50)
+  targetVersion    String?  @map("target_version") @db.VarChar(50)
+  scheduleEstimate String?  @map("schedule_estimate") @db.VarChar(50) // 예: "26/09", "3/4분기"
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  customer         Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  considerations   UpgradeConsideration[]
+
+  @@map("upgrade_plans")
+}
+
+// 업그레이드 고려 사항 (공통: 클라이언트/관리서버, 고객사별: 커스텀)
+model UpgradeConsideration {
+  id              Int       @id @default(autoincrement())
+  upgradePlanId   Int       @map("upgrade_plan_id")
+  category        String    @db.VarChar(20) // 클라이언트, 관리서버, 커스텀
+  feature         String    @db.VarChar(200) // 기능
+  description     String?   @db.Text // 설명
+  checked         Boolean   @default(false) // 확인여부
+  note            String?   @db.VarChar(500) // 비고
+  checkedByUserId Int?      @map("checked_by_user_id")
+  checkedByName   String?   @map("checked_by_name") @db.VarChar(100)
+  checkedAt       DateTime? @map("checked_at")
+  displayOrder    Int       @default(0) @map("display_order")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  upgradePlan     UpgradePlan @relation(fields: [upgradePlanId], references: [id], onDelete: Cascade)
+  checkedBy       User?       @relation("UpgradeConsiderationCheckedBy", fields: [checkedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([upgradePlanId, category])
+  @@index([checkedByUserId])
+  @@map("upgrade_considerations")
 }
 
 // 고객사 지원 로그

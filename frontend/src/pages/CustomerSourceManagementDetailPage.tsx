@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
+  Stack,
   Typography,
   Button,
   Paper,
@@ -782,14 +783,12 @@ const CustomerSourceManagementDetailPage = () => {
                                 </Typography>
                                 <Typography variant="body1">{access.serverSshPassword || '-'}</Typography>
                               </Grid>
-                              {access.serverRootAccessible === '가능' && (
-                                <Grid xs={12} sm={3}>
-                                  <Typography variant="body2" color="text.secondary">
-                                    root 패스워드
-                                  </Typography>
-                                  <Typography variant="body1">{access.serverRootPassword || '-'}</Typography>
-                                </Grid>
-                              )}
+                              <Grid xs={12} sm={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                  root 패스워드
+                                </Typography>
+                                <Typography variant="body1">{access.serverRootPassword || '-'}</Typography>
+                              </Grid>
                             </>
                           )}
                         </Grid>
@@ -893,32 +892,62 @@ const CustomerSourceManagementDetailPage = () => {
                   DB 연동 테이블 정보
                 </Typography>
                 {sourceData.hrIntegration.mappings?.length ? (
-                  <TableContainer sx={{ overflowX: 'auto', mb: 3 }}>
-                    <Table size="small" sx={{ minWidth: 850 }}>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>구분</TableCell>
-                          <TableCell>테이블명</TableCell>
-                          <TableCell>인사DB 필드명</TableCell>
-                          <TableCell>VMFort 필드명</TableCell>
-                          <TableCell>필수여부</TableCell>
-                          <TableCell>설명</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {sourceData.hrIntegration.mappings.map((mapping, index) => (
-                          <TableRow key={`${mapping.category}-${mapping.dbFieldName}-${index}`}>
-                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{mapping.category}</TableCell>
-                            <TableCell>{mapping.tableName || '-'}</TableCell>
-                            <TableCell>{mapping.dbFieldName || '-'}</TableCell>
-                            <TableCell>{mapping.vmfortFieldName || '-'}</TableCell>
-                            <TableCell>{mapping.isRequired ? 'O' : 'X'}</TableCell>
-                            <TableCell>{mapping.description || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                  <Box sx={{ mb: 3 }}>
+                    {(['부서', '사용자'] as const).map((category, categoryIndex) => {
+                      const items = sourceData.hrIntegration.mappings!.filter((mapping) => mapping.category === category);
+                      return (
+                        <Accordion
+                          key={category}
+                          disableGutters
+                          elevation={0}
+                          sx={{
+                            mb: categoryIndex === 0 ? 2 : 0,
+                            border: 1,
+                            borderColor: 'divider',
+                            '&:before': { display: 'none' },
+                          }}
+                        >
+                          <AccordionSummary expandIcon={<ExpandMore />}>
+                            <Typography variant="subtitle2" fontWeight="bold">
+                              {category} 매핑 ({items.length})
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            {items.length > 0 ? (
+                              <TableContainer sx={{ overflowX: 'auto' }}>
+                                <Table size="small" sx={{ minWidth: 700 }}>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>테이블명</TableCell>
+                                      <TableCell>인사DB 필드명</TableCell>
+                                      <TableCell>VMFort 필드명</TableCell>
+                                      <TableCell>필수여부</TableCell>
+                                      <TableCell>설명</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {items.map((mapping, index) => (
+                                      <TableRow key={`${mapping.category}-${mapping.dbFieldName}-${index}`}>
+                                        <TableCell>{mapping.tableName || '-'}</TableCell>
+                                        <TableCell>{mapping.dbFieldName || '-'}</TableCell>
+                                        <TableCell>{mapping.vmfortFieldName || '-'}</TableCell>
+                                        <TableCell>{mapping.isRequired ? 'O' : 'X'}</TableCell>
+                                        <TableCell>{mapping.description || '-'}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                등록된 {category} 매핑 정보가 없습니다.
+                              </Typography>
+                            )}
+                          </AccordionDetails>
+                        </Accordion>
+                      );
+                    })}
+                  </Box>
                 ) : (
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                     등록된 테이블 매핑 정보가 없습니다.
@@ -928,7 +957,7 @@ const CustomerSourceManagementDetailPage = () => {
                 <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
                   연동 쿼리
                 </Typography>
-                <Box sx={{ display: 'grid', gap: 2 }}>
+                <Stack spacing={2}>
                   <Box>
                     <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>
                       사용자 연동 쿼리
@@ -945,7 +974,7 @@ const CustomerSourceManagementDetailPage = () => {
                       {sourceData.hrIntegration.departmentSyncQuery || '-'}
                     </Paper>
                   </Box>
-                </Box>
+                </Stack>
               </>
             )}
           </Paper>

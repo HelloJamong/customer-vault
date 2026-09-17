@@ -51,6 +51,9 @@ export interface Customer {
   version?: string; // '4.2' | '6.1'
   versionInfo?: string; // '6.1 / 7.2.4.3010'
 
+  // 업그레이드 계획 상태
+  upgradePlanStatus?: string; // '예정' | '미정' | '완료'
+
   // 비고
   notes: string | null;
 

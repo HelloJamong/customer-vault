@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
-import { Add, Visibility, Info, Code, SupportAgent, Summarize, Search, FilterAlt, Download } from '@mui/icons-material';
+import { Add, Visibility, Info, Code, SupportAgent, Summarize, Search, FilterAlt, Download, Upgrade } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
@@ -715,6 +715,33 @@ const CustomersPage = () => {
           보기
         </Button>
       ),
+    },
+    {
+      field: 'upgradePlan',
+      headerName: '업그레이드 계획',
+      minWidth: 150,
+      flex: 1.1,
+      sortable: false,
+      renderCell: (params) => {
+        const status = params.row.upgradePlanStatus;
+        const statusSx =
+          status === '예정'
+            ? { color: '#f59e0b', borderColor: '#f59e0b' }
+            : status === '완료'
+              ? { color: '#16a34a', borderColor: '#16a34a' }
+              : {};
+        return (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Upgrade />}
+            sx={{ fontSize: '0.7rem', px: 0.5, minWidth: 0, whiteSpace: 'nowrap', ...statusSx }}
+            onClick={() => navigate(`/customers/${params.row.id}/upgrade-plan`)}
+          >
+            업그레이드 계획
+          </Button>
+        );
+      },
     },
     {
       field: 'sourceManagement',
