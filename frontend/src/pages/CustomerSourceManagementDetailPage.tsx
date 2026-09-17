@@ -168,6 +168,28 @@ const CustomerSourceManagementDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [sourceData, setSourceData] = useState<SourceManagement | null>(null);
   const [revealedAccessInfo, setRevealedAccessInfo] = useState<Set<number>>(new Set());
+  const [revealedData, setRevealedData] = useState<SourceManagement | null>(null);
+  const [isRevealLoading, setIsRevealLoading] = useState(false);
+
+  const handleRevealAccessInfo = async (index: number) => {
+    setRevealedAccessInfo(new Set(revealedAccessInfo).add(index));
+    if (revealedData || isRevealLoading) return;
+    setIsRevealLoading(true);
+    try {
+      const response = await apiClient.get(`/customers/${customerId}/source-management/edit`);
+      setRevealedData(response.data);
+    } catch (error) {
+      console.error('민감정보 조회 실패:', error);
+      alert('민감정보를 조회할 권한이 없거나 조회에 실패했습니다.');
+      setRevealedAccessInfo((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+    } finally {
+      setIsRevealLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -645,6 +667,7 @@ const CustomerSourceManagementDetailPage = () => {
               <Box>
                 {sourceData.accessInfo.map((access, index) => {
                   const isRevealed = revealedAccessInfo.has(index);
+                  const displayAccess = isRevealed ? (revealedData?.accessInfo?.[index] ?? access) : access;
 
                   return (
                     <Paper
@@ -665,7 +688,7 @@ const CustomerSourceManagementDetailPage = () => {
                       }}
                       onClick={() => {
                         if (!isRevealed) {
-                          setRevealedAccessInfo(new Set(revealedAccessInfo).add(index));
+                          handleRevealAccessInfo(index);
                         }
                       }}
                     >
@@ -741,7 +764,7 @@ const CustomerSourceManagementDetailPage = () => {
                                 <Typography variant="body2" color="text.secondary">
                                   패스워드
                                 </Typography>
-                                <Typography variant="body1">{access.webPassword || '-'}</Typography>
+                                <Typography variant="body1">{displayAccess.webPassword || '-'}</Typography>
                               </Grid>
                             </>
                           )}
@@ -782,13 +805,13 @@ const CustomerSourceManagementDetailPage = () => {
                                 <Typography variant="body2" color="text.secondary">
                                   SSH 패스워드
                                 </Typography>
-                                <Typography variant="body1">{access.serverSshPassword || '-'}</Typography>
+                                <Typography variant="body1">{displayAccess.serverSshPassword || '-'}</Typography>
                               </Grid>
                               <Grid xs={12} sm={3}>
                                 <Typography variant="body2" color="text.secondary">
                                   root 패스워드
                                 </Typography>
-                                <Typography variant="body1">{access.serverRootPassword || '-'}</Typography>
+                                <Typography variant="body1">{displayAccess.serverRootPassword || '-'}</Typography>
                               </Grid>
                             </>
                           )}

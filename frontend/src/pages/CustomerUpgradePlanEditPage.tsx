@@ -134,9 +134,10 @@ const CustomerUpgradePlanEditPage = () => {
     try {
       const dataToSend = {
         status: formData.status,
-        currentVersion: formData.currentVersion.trim() || undefined,
-        targetVersion: formData.targetVersion.trim() || undefined,
-        scheduleEstimate: formData.scheduleEstimate.trim() || undefined,
+        // 빈 문자열로 명시 전송해야 기존 값을 지울 수 있다 (undefined는 "값 유지"로 해석됨)
+        currentVersion: formData.currentVersion.trim(),
+        targetVersion: formData.targetVersion.trim(),
+        scheduleEstimate: formData.scheduleEstimate.trim(),
         considerations: formData.considerations
           .filter((item) => item.feature.trim())
           .map((item, displayOrder) => ({

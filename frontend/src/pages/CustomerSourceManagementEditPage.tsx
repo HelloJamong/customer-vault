@@ -45,6 +45,7 @@ interface ServerDiskGroup {
 
 interface ServerInfo {
   id?: number;
+  _clientKey?: string; // React key 안정화용 (신규 행), 저장 시 서버로 전송되지 않음(whitelist로 자동 제거)
   serverType: string;
   manufacturer?: string;
   modelName?: string;
@@ -62,6 +63,7 @@ interface ServerInfo {
 
 interface ServerAccessInfo {
   id?: number;
+  _clientKey?: string; // React key 안정화용 (신규 행), 저장 시 서버로 전송되지 않음(whitelist로 자동 제거)
   accessType: '관리웹' | '서버';
   webUrl?: string;
   webAccount?: string;
@@ -265,7 +267,7 @@ const CustomerSourceManagementEditPage = () => {
 
         // 소스 관리 정보 조회
         try {
-          const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management`);
+          const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management/edit`);
           if (sourceResponse.data) {
             const sourceData = sourceResponse.data as SourceManagement;
             const virtualPcImages = sourceData.virtualPcImages?.length
@@ -305,13 +307,18 @@ const CustomerSourceManagementEditPage = () => {
               },
               servers: sourceData.servers?.map((server) => ({
                 ...server,
-                diskGroups: server.diskGroups?.slice(0, 1).map((group) => ({
-                  ...group,
-                  raidType: group.raidType || '미확인',
-                  diskType: group.diskType || '',
-                  diskCapacityGb: group.diskCapacityGb ?? '',
-                  diskCapacityUnit: group.diskCapacityUnit === 'TB' ? 'TB' : 'GB',
-                })) || [],
+                // 편집 화면은 디스크 구성 1개만 다루지만, 기존에 여러 개가 등록된 서버의
+                // 추가 구성(index 1+)은 편집 대상이 아니므로 그대로 보존해 저장 시 유실되지 않게 한다.
+                diskGroups: server.diskGroups?.length ? [
+                  {
+                    ...server.diskGroups[0],
+                    raidType: server.diskGroups[0].raidType || '미확인',
+                    diskType: server.diskGroups[0].diskType || '',
+                    diskCapacityGb: server.diskGroups[0].diskCapacityGb ?? '',
+                    diskCapacityUnit: server.diskGroups[0].diskCapacityUnit === 'TB' ? 'TB' : 'GB',
+                  },
+                  ...server.diskGroups.slice(1),
+                ] : [],
               })) || [],
             });
           }
@@ -385,7 +392,7 @@ const CustomerSourceManagementEditPage = () => {
         })),
         servers: formData.servers?.map((server) => ({
           ...server,
-          diskGroups: server.diskGroups?.slice(0, 1).map((group) => ({
+          diskGroups: server.diskGroups?.map((group) => ({
             id: group.id,
             raidType: group.raidType,
             diskType: group.diskType?.trim() || undefined,
@@ -409,8 +416,9 @@ const CustomerSourceManagementEditPage = () => {
             description: mapping.description.trim() || undefined,
             displayOrder,
           })),
-          userSyncQuery: formData.hrIntegration.userSyncQuery.trim() || undefined,
-          departmentSyncQuery: formData.hrIntegration.departmentSyncQuery.trim() || undefined,
+          // 빈 문자열로 명시 전송해야 기존 값을 지울 수 있다 (undefined는 "값 유지"로 해석됨)
+          userSyncQuery: formData.hrIntegration.userSyncQuery.trim(),
+          departmentSyncQuery: formData.hrIntegration.departmentSyncQuery.trim(),
         },
       };
 
@@ -433,6 +441,7 @@ const CustomerSourceManagementEditPage = () => {
 
   const handleAddServer = () => {
     const newServer: ServerInfo = {
+      _clientKey: crypto.randomUUID(),
       serverType: '관리서버',
       manufacturer: '',
       modelName: '',
@@ -513,16 +522,19 @@ const CustomerSourceManagementEditPage = () => {
     value: string | number,
   ) => {
     const updatedServers = [...(formData.servers || [])];
-    const diskConfig = updatedServers[serverIndex].diskGroups?.[0] || createServerDiskGroup();
+    const existingGroups = updatedServers[serverIndex].diskGroups || [];
+    const diskConfig = existingGroups[0] || createServerDiskGroup();
     updatedServers[serverIndex] = {
       ...updatedServers[serverIndex],
-      diskGroups: [{ ...diskConfig, [field]: value }],
+      // 이 화면은 구성 1개만 편집하므로 index 0만 갱신하고, 추가 구성(index 1+)은 그대로 둔다.
+      diskGroups: [{ ...diskConfig, [field]: value }, ...existingGroups.slice(1)],
     };
     setFormData({ ...formData, servers: updatedServers });
   };
 
   const handleAddAccessInfo = () => {
     const newAccessInfo: ServerAccessInfo = {
+      _clientKey: crypto.randomUUID(),
       accessType: '관리웹',
       webUrl: '',
       webAccount: '',
@@ -993,7 +1005,7 @@ const CustomerSourceManagementEditPage = () => {
         {formData.accessInfo && formData.accessInfo.length > 0 ? (
           <Box>
             {formData.accessInfo.map((access, index) => (
-              <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <Paper key={access.id ?? access._clientKey ?? index} variant="outlined" sx={{ p: 2, mb: 2 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     접근 정보 #{index + 1}
@@ -1191,7 +1203,7 @@ const CustomerSourceManagementEditPage = () => {
               서버 정보
             </Typography>
             {formData.servers.map((server, index) => (
-              <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <Paper key={server.id ?? server._clientKey ?? index} variant="outlined" sx={{ p: 2, mb: 2 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     서버 #{index + 1}

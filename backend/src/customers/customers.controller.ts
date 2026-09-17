@@ -101,8 +101,17 @@ export class CustomersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '소스 관리 정보 조회' })
   getSourceManagement(@Param('id', ParseIntPipe) id: number) {
-    // 조회는 로그인한 모든 내부 사용자에게 허용 (담당 여부 무관)
+    // 조회는 로그인한 모든 내부 사용자에게 허용 (담당 여부 무관). 서버 접속 비밀번호 등은 마스킹되어 반환됨.
     return this.customersService.getSourceManagement(id);
+  }
+
+  @Get(':id/source-management/edit')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '소스 관리 정보 조회 (자격증명 포함, 담당자·관리자 한정, 감사 기록됨)' })
+  async getSourceManagementForEdit(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
+    const ipAddress = getClientIp(req);
+    return this.customersService.getSourceManagementForEdit(id, req.user.id, ipAddress);
   }
 
   @Post(':id/source-management')

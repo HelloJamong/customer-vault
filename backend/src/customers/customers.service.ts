@@ -555,8 +555,15 @@ export class CustomersService {
     return completedTargets.length === targetIds.length;
   }
 
+  // 저장된 값이 있으면 마스킹, revealSecrets일 때만 실제 복호화 값을 반환
+  private maskOrReveal(value: string | null, revealSecrets: boolean): string | null {
+    if (!value) return null;
+    return revealSecrets ? this.cryptoService.safeDecrypt(value) : '********';
+  }
+
   // 소스 관리
-  async getSourceManagement(customerId: number) {
+  async getSourceManagement(customerId: number, options: { revealSecrets?: boolean } = {}) {
+    const revealSecrets = options.revealSecrets ?? false;
     const sourceManagement = await this.prisma.sourceManagement.findUnique({
       where: { customerId },
       include: {
@@ -692,14 +699,14 @@ export class CustomersService {
         accessType: access.accessType,
         webUrl: access.webUrl,
         webAccount: access.webAccount,
-        webPassword: this.cryptoService.safeDecrypt(access.webPassword),
+        webPassword: this.maskOrReveal(access.webPassword, revealSecrets),
         serverHostname: access.serverHostname,
         serverIpAddress: access.serverIpAddress,
         serverSshPort: access.serverSshPort,
         serverRootAccessible: access.serverRootAccessible,
         serverSshAccount: access.serverSshAccount,
-        serverSshPassword: this.cryptoService.safeDecrypt(access.serverSshPassword),
-        serverRootPassword: this.cryptoService.safeDecrypt(access.serverRootPassword),
+        serverSshPassword: this.maskOrReveal(access.serverSshPassword, revealSecrets),
+        serverRootPassword: this.maskOrReveal(access.serverRootPassword, revealSecrets),
       })) || [],
       hrIntegration: {
         enabled: sourceManagement.hrIntegrationEnabled,
@@ -709,7 +716,7 @@ export class CustomersService {
         dbHost: sourceManagement.hrDbHost,
         dbPort: sourceManagement.hrDbPort,
         dbUsername: sourceManagement.hrDbUsername,
-        dbPassword: this.cryptoService.safeDecrypt(sourceManagement.hrDbPassword),
+        dbPassword: this.maskOrReveal(sourceManagement.hrDbPassword, revealSecrets),
         mappings: sourceManagement.hrMappings.map((mapping) => ({
           id: mapping.id,
           category: mapping.category,
@@ -724,6 +731,19 @@ export class CustomersService {
         departmentSyncQuery: sourceManagement.hrDepartmentSyncQuery,
       },
     };
+  }
+
+  // 서버 접속 자격증명 등 민감정보를 실제 값으로 조회. 담당자·관리자만 호출 가능(컨트롤러에서 권한 확인) + 감사 기록.
+  async getSourceManagementForEdit(customerId: number, userId: number, ipAddress: string) {
+    const result = await this.getSourceManagement(customerId, { revealSecrets: true });
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '보안',
+      action: '소스 관리 민감정보 열람',
+      description: `고객사 ${customerId}의 서버 접속·인사연동 DB 자격증명을 열람했습니다`,
+      ipAddress,
+    });
+    return result;
   }
 
   private buildVirtualPcImageCreateData(
@@ -899,7 +919,7 @@ export class CustomersService {
       ipAddress,
     });
 
-    return this.getSourceManagement(customerId);
+    return this.getSourceManagement(customerId, { revealSecrets: true });
   }
 
   async updateSourceManagement(customerId: number, dto: UpdateSourceManagementDto, userId: number, ipAddress: string) {
@@ -958,11 +978,14 @@ export class CustomersService {
     });
 
     // 트랜잭션으로 서버 정보 및 접근 정보 업데이트
+    // 각 목록은 dto에 해당 필드가 전달된 경우에만 삭제 후 재생성한다.
+    // (필드 자체가 없는 요청까지 전량 삭제하면, 그 목록만 다루지 않는 향후 부분 업데이트에서 데이터가 유실된다)
     await this.prisma.$transaction(async (tx) => {
-      // 기존 서버 정보 삭제
-      await tx.serverInfo.deleteMany({
-        where: { sourceManagementId: existing.id },
-      });
+      if (dto.servers !== undefined) {
+        await tx.serverInfo.deleteMany({
+          where: { sourceManagementId: existing.id },
+        });
+      }
 
       if (dto.virtualPcImages) {
         await tx.virtualPcImage.deleteMany({
@@ -970,14 +993,17 @@ export class CustomersService {
         });
       }
 
-      // 기존 접근 정보 삭제
-      await (tx as any).serverAccessInfo.deleteMany({
-        where: { sourceManagementId: existing.id },
-      });
+      if (dto.accessInfo !== undefined) {
+        await (tx as any).serverAccessInfo.deleteMany({
+          where: { sourceManagementId: existing.id },
+        });
+      }
 
-      await tx.hrIntegrationMapping.deleteMany({
-        where: { sourceManagementId: existing.id },
-      });
+      if (dto.hrIntegration?.mappings !== undefined) {
+        await tx.hrIntegrationMapping.deleteMany({
+          where: { sourceManagementId: existing.id },
+        });
+      }
 
       // 소스 관리 정보 업데이트
       await tx.sourceManagement.update({
@@ -1090,7 +1116,7 @@ export class CustomersService {
       ipAddress,
     });
 
-    return this.getSourceManagement(customerId);
+    return this.getSourceManagement(customerId, { revealSecrets: true });
   }
 
   private buildConsiderationCreateData(
@@ -1229,7 +1255,9 @@ export class CustomersService {
     );
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.upgradeConsideration.deleteMany({ where: { upgradePlanId: existing.id } });
+      if (dto.considerations !== undefined) {
+        await tx.upgradeConsideration.deleteMany({ where: { upgradePlanId: existing.id } });
+      }
 
       await tx.upgradePlan.update({
         where: { customerId },
