@@ -45,7 +45,7 @@ const DuplicateLoginDialog = ({ open, onConfirm, onCancel }: DuplicateLoginDialo
           <WarningAmberIcon
             sx={{
               fontSize: 64,
-              color: '#f59e0b', // amber-500
+              color: 'warning.main',
             }}
           />
         </Box>
@@ -53,7 +53,7 @@ const DuplicateLoginDialog = ({ open, onConfirm, onCancel }: DuplicateLoginDialo
           variant="h6"
           sx={{
             fontWeight: 600,
-            color: '#0f172a', // slate-900
+            color: 'text.primary',
           }}
         >
           중복 로그인 감지
@@ -70,7 +70,7 @@ const DuplicateLoginDialog = ({ open, onConfirm, onCancel }: DuplicateLoginDialo
         <Typography
           variant="body1"
           sx={{
-            color: '#475569', // slate-600
+            color: 'text.secondary',
             lineHeight: 1.6,
             whiteSpace: 'pre-line',
           }}
@@ -92,11 +92,11 @@ const DuplicateLoginDialog = ({ open, onConfirm, onCancel }: DuplicateLoginDialo
           variant="outlined"
           sx={{
             minWidth: 100,
-            borderColor: '#cbd5e1', // slate-300
-            color: '#475569', // slate-600
+            borderColor: 'divider',
+            color: 'text.secondary',
             '&:hover': {
-              borderColor: '#94a3b8', // slate-400
-              bgcolor: '#f8fafc', // slate-50
+              borderColor: 'text.secondary',
+              bgcolor: 'action.hover',
             },
           }}
         >
@@ -107,9 +107,9 @@ const DuplicateLoginDialog = ({ open, onConfirm, onCancel }: DuplicateLoginDialo
           variant="contained"
           sx={{
             minWidth: 100,
-            bgcolor: '#6366f1', // indigo-600
+            bgcolor: 'secondary.main',
             '&:hover': {
-              bgcolor: '#4f46e5', // indigo-700
+              bgcolor: 'secondary.dark',
             },
           }}
         >

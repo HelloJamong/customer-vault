@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
+import { alpha } from '@mui/material/styles';
 import {
   ArrowBack,
   Save,
@@ -1051,7 +1052,15 @@ const CustomerEditPage = () => {
 
       {/* 고객사 삭제 - SUPER_ADMIN과 ADMIN만 표시 */}
       {user && (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) && (
-        <Paper sx={{ p: 3, mb: 3, bgcolor: '#fff5f5', border: '1px solid #ffcccc' }}>
+        <Paper
+          sx={{
+            p: 3,
+            mb: 3,
+            bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+            border: '1px solid',
+            borderColor: (theme) => alpha(theme.palette.error.main, 0.3),
+          }}
+        >
           <Typography variant="h6" fontWeight="bold" color="error" gutterBottom>
             위험 구역
           </Typography>

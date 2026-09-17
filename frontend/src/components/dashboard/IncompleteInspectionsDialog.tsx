@@ -56,14 +56,14 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
           alignItems: 'center',
           justifyContent: 'space-between',
           pb: 2,
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: 1, borderColor: 'divider',
         }}
       >
         <Typography
           sx={{
             fontSize: '1.25rem',
             fontWeight: 600,
-            color: '#1e293b',
+            color: 'text.primary',
           }}
         >
           점검 미진행 고객사 목록
@@ -72,9 +72,9 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
           onClick={onClose}
           size="small"
           sx={{
-            color: '#64748b',
+            color: 'text.secondary',
             '&:hover': {
-              bgcolor: '#f1f5f9',
+              bgcolor: 'action.hover',
             },
           }}
         >
@@ -117,7 +117,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
             <Typography
               sx={{
                 fontSize: '0.875rem',
-                color: '#64748b',
+                color: 'text.secondary',
                 mb: 2,
               }}
             >
@@ -127,7 +127,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
               component={Paper}
               elevation={0}
               sx={{
-                border: '1px solid #e2e8f0',
+                border: 1, borderColor: 'divider',
                 borderRadius: 2,
               }}
             >
@@ -135,13 +135,13 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
                 <TableHead>
                   <TableRow
                     sx={{
-                      bgcolor: '#f8fafc',
+                      bgcolor: 'action.hover',
                     }}
                   >
                     <TableCell
                       sx={{
                         fontWeight: 600,
-                        color: '#475569',
+                        color: 'text.secondary',
                         fontSize: '0.875rem',
                       }}
                     >
@@ -150,7 +150,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
                     <TableCell
                       sx={{
                         fontWeight: 600,
-                        color: '#475569',
+                        color: 'text.secondary',
                         fontSize: '0.875rem',
                       }}
                     >
@@ -159,7 +159,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
                     <TableCell
                       sx={{
                         fontWeight: 600,
-                        color: '#475569',
+                        color: 'text.secondary',
                         fontSize: '0.875rem',
                       }}
                     >
@@ -173,14 +173,14 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
                       key={inspection.id}
                       sx={{
                         '&:hover': {
-                          bgcolor: '#f8fafc',
+                          bgcolor: 'action.hover',
                         },
                       }}
                     >
                       <TableCell
                         sx={{
                           fontSize: '0.875rem',
-                          color: '#0f172a',
+                          color: 'text.primary',
                           fontWeight: 500,
                         }}
                       >
@@ -189,7 +189,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
                       <TableCell
                         sx={{
                           fontSize: '0.875rem',
-                          color: '#475569',
+                          color: 'text.secondary',
                         }}
                       >
                         {inspection.primaryEngineer}
@@ -197,7 +197,7 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
                       <TableCell
                         sx={{
                           fontSize: '0.875rem',
-                          color: '#475569',
+                          color: 'text.secondary',
                         }}
                       >
                         {inspection.subEngineer}
@@ -215,15 +215,16 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
               justifyContent: 'center',
               alignItems: 'center',
               minHeight: 200,
-              bgcolor: '#f8fafc',
+              bgcolor: 'action.hover',
               borderRadius: 2,
-              border: '1px dashed #cbd5e1',
+              border: '1px dashed',
+              borderColor: 'divider',
             }}
           >
             <Typography
               sx={{
                 fontSize: '0.875rem',
-                color: '#64748b',
+                color: 'text.secondary',
               }}
             >
               모든 고객사의 점검이 완료되었습니다.
@@ -243,9 +244,9 @@ const IncompleteInspectionsDialog = ({ open, onClose }: IncompleteInspectionsDia
           onClick={onClose}
           variant="contained"
           sx={{
-            bgcolor: '#2563eb',
+            bgcolor: 'primary.main',
             '&:hover': {
-              bgcolor: '#1d4ed8',
+              bgcolor: 'primary.dark',
             },
             textTransform: 'none',
             fontWeight: 500,

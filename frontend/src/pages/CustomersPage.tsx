@@ -829,7 +829,7 @@ const CustomersPage = () => {
       </Box>
 
       {/* 검색 및 필터 섹션 */}
-      <Box sx={{ mb: 2, p: 2, bgcolor: 'white', borderRadius: 1 }}>
+      <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
         <Box display="flex" gap={2} alignItems="center" justifyContent="space-between">
           <Box display="flex" gap={2} alignItems="center" flex={1}>
             {/* 고객사명 검색 */}
@@ -938,7 +938,7 @@ const CustomersPage = () => {
         </Box>
       </Box>
 
-      <Box sx={{ height: 600, width: '100%', bgcolor: 'white', borderRadius: 1 }}>
+      <Box sx={{ height: 600, width: '100%', bgcolor: 'background.paper', borderRadius: 1 }}>
         <DataGrid
           rows={customers}
           columns={columns}

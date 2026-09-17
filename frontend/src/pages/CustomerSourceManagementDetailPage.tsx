@@ -17,6 +17,7 @@ import {
   AccordionDetails,
   AccordionSummary,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import Grid from '@/mui-grid2';
 import { ArrowBack, Edit, Download, ExpandMore } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -680,7 +681,7 @@ const CustomerSourceManagementDetailPage = () => {
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.95),
                             zIndex: 1,
                             borderRadius: 1,
                             pointerEvents: 'none',

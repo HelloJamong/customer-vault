@@ -166,7 +166,8 @@ const DocumentViewerPage = () => {
       <Box
         sx={{
           flex: 1,
-          border: '1px solid #e0e0e0',
+          border: '1px solid',
+          borderColor: 'divider',
           borderRadius: 1,
           overflow: 'hidden',
           minHeight: '80vh',

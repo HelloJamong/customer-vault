@@ -1,21 +1,28 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Button, Menu, MenuItem, Typography, Tooltip, IconButton } from '@mui/material';
-import { KeyboardArrowDown } from '@mui/icons-material';
+import { alpha } from '@mui/material/styles';
+import { KeyboardArrowDown, DarkMode, LightMode } from '@mui/icons-material';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useColorMode } from '@/hooks/useColorMode';
 import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
 import NotificationBell from '@/components/layout/NotificationBell';
 import { NoticePopup } from '@/components/NoticePopup';
 import { noticesApi, type Notice } from '@/api/notices.api';
 import headerLogo from '@/assets/images/logo.svg';
 
+// 다크모드에서도 알파 블렌딩으로 자연스럽게 배경에 녹아들도록 고정 색상 대신 투명도로 표현
+const NAV_ACTIVE_BG = alpha('#2563eb', 0.1);
+const LOGOUT_HOVER_BG = alpha('#dc2626', 0.08);
+
 const MainLayout = () => {
   const user = useAuthStore((state) => state.user);
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { mode, toggle: toggleColorMode } = useColorMode();
 
   const [accountAnchor, setAccountAnchor] = useState<null | HTMLElement>(null);
   const [logAnchor, setLogAnchor] = useState<null | HTMLElement>(null);
@@ -115,15 +122,16 @@ const MainLayout = () => {
   const canManageCustomers = isAdmin || userRole === 'user';
 
   return (
-    <Box sx={{ minHeight: '100vh', width: '100vw', bgcolor: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ minHeight: '100vh', width: '100vw', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box
         component="header"
         sx={{
           width: '100%',
           height: 80,
-          bgcolor: 'white',
-          borderBottom: '1px solid #e2e8f0',
+          bgcolor: 'background.paper',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
           position: 'sticky',
           top: 0,
           zIndex: 20,
@@ -164,13 +172,13 @@ const MainLayout = () => {
                 py: 1,
                 fontSize: '0.875rem',
                 fontWeight: isActive('/dashboard') ? 600 : 500,
-                color: isActive('/dashboard') ? '#2563eb' : '#64748b',
-                bgcolor: isActive('/dashboard') ? '#eff6ff' : 'transparent',
+                color: isActive('/dashboard') ? 'primary.main' : 'text.secondary',
+                bgcolor: isActive('/dashboard') ? NAV_ACTIVE_BG : 'transparent',
                 borderRadius: 1.5,
                 textTransform: 'none',
                 '&:hover': {
-                  bgcolor: isActive('/dashboard') ? '#eff6ff' : '#f8fafc',
-                  color: '#0f172a',
+                  bgcolor: isActive('/dashboard') ? NAV_ACTIVE_BG : 'action.hover',
+                  color: 'text.primary',
                 },
               }}
             >
@@ -188,10 +196,10 @@ const MainLayout = () => {
                     py: 1,
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                     textTransform: 'none',
                     '&:hover': {
-                      color: '#0f172a',
+                      color: 'text.primary',
                     },
                   }}
                 >
@@ -206,7 +214,7 @@ const MainLayout = () => {
                       mt: 1,
                       minWidth: 192,
                       borderRadius: 2,
-                      border: '1px solid #e2e8f0',
+                      border: 1, borderColor: 'divider',
                       boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
                     },
                   }}
@@ -217,7 +225,7 @@ const MainLayout = () => {
                         setAccountAnchor(null);
                         navigate('/super-admins');
                       }}
-                      sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                      sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                     >
                       슈퍼관리자
                     </MenuItem>
@@ -227,7 +235,7 @@ const MainLayout = () => {
                       setAccountAnchor(null);
                       navigate('/admins');
                     }}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                   >
                     관리자
                   </MenuItem>
@@ -236,7 +244,7 @@ const MainLayout = () => {
                       setAccountAnchor(null);
                       navigate('/users');
                     }}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                   >
                     사용자
                   </MenuItem>
@@ -253,12 +261,12 @@ const MainLayout = () => {
                   py: 1,
                   fontSize: '0.875rem',
                   fontWeight: isActive('/customers') ? 600 : 500,
-                  color: isActive('/customers') ? '#2563eb' : '#64748b',
-                  bgcolor: isActive('/customers') ? '#eff6ff' : 'transparent',
+                  color: isActive('/customers') ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive('/customers') ? NAV_ACTIVE_BG : 'transparent',
                   borderRadius: 1.5,
                   textTransform: 'none',
                   '&:hover': {
-                    color: '#0f172a',
+                    color: 'text.primary',
                   },
                 }}
               >
@@ -277,10 +285,10 @@ const MainLayout = () => {
                     py: 1,
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: location.pathname.startsWith('/work-status') ? '#2563eb' : '#64748b',
+                    color: location.pathname.startsWith('/work-status') ? 'primary.main' : 'text.secondary',
                     textTransform: 'none',
                     '&:hover': {
-                      color: '#0f172a',
+                      color: 'text.primary',
                     },
                   }}
                 >
@@ -295,7 +303,7 @@ const MainLayout = () => {
                       mt: 1,
                       minWidth: 192,
                       borderRadius: 2,
-                      border: '1px solid #e2e8f0',
+                      border: 1, borderColor: 'divider',
                       boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
                     },
                   }}
@@ -306,7 +314,7 @@ const MainLayout = () => {
                       navigate('/work-status/inspections');
                     }}
                     selected={location.pathname === '/work-status/inspections'}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                   >
                     점검 현황
                   </MenuItem>
@@ -316,7 +324,7 @@ const MainLayout = () => {
                       navigate('/work-status/assignments');
                     }}
                     selected={location.pathname === '/work-status/assignments'}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                   >
                     고객사 담당 현황
                   </MenuItem>
@@ -332,13 +340,13 @@ const MainLayout = () => {
                 py: 1,
                 fontSize: '0.875rem',
                 fontWeight: isActive('/notices') ? 600 : 500,
-                color: isActive('/notices') ? '#2563eb' : '#64748b',
-                bgcolor: isActive('/notices') ? '#eff6ff' : 'transparent',
+                color: isActive('/notices') ? 'primary.main' : 'text.secondary',
+                bgcolor: isActive('/notices') ? NAV_ACTIVE_BG : 'transparent',
                 borderRadius: 1.5,
                 textTransform: 'none',
                 '&:hover': {
-                  bgcolor: isActive('/notices') ? '#eff6ff' : '#f8fafc',
-                  color: '#0f172a',
+                  bgcolor: isActive('/notices') ? NAV_ACTIVE_BG : 'action.hover',
+                  color: 'text.primary',
                 },
               }}
             >
@@ -354,12 +362,12 @@ const MainLayout = () => {
                   py: 1,
                   fontSize: '0.875rem',
                   fontWeight: isActive('/documents') ? 600 : 500,
-                  color: isActive('/documents') ? '#2563eb' : '#64748b',
-                  bgcolor: isActive('/documents') ? '#eff6ff' : 'transparent',
+                  color: isActive('/documents') ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive('/documents') ? NAV_ACTIVE_BG : 'transparent',
                   borderRadius: 1.5,
                   textTransform: 'none',
                   '&:hover': {
-                    color: '#0f172a',
+                    color: 'text.primary',
                   },
                 }}
               >
@@ -378,10 +386,10 @@ const MainLayout = () => {
                     py: 1,
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                     textTransform: 'none',
                     '&:hover': {
-                      color: '#0f172a',
+                      color: 'text.primary',
                     },
                   }}
                 >
@@ -396,7 +404,7 @@ const MainLayout = () => {
                       mt: 1,
                       minWidth: 192,
                       borderRadius: 2,
-                      border: '1px solid #e2e8f0',
+                      border: 1, borderColor: 'divider',
                       boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
                     },
                   }}
@@ -406,7 +414,7 @@ const MainLayout = () => {
                       setLogAnchor(null);
                       navigate('/logs/login');
                     }}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                   >
                     로그인 이력
                   </MenuItem>
@@ -415,7 +423,7 @@ const MainLayout = () => {
                       setLogAnchor(null);
                       navigate('/logs/upload');
                     }}
-                    sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                    sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                   >
                     업로드 이력
                   </MenuItem>
@@ -425,7 +433,7 @@ const MainLayout = () => {
                         setLogAnchor(null);
                         navigate('/logs/system');
                       }}
-                      sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+                      sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
                     >
                       시스템 이력
                     </MenuItem>
@@ -443,12 +451,12 @@ const MainLayout = () => {
                   py: 1,
                   fontSize: '0.875rem',
                   fontWeight: isActive('/settings') ? 600 : 500,
-                  color: isActive('/settings') ? '#2563eb' : '#64748b',
-                  bgcolor: isActive('/settings') ? '#eff6ff' : 'transparent',
+                  color: isActive('/settings') ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive('/settings') ? NAV_ACTIVE_BG : 'transparent',
                   borderRadius: 1.5,
                   textTransform: 'none',
                   '&:hover': {
-                    color: '#0f172a',
+                    color: 'text.primary',
                   },
                 }}
               >
@@ -465,12 +473,12 @@ const MainLayout = () => {
                   py: 1,
                   fontSize: '0.875rem',
                   fontWeight: isActive('/backup') ? 600 : 500,
-                  color: isActive('/backup') ? '#2563eb' : '#64748b',
-                  bgcolor: isActive('/backup') ? '#eff6ff' : 'transparent',
+                  color: isActive('/backup') ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive('/backup') ? NAV_ACTIVE_BG : 'transparent',
                   borderRadius: 1.5,
                   textTransform: 'none',
                   '&:hover': {
-                    color: '#0f172a',
+                    color: 'text.primary',
                   },
                 }}
               >
@@ -480,18 +488,25 @@ const MainLayout = () => {
           </Box>
         </Box>
 
-        {/* Right: Notification Bell + User Profile Dropdown */}
+        {/* Right: Color Mode Toggle + Notification Bell + User Profile Dropdown */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* 다크모드 / 라이트모드 전환 */}
+          <Tooltip title={mode === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}>
+            <IconButton onClick={toggleColorMode} size="small" sx={{ color: 'text.secondary' }}>
+              {mode === 'dark' ? <LightMode fontSize="small" /> : <DarkMode fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+
           {/* Notification Bell */}
           <NotificationBell />
 
           {/* User Profile Dropdown */}
           <Button
             onClick={(e) => setUserAnchor(e.currentTarget)}
-            endIcon={<KeyboardArrowDown sx={{ fontSize: '0.75rem', color: '#64748b' }} />}
+            endIcon={<KeyboardArrowDown sx={{ fontSize: '0.75rem', color: 'text.secondary' }} />}
             sx={{
               textTransform: 'none',
-              color: '#334155',
+              color: 'text.primary',
               fontSize: '0.875rem',
               fontWeight: 500,
               '&:hover': {
@@ -512,27 +527,27 @@ const MainLayout = () => {
                 mt: 1.5,
                 minWidth: 192,
                 borderRadius: 2,
-                border: '1px solid #e2e8f0',
+                border: 1, borderColor: 'divider',
                 boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
               },
             }}
           >
             <MenuItem
               onClick={handlePasswordDialogOpen}
-              sx={{ fontSize: '0.875rem', color: '#334155', py: 1.25, px: 2 }}
+              sx={{ fontSize: '0.875rem', color: 'text.primary', py: 1.25, px: 2 }}
             >
               패스워드 변경
             </MenuItem>
-            <Box sx={{ height: '1px', bgcolor: '#f1f5f9', my: 0.5 }} />
+            <Box sx={{ height: '1px', bgcolor: 'divider', my: 0.5 }} />
             <MenuItem
               onClick={handleLogout}
               sx={{
                 fontSize: '0.875rem',
-                color: '#dc2626',
+                color: 'error.main',
                 py: 1.25,
                 px: 2,
                 '&:hover': {
-                  bgcolor: '#fef2f2',
+                  bgcolor: LOGOUT_HOVER_BG,
                 },
               }}
             >
@@ -579,8 +594,9 @@ const MainLayout = () => {
         component="footer"
         sx={{
           width: '100%',
-          borderTop: '1px solid #e2e8f0',
-          bgcolor: 'white',
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
           py: 2,
           px: 5,
         }}
@@ -609,7 +625,7 @@ const MainLayout = () => {
               target="_blank"
               rel="noopener noreferrer"
               size="small"
-              sx={{ color: '#64748b', '&:hover': { color: '#0f172a' } }}
+              sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
             >
               <GitHubIcon fontSize="small" />
             </IconButton>

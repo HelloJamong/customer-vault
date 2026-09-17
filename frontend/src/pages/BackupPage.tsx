@@ -152,7 +152,7 @@ const BackupPage = () => {
         <TableContainer>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell width={60}>번호</TableCell>
                 <TableCell width={80}>유형</TableCell>
                 <TableCell width={120}>대상</TableCell>

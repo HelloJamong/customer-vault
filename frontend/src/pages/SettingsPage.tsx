@@ -544,7 +544,7 @@ const SettingsPage = () => {
 
               {/* SFTP 설정 */}
               {formData.backupDestRemote && (
-                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2 }}>
+                <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1, mb: 2 }}>
                   <Typography variant="subtitle2" gutterBottom>SFTP 서버 설정</Typography>
                   <Grid container spacing={2}>
                     <Grid xs={12} sm={6}>

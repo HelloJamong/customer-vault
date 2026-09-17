@@ -1,57 +1,63 @@
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, createTheme, CssBaseline, Box, CircularProgress } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box, CircularProgress, type PaletteMode } from '@mui/material';
 import { router } from './routes';
 import { queryClient } from '@/lib/queryClient';
 import { useAutoLogoutOnClose } from '@/hooks/useAutoLogoutOnClose';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
+import { useColorMode } from '@/hooks/useColorMode';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#2563eb', // blue-600
+const createAppTheme = (mode: PaletteMode) =>
+  createTheme({
+    palette: {
+      mode,
+      primary: {
+        main: '#2563eb', // blue-600
+      },
+      secondary: {
+        main: '#6366f1', // indigo-500
+      },
+      error: {
+        main: '#dc2626', // red-600
+      },
+      warning: {
+        main: '#f59e0b', // amber-500
+      },
+      success: {
+        main: '#14b8a6', // teal-500
+      },
     },
-    secondary: {
-      main: '#6366f1', // indigo-500
+    typography: {
+      fontFamily: [
+        '-apple-system',
+        'BlinkMacSystemFont',
+        '"Segoe UI"',
+        'Roboto',
+        '"Helvetica Neue"',
+        'Arial',
+        '"Noto Sans KR"',
+        '"Malgun Gothic"',
+        'sans-serif',
+      ].join(','),
     },
-    error: {
-      main: '#dc2626', // red-600
-    },
-    warning: {
-      main: '#f59e0b', // amber-500
-    },
-    success: {
-      main: '#14b8a6', // teal-500
-    },
-  },
-  typography: {
-    fontFamily: [
-      '-apple-system',
-      'BlinkMacSystemFont',
-      '"Segoe UI"',
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
-      '"Noto Sans KR"',
-      '"Malgun Gothic"',
-      'sans-serif',
-    ].join(','),
-  },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        body: {
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif',
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif',
+          },
         },
       },
     },
-  },
-});
+  });
 
 function App() {
   useAutoLogoutOnClose();
   useSessionEvents(); // SSE 기반 실시간 세션 이벤트
+
+  const { mode } = useColorMode();
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
 
   return (
     <ThemeProvider theme={theme}>

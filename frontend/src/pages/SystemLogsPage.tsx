@@ -359,7 +359,7 @@ const SystemLogsPage = () => {
                     <TableRow>
                       <TableCell colSpan={6} sx={{ py: 0, borderBottom: expandedRow === log.rowKey ? undefined : 'none' }}>
                         <Collapse in={expandedRow === log.rowKey} timeout="auto" unmountOnExit>
-                          <Box sx={{ py: 2, px: 3, bgcolor: 'grey.50' }}>
+                          <Box sx={{ py: 2, px: 3, bgcolor: 'action.hover' }}>
                             <Typography variant="subtitle2" gutterBottom>
                               변경 내역
                             </Typography>

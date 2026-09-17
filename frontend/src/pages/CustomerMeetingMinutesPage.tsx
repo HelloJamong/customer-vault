@@ -253,7 +253,7 @@ const CustomerMeetingMinutesPage = () => {
         <TableContainer component={Paper} variant="outlined">
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f8fafc' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell sx={{ fontWeight: 600, width: 110 }}>날짜</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>회의록 주제</TableCell>
                 <TableCell sx={{ fontWeight: 600, width: 100 }}>작성자</TableCell>
@@ -353,21 +353,21 @@ const CustomerMeetingMinutesPage = () => {
               {selected.content && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">회의 내용</Typography>
-                  <Box sx={{ mt: 0.5, p: 1.5, border: '1px solid #e2e8f0', borderRadius: 1 }}
+                  <Box sx={{ mt: 0.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
                     dangerouslySetInnerHTML={{ __html: selected.content }} className="ql-editor" />
                 </Box>
               )}
               {selected.decisions && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">회의 결정 사항</Typography>
-                  <Box sx={{ mt: 0.5, p: 1.5, border: '1px solid #e2e8f0', borderRadius: 1 }}
+                  <Box sx={{ mt: 0.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
                     dangerouslySetInnerHTML={{ __html: selected.decisions }} className="ql-editor" />
                 </Box>
               )}
               {selected.remarks && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">비고</Typography>
-                  <Box sx={{ mt: 0.5, p: 1.5, border: '1px solid #e2e8f0', borderRadius: 1 }}
+                  <Box sx={{ mt: 0.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
                     dangerouslySetInnerHTML={{ __html: selected.remarks }} className="ql-editor" />
                 </Box>
               )}

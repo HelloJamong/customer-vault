@@ -1,4 +1,5 @@
-import { Box, Typography, CircularProgress, Button, Chip, Stack } from '@mui/material';
+import { Box, Typography, CircularProgress, Button, Chip, Stack, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import {
   Business,
@@ -45,6 +46,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
   const { stats, isLoading, error } = useDashboard();
   const [dialogOpen, setDialogOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
+  const theme = useTheme();
 
   const handleOpenDialog = () => {
     setDialogOpen(true);
@@ -84,7 +86,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
       title: '전체 사용자 수',
       value: stats.totalUsers.toLocaleString(),
       icon: <People />,
-      bgColor: '#dbeafe',
+      bgColor: alpha('#2563eb', 0.15),
       iconColor: '#2563eb',
     },
     {
@@ -92,7 +94,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
       title: '관리자 수',
       value: stats.adminUsers.toLocaleString(),
       icon: <Shield />,
-      bgColor: '#ccfbf1',
+      bgColor: alpha('#14b8a6', 0.15),
       iconColor: '#14b8a6',
     },
     {
@@ -100,7 +102,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
       title: '일반 사용자 수',
       value: stats.regularUsers.toLocaleString(),
       icon: <PeopleOutline />,
-      bgColor: '#e0f2fe',
+      bgColor: alpha('#0ea5e9', 0.15),
       iconColor: '#0ea5e9',
     },
     {
@@ -108,7 +110,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
       title: '고객사 수',
       value: stats.totalCustomers.toLocaleString(),
       icon: <Business />,
-      bgColor: '#e0e7ff',
+      bgColor: alpha('#6366f1', 0.15),
       iconColor: '#6366f1',
     },
   ];
@@ -136,10 +138,10 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           <Box
             key={stat.title}
             sx={{
-              bgcolor: 'white',
+              bgcolor: 'background.paper',
               p: 3,
               borderRadius: 3,
-              border: '1px solid #e2e8f0',
+              border: 1, borderColor: 'divider',
               boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
             }}
           >
@@ -154,7 +156,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 sx={{
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#64748b',
+                  color: 'text.secondary',
                 }}
               >
                 {stat.title}
@@ -180,7 +182,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
               sx={{
                 fontSize: '2.25rem',
                 fontWeight: 700,
-                color: '#1e293b',
+                color: 'text.primary',
                 mt: 1.5,
               }}
             >
@@ -202,10 +204,10 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
         {/* Inspection Details - 2 columns */}
         <Box
           sx={{
-            bgcolor: 'white',
+            bgcolor: 'background.paper',
             p: 3,
             borderRadius: 3,
-            border: '1px solid #e2e8f0',
+            border: 1, borderColor: 'divider',
             boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
           }}
         >
@@ -213,7 +215,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
             sx={{
               fontSize: '1.125rem',
               fontWeight: 600,
-              color: '#1e293b',
+              color: 'text.primary',
             }}
           >
             이번달 점검 고객사
@@ -221,7 +223,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           <Typography
             sx={{
               fontSize: '0.875rem',
-              color: '#64748b',
+              color: 'text.secondary',
               mt: 0.5,
             }}
           >
@@ -237,7 +239,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           >
             <Box
               sx={{
-                bgcolor: '#f8fafc',
+                bgcolor: 'action.hover',
                 p: 2.5,
                 borderRadius: 2,
               }}
@@ -246,7 +248,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 sx={{
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#64748b',
+                  color: 'text.secondary',
                 }}
               >
                 완료
@@ -255,7 +257,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 sx={{
                   fontSize: '1.875rem',
                   fontWeight: 700,
-                  color: '#2563eb',
+                  color: 'primary.main',
                   mt: 1,
                 }}
               >
@@ -265,7 +267,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '1.125rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   / {stats.inspection.totalCustomers}
@@ -274,7 +276,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
             </Box>
             <Box
               sx={{
-                bgcolor: '#f8fafc',
+                bgcolor: 'action.hover',
                 p: 2.5,
                 borderRadius: 2,
               }}
@@ -290,7 +292,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   미진행
@@ -303,11 +305,11 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                     sx={{
                       fontSize: '0.75rem',
                       textTransform: 'none',
-                      borderColor: '#f59e0b',
-                      color: '#f59e0b',
+                      borderColor: 'warning.main',
+                      color: 'warning.main',
                       '&:hover': {
                         borderColor: '#d97706',
-                        bgcolor: '#fef3c7',
+                        bgcolor: alpha('#f59e0b', 0.15),
                       },
                     }}
                   >
@@ -319,7 +321,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 sx={{
                   fontSize: '1.875rem',
                   fontWeight: 700,
-                  color: '#f59e0b',
+                  color: 'warning.main',
                   mt: 1,
                 }}
               >
@@ -329,7 +331,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '1.125rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   / {stats.inspection.totalCustomers}
@@ -342,10 +344,10 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
         {/* Completion Rate - 1 column */}
         <Box
           sx={{
-            bgcolor: 'white',
+            bgcolor: 'background.paper',
             p: 3,
             borderRadius: 3,
-            border: '1px solid #e2e8f0',
+            border: 1, borderColor: 'divider',
             boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
             display: 'flex',
             flexDirection: 'column',
@@ -357,7 +359,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
             sx={{
               fontSize: '1.125rem',
               fontWeight: 600,
-              color: '#1e293b',
+              color: 'text.primary',
               textAlign: 'center',
             }}
           >
@@ -375,13 +377,13 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
               <path
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none"
-                stroke="#e2e8f0"
+                stroke={theme.palette.divider}
                 strokeWidth="3"
               />
               <path
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none"
-                stroke="#2563eb"
+                stroke={theme.palette.primary.main}
                 strokeWidth="3"
                 strokeDasharray={`${stats.inspection.completionRate}, 100`}
                 strokeLinecap="round"
@@ -404,7 +406,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 sx={{
                   fontSize: '2.25rem',
                   fontWeight: 700,
-                  color: '#1e293b',
+                  color: 'text.primary',
                 }}
               >
                 {stats.inspection.completionRate}%
@@ -426,20 +428,20 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           {/* Storage Status */}
           <Box
             sx={{
-              bgcolor: 'white',
+              bgcolor: 'background.paper',
               p: 4,
               borderRadius: 3,
-              border: '1px solid #e2e8f0',
+              border: 1, borderColor: 'divider',
               boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-              <Storage sx={{ color: '#64748b', fontSize: '1.25rem' }} />
+              <Storage sx={{ color: 'text.secondary', fontSize: '1.25rem' }} />
               <Typography
                 sx={{
                   fontSize: '1.125rem',
                   fontWeight: 600,
-                  color: '#1e293b',
+                  color: 'text.primary',
                 }}
               >
                 운영서버 스토리지 용량
@@ -450,7 +452,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 sx={{
                   width: '100%',
                   height: 16,
-                  bgcolor: '#e2e8f0',
+                  bgcolor: 'divider',
                   borderRadius: 2,
                   overflow: 'hidden',
                 }}
@@ -459,7 +461,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     width: `${stats.systemResources.storage.usagePercent}%`,
                     height: '100%',
-                    bgcolor: stats.systemResources.storage.usagePercent > 80 ? '#ef4444' : '#2563eb',
+                    bgcolor: stats.systemResources.storage.usagePercent > 80 ? '#ef4444' : 'primary.main',
                     borderRadius: 2,
                     transition: 'width 0.3s ease',
                   }}
@@ -477,7 +479,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   사용량 / 전체용량:{' '}
@@ -485,7 +487,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                     component="span"
                     sx={{
                       fontWeight: 700,
-                      color: '#1e293b',
+                      color: 'text.primary',
                     }}
                   >
                     {stats.systemResources.storage.used}{stats.systemResources.storage.unit} / {stats.systemResources.storage.total}{stats.systemResources.storage.unit}
@@ -495,7 +497,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   여유용량:{' '}
@@ -516,10 +518,10 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           {/* Memory Usage */}
           <Box
             sx={{
-              bgcolor: 'white',
+              bgcolor: 'background.paper',
               p: 3,
               borderRadius: 3,
-              border: '1px solid #e2e8f0',
+              border: 1, borderColor: 'divider',
               boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
               display: 'flex',
               flexDirection: 'column',
@@ -528,12 +530,12 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Memory sx={{ color: '#64748b', fontSize: '1.25rem' }} />
+              <Memory sx={{ color: 'text.secondary', fontSize: '1.25rem' }} />
               <Typography
                 sx={{
                   fontSize: '1.125rem',
                   fontWeight: 600,
-                  color: '#1e293b',
+                  color: 'text.primary',
                   textAlign: 'center',
                 }}
               >
@@ -551,7 +553,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 <path
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
-                  stroke="#e2e8f0"
+                  stroke={theme.palette.divider}
                   strokeWidth="3"
                 />
                 <path
@@ -581,7 +583,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '2rem',
                     fontWeight: 700,
-                    color: '#1e293b',
+                    color: 'text.primary',
                   }}
                 >
                   {stats.systemResources.memory.usagePercent}%
@@ -589,7 +591,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 <Typography
                   sx={{
                     fontSize: '0.75rem',
-                    color: '#64748b',
+                    color: 'text.secondary',
                     mt: 0.5,
                   }}
                 >
@@ -602,10 +604,10 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
           {/* CPU Usage */}
           <Box
             sx={{
-              bgcolor: 'white',
+              bgcolor: 'background.paper',
               p: 3,
               borderRadius: 3,
-              border: '1px solid #e2e8f0',
+              border: 1, borderColor: 'divider',
               boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
               display: 'flex',
               flexDirection: 'column',
@@ -614,12 +616,12 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Computer sx={{ color: '#64748b', fontSize: '1.25rem' }} />
+              <Computer sx={{ color: 'text.secondary', fontSize: '1.25rem' }} />
               <Typography
                 sx={{
                   fontSize: '1.125rem',
                   fontWeight: 600,
-                  color: '#1e293b',
+                  color: 'text.primary',
                   textAlign: 'center',
                 }}
               >
@@ -637,7 +639,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 <path
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
-                  stroke="#e2e8f0"
+                  stroke={theme.palette.divider}
                   strokeWidth="3"
                 />
                 <path
@@ -667,7 +669,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                   sx={{
                     fontSize: '2rem',
                     fontWeight: 700,
-                    color: '#1e293b',
+                    color: 'text.primary',
                   }}
                 >
                   {stats.systemResources.cpu.usagePercent}%
@@ -675,7 +677,7 @@ const DashboardContent = ({ hideUserCounts = false, hideSystemResources = false 
                 <Typography
                   sx={{
                     fontSize: '0.75rem',
-                    color: '#64748b',
+                    color: 'text.secondary',
                     mt: 0.5,
                   }}
                 >
@@ -700,6 +702,7 @@ const AdminDashboard = () => <DashboardContent hideUserCounts hideSystemResource
 // 일반 사용자용 대시보드
 const UserDashboard = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const {
     data: myCustomers,
@@ -746,21 +749,21 @@ const UserDashboard = () => {
       title: '점검 대상 고객사',
       value: totalMyCustomers.toLocaleString(),
       icon: <Business />,
-      bgColor: '#dbeafe',
+      bgColor: alpha('#2563eb', 0.15),
       iconColor: '#2563eb',
     },
     {
       title: '점검 완료',
       value: completedCount.toLocaleString(),
       icon: <Shield />,
-      bgColor: '#dcfce7',
+      bgColor: alpha('#16a34a', 0.15),
       iconColor: '#16a34a',
     },
     {
       title: '미진행 점검',
       value: incompleteCount.toLocaleString(),
       icon: <PeopleOutline />,
-      bgColor: '#fee2e2',
+      bgColor: alpha('#ef4444', 0.15),
       iconColor: '#ef4444',
     },
   ];
@@ -812,10 +815,10 @@ const UserDashboard = () => {
           <Box
             key={stat.title}
             sx={{
-              bgcolor: 'white',
+              bgcolor: 'background.paper',
               p: 3,
               borderRadius: 3,
-              border: '1px solid #e2e8f0',
+              border: 1, borderColor: 'divider',
               boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
             }}
           >
@@ -830,7 +833,7 @@ const UserDashboard = () => {
                 sx={{
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#64748b',
+                  color: 'text.secondary',
                 }}
               >
                 {stat.title}
@@ -856,7 +859,7 @@ const UserDashboard = () => {
               sx={{
                 fontSize: '2.25rem',
                 fontWeight: 700,
-                color: '#1e293b',
+                color: 'text.primary',
                 mt: 1.5,
               }}
             >
@@ -878,10 +881,10 @@ const UserDashboard = () => {
         {/* Inspection Details - 2 columns */}
         <Box
           sx={{
-            bgcolor: 'white',
+            bgcolor: 'background.paper',
             p: 3,
             borderRadius: 3,
-            border: '1px solid #e2e8f0',
+            border: 1, borderColor: 'divider',
             boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
           }}
         >
@@ -889,7 +892,7 @@ const UserDashboard = () => {
             sx={{
               fontSize: '1.125rem',
               fontWeight: 600,
-              color: '#1e293b',
+              color: 'text.primary',
             }}
           >
             내 담당 고객사 점검 현황
@@ -897,7 +900,7 @@ const UserDashboard = () => {
           <Typography
             sx={{
               fontSize: '0.875rem',
-              color: '#64748b',
+              color: 'text.secondary',
               mt: 0.5,
             }}
           >
@@ -913,7 +916,7 @@ const UserDashboard = () => {
           >
             <Box
               sx={{
-                bgcolor: '#f8fafc',
+                bgcolor: 'action.hover',
                 p: 2.5,
                 borderRadius: 2,
               }}
@@ -922,7 +925,7 @@ const UserDashboard = () => {
                 sx={{
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#64748b',
+                  color: 'text.secondary',
                 }}
               >
                 점검 완료
@@ -931,7 +934,7 @@ const UserDashboard = () => {
                 sx={{
                   fontSize: '1.875rem',
                   fontWeight: 700,
-                  color: '#2563eb',
+                  color: 'primary.main',
                   mt: 1,
                 }}
               >
@@ -941,7 +944,7 @@ const UserDashboard = () => {
                   sx={{
                     fontSize: '1.125rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   / {totalMyCustomers}
@@ -950,7 +953,7 @@ const UserDashboard = () => {
             </Box>
             <Box
               sx={{
-                bgcolor: '#f8fafc',
+                bgcolor: 'action.hover',
                 p: 2.5,
                 borderRadius: 2,
               }}
@@ -959,7 +962,7 @@ const UserDashboard = () => {
                 sx={{
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#64748b',
+                  color: 'text.secondary',
                 }}
               >
                 미진행
@@ -968,7 +971,7 @@ const UserDashboard = () => {
                 sx={{
                   fontSize: '1.875rem',
                   fontWeight: 700,
-                  color: '#f59e0b',
+                  color: 'warning.main',
                   mt: 1,
                 }}
               >
@@ -978,7 +981,7 @@ const UserDashboard = () => {
                   sx={{
                     fontSize: '1.125rem',
                     fontWeight: 500,
-                    color: '#64748b',
+                    color: 'text.secondary',
                   }}
                 >
                   / {totalMyCustomers}
@@ -991,10 +994,10 @@ const UserDashboard = () => {
         {/* Completion Rate - 1 column */}
         <Box
           sx={{
-            bgcolor: 'white',
+            bgcolor: 'background.paper',
             p: 3,
             borderRadius: 3,
-            border: '1px solid #e2e8f0',
+            border: 1, borderColor: 'divider',
             boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
             display: 'flex',
             flexDirection: 'column',
@@ -1006,7 +1009,7 @@ const UserDashboard = () => {
             sx={{
               fontSize: '1.125rem',
               fontWeight: 600,
-              color: '#1e293b',
+              color: 'text.primary',
               textAlign: 'center',
             }}
           >
@@ -1024,13 +1027,13 @@ const UserDashboard = () => {
               <path
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none"
-                stroke="#e2e8f0"
+                stroke={theme.palette.divider}
                 strokeWidth="3"
               />
               <path
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none"
-                stroke="#2563eb"
+                stroke={theme.palette.primary.main}
                 strokeWidth="3"
                 strokeDasharray={`${completionRate}, 100`}
                 strokeLinecap="round"
@@ -1053,7 +1056,7 @@ const UserDashboard = () => {
                 sx={{
                   fontSize: '2.25rem',
                   fontWeight: 700,
-                  color: '#1e293b',
+                  color: 'text.primary',
                 }}
               >
                 {completionRate}%
@@ -1067,10 +1070,10 @@ const UserDashboard = () => {
       <Box
         sx={{
           mt: 3,
-          bgcolor: 'white',
+          bgcolor: 'background.paper',
           p: 3,
           borderRadius: 3,
-          border: '1px solid #e2e8f0',
+          border: 1, borderColor: 'divider',
           boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
         }}
       >
@@ -1078,7 +1081,7 @@ const UserDashboard = () => {
           sx={{
             fontSize: '1.125rem',
             fontWeight: 600,
-            color: '#1e293b',
+            color: 'text.primary',
           }}
         >
           담당 고객사 목록
@@ -1086,7 +1089,7 @@ const UserDashboard = () => {
         <Typography
           sx={{
             fontSize: '0.875rem',
-            color: '#64748b',
+            color: 'text.secondary',
             mt: 0.5,
           }}
         >
@@ -1097,14 +1100,15 @@ const UserDashboard = () => {
           {myCustomers.length === 0 ? (
             <Box
               sx={{
-                border: '1px dashed #cbd5e1',
+                border: '1px dashed',
+                borderColor: 'divider',
                 borderRadius: 2,
                 p: 3,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#64748b',
-                bgcolor: '#f8fafc',
+                color: 'text.secondary',
+                bgcolor: 'action.hover',
               }}
             >
               현재 담당 고객사가 없습니다.
@@ -1114,13 +1118,13 @@ const UserDashboard = () => {
               <Box
                 key={customer.id}
                 sx={{
-                  border: '1px solid #e2e8f0',
+                  border: 1, borderColor: 'divider',
                   borderRadius: 2,
                   p: 2,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 1,
-                  bgcolor: '#f8fafc',
+                  bgcolor: 'action.hover',
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1129,7 +1133,7 @@ const UserDashboard = () => {
                       sx={{
                         fontSize: '1rem',
                         fontWeight: 600,
-                        color: '#0f172a',
+                        color: 'text.primary',
                       }}
                     >
                       {customer.name}
@@ -1137,7 +1141,7 @@ const UserDashboard = () => {
                     <Typography
                       sx={{
                         fontSize: '0.875rem',
-                        color: '#64748b',
+                        color: 'text.secondary',
                       }}
                     >
                       {customer.location || '지역 정보 없음'}

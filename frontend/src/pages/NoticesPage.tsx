@@ -307,7 +307,7 @@ const NoticesPage = () => {
             </Typography>
           </Box>
           <Box
-            sx={{ mt: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1, minHeight: 200 }}
+            sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, minHeight: 200 }}
             dangerouslySetInnerHTML={{ __html: selectedNotice?.content || '' }}
           />
         </DialogContent>

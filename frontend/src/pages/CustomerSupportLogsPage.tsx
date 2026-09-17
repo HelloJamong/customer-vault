@@ -585,7 +585,7 @@ const CustomerSupportLogsPage = () => {
                   textAlign: 'center',
                 },
                 '& th': {
-                  bgcolor: 'grey.100',
+                  bgcolor: 'action.hover',
                   fontWeight: 'bold',
                 }
               }}
@@ -821,7 +821,7 @@ const CustomerSupportLogsPage = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   문의 내용
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" whiteSpace="pre-wrap">
                     {selectedLog.inquiryContent || '-'}
                   </Typography>
@@ -831,7 +831,7 @@ const CustomerSupportLogsPage = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   진척 사항
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" whiteSpace="pre-wrap">
                     {selectedLog.actionContent || '-'}
                   </Typography>
@@ -841,7 +841,7 @@ const CustomerSupportLogsPage = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   조치 결과
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" whiteSpace="pre-wrap">
                     {selectedLog.actionResult || '-'}
                   </Typography>
@@ -872,7 +872,7 @@ const CustomerSupportLogsPage = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   비고
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" whiteSpace="pre-wrap">
                     {selectedLog.remarks || '-'}
                   </Typography>

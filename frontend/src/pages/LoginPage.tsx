@@ -73,7 +73,7 @@ const LoginPage = () => {
       sx={{
         minHeight: '100vh',
         width: '100vw',
-        bgcolor: '#f8fafc', // slate-50
+        bgcolor: 'background.default',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -113,7 +113,7 @@ const LoginPage = () => {
           elevation={0}
           sx={{
             width: '100%',
-            bgcolor: 'white',
+            bgcolor: 'background.paper',
             borderRadius: 4, // rounded-2xl
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', // shadow-xl
             p: 5,
@@ -124,7 +124,7 @@ const LoginPage = () => {
             <Typography
               variant="body2"
               sx={{
-                color: '#64748b', // slate-500
+                color: 'text.secondary',
               }}
             >
               로그인하여 시작하세요.
@@ -145,7 +145,7 @@ const LoginPage = () => {
                   display: 'block',
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#334155', // slate-700
+                  color: 'text.primary',
                   mb: 0.5,
                 }}
               >
@@ -160,25 +160,25 @@ const LoginPage = () => {
                 autoFocus
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    bgcolor: '#f8fafc', // slate-50
+                    bgcolor: 'action.hover',
                     borderRadius: 2,
                     '& fieldset': {
-                      borderColor: '#e2e8f0', // slate-200
+                      borderColor: 'divider',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#cbd5e1', // slate-300
+                      borderColor: 'text.secondary',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#6366f1', // indigo-500
+                      borderColor: 'secondary.main',
                       borderWidth: 2,
                     },
                   },
                   '& .MuiOutlinedInput-input': {
                     py: 1.5,
-                    color: '#0f172a', // slate-900
+                    color: 'text.primary',
                   },
                   '& .MuiOutlinedInput-input::placeholder': {
-                    color: '#94a3b8', // slate-400
+                    color: 'text.disabled',
                     opacity: 1,
                   },
                 }}
@@ -192,7 +192,7 @@ const LoginPage = () => {
                   display: 'block',
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: '#334155', // slate-700
+                  color: 'text.primary',
                   mb: 0.5,
                 }}
               >
@@ -207,25 +207,25 @@ const LoginPage = () => {
                 helperText={errors.password?.message}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    bgcolor: '#f8fafc', // slate-50
+                    bgcolor: 'action.hover',
                     borderRadius: 2,
                     '& fieldset': {
-                      borderColor: '#e2e8f0', // slate-200
+                      borderColor: 'divider',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#cbd5e1', // slate-300
+                      borderColor: 'text.secondary',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#6366f1', // indigo-500
+                      borderColor: 'secondary.main',
                       borderWidth: 2,
                     },
                   },
                   '& .MuiOutlinedInput-input': {
                     py: 1.5,
-                    color: '#0f172a', // slate-900
+                    color: 'text.primary',
                   },
                   '& .MuiOutlinedInput-input::placeholder': {
-                    color: '#94a3b8', // slate-400
+                    color: 'text.disabled',
                     opacity: 1,
                   },
                 }}
@@ -238,7 +238,7 @@ const LoginPage = () => {
               variant="contained"
               disabled={isLoginLoading}
               sx={{
-                bgcolor: '#6366f1', // indigo-600
+                bgcolor: 'secondary.main',
                 color: 'white',
                 fontWeight: 600,
                 py: 1.5,
@@ -247,14 +247,15 @@ const LoginPage = () => {
                 fontSize: '1rem',
                 boxShadow: 'none',
                 '&:hover': {
-                  bgcolor: '#4f46e5', // indigo-700
+                  bgcolor: 'secondary.dark',
                   boxShadow: 'none',
                 },
                 '&:active': {
                   transform: 'scale(0.98)',
                 },
                 '&:focus': {
-                  outline: '2px solid #6366f1',
+                  outline: '2px solid',
+                  outlineColor: 'secondary.main',
                   outlineOffset: '2px',
                 },
                 transition: 'all 0.2s',
@@ -270,7 +271,7 @@ const LoginPage = () => {
           <Typography
             variant="body2"
             sx={{
-              color: '#64748b', // slate-500
+              color: 'text.secondary',
               fontSize: '0.875rem',
             }}
           >

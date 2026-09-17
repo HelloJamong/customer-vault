@@ -51,9 +51,9 @@ const NotificationBell = () => {
       <IconButton
         onClick={handleOpen}
         sx={{
-          color: '#64748b',
+          color: 'text.secondary',
           '&:hover': {
-            bgcolor: '#f8fafc',
+            bgcolor: 'action.hover',
           },
         }}
       >
@@ -84,7 +84,7 @@ const NotificationBell = () => {
             minWidth: 320,
             maxWidth: 400,
             borderRadius: 2,
-            border: '1px solid #e2e8f0',
+            border: 1, borderColor: 'divider',
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
           },
         }}
@@ -94,7 +94,7 @@ const NotificationBell = () => {
             sx={{
               fontSize: '0.875rem',
               fontWeight: 600,
-              color: '#0f172a',
+              color: 'text.primary',
             }}
           >
             진행 중인 지원 현황
@@ -108,7 +108,7 @@ const NotificationBell = () => {
             <Typography
               sx={{
                 fontSize: '0.875rem',
-                color: '#94a3b8',
+                color: 'text.disabled',
               }}
             >
               현재 진행 중인 지원이 없습니다
@@ -124,10 +124,10 @@ const NotificationBell = () => {
                   px: 2,
                   py: 1.5,
                   fontSize: '0.875rem',
-                  color: '#334155',
+                  color: 'text.primary',
                   whiteSpace: 'normal',
                   '&:hover': {
-                    bgcolor: '#f8fafc',
+                    bgcolor: 'action.hover',
                   },
                 }}
               >
@@ -136,7 +136,7 @@ const NotificationBell = () => {
                     sx={{
                       fontSize: '0.875rem',
                       fontWeight: 500,
-                      color: '#0f172a',
+                      color: 'text.primary',
                       mb: 0.5,
                     }}
                   >
@@ -145,7 +145,7 @@ const NotificationBell = () => {
                   <Typography
                     sx={{
                       fontSize: '0.75rem',
-                      color: '#64748b',
+                      color: 'text.secondary',
                     }}
                   >
                     진행 중 {notification.inProgressCount} / 진행 불가 {notification.impossibleCount} / 보류 {notification.onHoldCount}
