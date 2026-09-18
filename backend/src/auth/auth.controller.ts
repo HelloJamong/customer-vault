@@ -87,6 +87,16 @@ export class AuthController {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);
   }
 
+  @Post('extend-session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '현재 세션 연장' })
+  @ApiResponse({ status: 200, description: '세션 연장 성공' })
+  async extendSession(@Request() req) {
+    return this.authService.extendSession(req.user.id, req.user.sessionId);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -101,6 +111,15 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '조회 성공' })
   async getPasswordRequirements() {
     return this.authService.getPasswordRequirements();
+  }
+
+  @Get('session-policy')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '현재 세션 정책 조회' })
+  @ApiResponse({ status: 200, description: '세션 정책 조회 성공' })
+  async getSessionPolicy() {
+    return this.authService.getSessionPolicy();
   }
 
   @Get('validate-session')

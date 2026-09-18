@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { SESSION_EXPIRY_MS, isPasswordExpired } from '../session-policy';
+import { getSessionTimeoutMs, getSessionTimeoutMinutes, isPasswordExpired } from '../session-policy';
 
 export interface JwtPayload {
   sub: number;
@@ -44,11 +44,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!payload.sessionId) {
       throw new UnauthorizedException('세션이 만료되었습니다.');
     }
+    const settings = await this.prisma.systemSettings.findFirst();
+    const now = new Date();
     const session = await this.prisma.userSession.findFirst({
       where: {
         userId: user.id,
         sessionId: payload.sessionId,
-        lastActivity: { gte: new Date(Date.now() - SESSION_EXPIRY_MS) },
+        lastActivity: { gte: new Date(now.getTime() - getSessionTimeoutMs(settings)) },
       },
     });
     if (!session) {
@@ -57,14 +59,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // 유효한 세션만 활동 시각을 갱신한다. 삭제되거나 만료된 세션은 부활시키지 않는다.
     await this.prisma.userSession.updateMany({
-      where: {
-        userId: user.id,
-        sessionId: payload.sessionId,
-        lastActivity: { lt: new Date(Date.now() - 5 * 60 * 1000) },
-      },
-      data: { lastActivity: new Date() },
+      where: { id: session.id },
+      data: { lastActivity: now },
     });
-    const settings = await this.prisma.systemSettings.findFirst();
+    const timeoutMinutes = getSessionTimeoutMinutes(settings);
 
     return {
       id: user.id,
@@ -74,6 +72,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       isFirstLogin: user.isFirstLogin,
       passwordExpired: isPasswordExpired(user.passwordChangedAt, settings),
       sessionId: payload.sessionId, // JWT에서 sessionId 전달
+      sessionTimeoutMinutes: timeoutMinutes,
+      sessionTimeoutWarningEnabled: settings?.sessionTimeoutWarningEnabled ?? true,
+      sessionExpiresAt: new Date(now.getTime() + timeoutMinutes * 60 * 1000).toISOString(),
     };
   }
 }

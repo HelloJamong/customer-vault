@@ -17,13 +17,17 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { getClientIp } from '../common/utils/ip.util';
+import { LogsService } from '../logs/logs.service';
 
 @ApiTags('백업 관리')
 @Controller('backup')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class BackupController {
-  constructor(private readonly backupService: BackupService) {}
+  constructor(
+    private readonly backupService: BackupService,
+    private readonly logsService: LogsService,
+  ) {}
 
   @Post('run')
   @Roles(Role.SUPER_ADMIN)
@@ -50,9 +54,17 @@ export class BackupController {
   @ApiOperation({ summary: '백업 파일 다운로드' })
   async downloadBackup(
     @Param('id', ParseIntPipe) id: number,
+    @Request() req,
     @Res() res: Response,
   ) {
     const { filePath, filename } = await this.backupService.getBackupFilePath(id);
+    await this.logsService.createServiceLog({
+      userId: req.user.id,
+      logType: '경고',
+      action: '암호화 백업 파일 다운로드',
+      description: `암호화된 백업 파일을 다운로드했습니다. (파일명: ${filename})`,
+      ipAddress: getClientIp(req),
+    });
     res.download(filePath, filename);
   }
 }

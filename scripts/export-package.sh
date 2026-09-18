@@ -107,7 +107,8 @@ docker save -o "$IMAGE_TAR" \
     customer_backend:${VERSION} \
     customer_frontend:${VERSION} \
     nginx:alpine \
-    mariadb:10.11
+    mariadb:10.11 \
+    clamav/clamav:1.4.6
 
 log_success "이미지 저장 완료: $(du -h "$IMAGE_TAR" | cut -f1)"
 
@@ -131,6 +132,7 @@ if [ -d "backend/prisma/migrations" ]; then
     log_info "Prisma 마이그레이션 파일 복사..."
     mkdir -p "${PACKAGE_DIR}/prisma"
     cp -r backend/prisma/migrations "${PACKAGE_DIR}/prisma/"
+    cp backend/prisma/migration_lock.toml "${PACKAGE_DIR}/prisma/"
     cp backend/prisma/schema.prisma "${PACKAGE_DIR}/prisma/"
     
     # 마이그레이션 개수 확인
@@ -171,7 +173,8 @@ MIGRATIONS_EOF
 ### 수동 적용
 ```bash
 # 1. DB 백업
-docker exec customer_db mysqldump -u root -p<PASSWORD> customer_db > backup_before_migration.sql
+# import-package.sh가 BACKUP_ENCRYPTION_KEY로 자동 생성하는 .sql.gz.enc 백업을 사용하세요.
+# 비밀번호를 -pPASSWORD 형태로 명령행에 넣지 마세요.
 
 # 2. 마이그레이션 상태 확인
 docker compose exec backend npx prisma migrate status
@@ -192,7 +195,8 @@ Prisma Migrate는 자동 롤백을 지원하지 않습니다. 롤백이 필요�
 docker compose stop backend
 
 # 2. DB 복원
-docker exec -i customer_db mysql -u root -p<PASSWORD> customer_db < backup_before_migration.sql
+# .sql.gz.enc 파일을 BACKUP_ENCRYPTION_KEY로 먼저 복호화한 뒤,
+# DB 클라이언트의 --defaults-extra-file을 사용해 복원하세요.
 
 # 3. 이전 버전 컨테이너로 복원
 docker compose up -d
@@ -242,13 +246,14 @@ vi .env  # 운영 환경에 맞게 수정
 **필수 수정 항목:**
 - `NODE_ENV=production`
 - `JWT_SECRET` (128자 랜덤 문자열)
+- `ENCRYPTION_KEY` 및 `BACKUP_ENCRYPTION_KEY` (서로 다른 64자리 hex 키)
 - `DB_PASSWORD` (강력한 비밀번호)
 - `CORS_ORIGIN` (실제 도메인 또는 IP)
 
 ### 4. 기존 서비스 중지 (기존 환경인 경우)
 ```bash
-# DB 백업 먼저!
-docker exec customer_db mysqldump -u root -p<PASSWORD> customer_db > backup_$(date +%Y%m%d_%H%M%S).sql
+# DB 백업은 import-package.sh가 백업 암호화 키로 자동 처리합니다.
+# 비밀번호를 -pPASSWORD 형태로 명령행에 넣지 마세요.
 
 # 서비스 중지 (DB는 중지하지 않음)
 docker stop customer_backend customer_frontend customer_proxy
@@ -272,7 +277,7 @@ docker compose logs -f backend frontend
 
 ### 8. 접속 테스트
 - URL: http://<SERVER_IP>:2082
-- 초기 계정: admin / 1111
+- 초기 계정: admin / `.env`의 `INITIAL_ADMIN_PASSWORD` 값 (최초 설치 시에만 사용)
 
 ## 롤백 방법
 
@@ -285,9 +290,8 @@ docker compose up -d
 ```
 
 ### DB 복원 (필요시)
-```bash
-docker exec -i customer_db mysql -u root -p<PASSWORD> customer_db < backup_YYYYMMDD_HHMMSS.sql
-```
+암호화된 `.sql.gz.enc` 백업을 `BACKUP_ENCRYPTION_KEY`로 먼저 복호화한 뒤,
+DB 클라이언트의 `--defaults-extra-file`을 사용해 복원하세요. 비밀번호를 명령행에 넣지 마세요.
 
 ## 트러블슈팅
 
@@ -319,6 +323,10 @@ log_success "배포 가이드 생성 완료"
 log_info "import 스크립트 복사..."
 cp "${SCRIPT_DIR}/import-package.sh" "${PACKAGE_DIR}/"
 chmod +x "${PACKAGE_DIR}/import-package.sh"
+
+log_info "오프라인 업그레이드 스크립트 복사..."
+cp "${SCRIPT_DIR}/offline-upgrade.sh" "${PACKAGE_DIR}/"
+chmod +x "${PACKAGE_DIR}/offline-upgrade.sh"
 
 # 6. 패키지 압축
 log_info "=========================================="

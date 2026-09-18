@@ -45,6 +45,8 @@ const SettingsPage = () => {
         passwordExpiryEnabled: settings.passwordExpiryEnabled,
         passwordExpiryDays: settings.passwordExpiryDays,
         preventDuplicateLogin: settings.preventDuplicateLogin,
+        sessionTimeoutMinutes: settings.sessionTimeoutMinutes ?? 30,
+        sessionTimeoutWarningEnabled: settings.sessionTimeoutWarningEnabled ?? true,
         loginFailureLimitEnabled: settings.loginFailureLimitEnabled,
         loginFailureLimit: settings.loginFailureLimit,
         accountLockMinutes: settings.accountLockMinutes,
@@ -287,10 +289,51 @@ const SettingsPage = () => {
           />
         </Paper>
 
-        {/* 5. 로그인 실패 횟수 */}
+        {/* 5. 세션 타임아웃 */}
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            5. 로그인 실패 횟수 제한
+            5. 세션 타임아웃
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            일정 시간 동안 활동이 없으면 세션을 자동 종료합니다. 안내 팝업 시간은 1분으로 고정됩니다.
+          </Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid xs={12} sm={6}>
+              <TextField
+                fullWidth
+                size="small"
+                label="세션 타임아웃 (분)"
+                type="number"
+                value={formData.sessionTimeoutMinutes ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    sessionTimeoutMinutes: value === '' ? undefined : Number(value),
+                  });
+                }}
+                inputProps={{ min: 10, max: 60, step: 1 }}
+                helperText="10분 이상 60분 이하로 입력하세요."
+              />
+            </Grid>
+            <Grid xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.sessionTimeoutWarningEnabled ?? true}
+                    onChange={(e) => setFormData({ ...formData, sessionTimeoutWarningEnabled: e.target.checked })}
+                  />
+                }
+                label="세션 만료 1분 전 안내 팝업 표시"
+              />
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {/* 6. 로그인 실패 횟수 */}
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            6. 로그인 실패 횟수 제한
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
             연속된 로그인 실패 시 계정을 일시적으로 잠금합니다

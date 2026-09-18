@@ -22,7 +22,7 @@ docker-compose.yml
 customer-vault-images-26.7.3.tar.gz
 ```
 
-스크립트는 실행 전 `.env`의 `JWT_SECRET`과 `ENCRYPTION_KEY`를 검증하고, 다음 순서로
+스크립트는 실행 전 `.env`의 `JWT_SECRET`, `ENCRYPTION_KEY`, `BACKUP_ENCRYPTION_KEY`를 검증하고, 다음 순서로
 작업합니다.
 
 1. 이미지 아카이브 무결성 및 필수 이미지 확인
@@ -35,7 +35,19 @@ customer-vault-images-26.7.3.tar.gz
 백업은 애플리케이션 디렉터리 외부의 `../customer-vault-upgrade-backups/`에 생성됩니다.
 데이터베이스를 자동 복원하지 않는 이유는 새 버전이 기존 데이터를 변환하는 과정에서
 잘못된 자동 복원이 추가 손상을 만들 수 있기 때문입니다. 롤백이 필요한 경우 생성된
-`database.sql.gz`와 체크섬을 확인한 후 별도 복원 절차를 진행합니다.
+`database.sql.gz.enc`, `files.tar.gz.enc`와 체크섬을 확인한 후 별도 복원 절차를 진행합니다.
+
+`BACKUP_ENCRYPTION_KEY`는 기존 평문 백업 자동 마이그레이션과 업그레이드 백업 복원에 모두 필요합니다.
+기존 `.env`의 키를 유지하고, 백업 파일과 분리된 보안 저장소에도 별도로 보관하세요. 키를 잃으면
+`.enc` 백업은 복원할 수 없습니다.
+
+### 마이그레이션 파일 기준 운영 원칙
+
+- 운영 이미지에는 `backend/prisma/migrations/`와 `migration_lock.toml`이 반드시 포함되어야 합니다.
+- 운영 컨테이너는 마이그레이션 파일이 없을 때 `prisma db push`를 실행하지 않고 기동을 중단합니다.
+- 기존 설치처럼 `_prisma_migrations` 이력이 없는 DB는 업그레이드 스크립트가 초기 기준 마이그레이션만 `resolve --applied` 처리한 뒤 나머지 마이그레이션을 적용합니다.
+- 이미 적용된 마이그레이션 SQL은 수정하지 않고, 변경마다 새 마이그레이션 디렉터리를 추가합니다.
+- `prisma migrate deploy` 실패 시 애플리케이션을 자동으로 DB 롤백하지 않습니다. 암호화 백업을 검증한 후 별도로 복원해야 합니다.
 
 실행 전 검증만 하려면 다음과 같이 합니다.
 
@@ -265,7 +277,7 @@ docker compose stop backend
 
 # 2. 마이그레이션 전 DB 백업 파일로 복원
 #    (import-package.sh 사용 시 자동 백업된 파일 사용)
-docker exec -i customer_db mysql -u root -p"${DB_ROOT_PASSWORD}" customer_db < backup_before_migration_YYYYMMDD_HHMMSS.sql
+복원 전 `.sql.gz.enc` 파일을 `BACKUP_ENCRYPTION_KEY`로 복호화하고, DB 컨테이너 내부의 권한 파일(`--defaults-extra-file`)을 사용해 복원하세요. 비밀번호를 `-pPASSWORD` 형태로 명령행에 넣지 마세요.
 
 # 3. 이전 버전 이미지로 docker-compose.yml 변경 후 재시작
 docker compose up -d
@@ -491,7 +503,7 @@ cd /home/dev/project/customer-vault
    - Frontend: `customer_frontend:2.1.2`
 
 2. **이미지 저장**
-   - `images.tar` (backend, frontend, nginx, mariadb)
+   - `images.tar` (backend, frontend, nginx, mariadb, clamav)
 
 3. **설정 파일 복사**
    - `docker-compose.yml` (버전 자동 업데이트)
@@ -758,7 +770,7 @@ Database schema is up to date!
 
 [INFO] 서비스 접속 정보:
   - URL: http://192.168.10.120:2082
-  - 초기 계정: admin / 1111
+  - 초기 계정: admin / `.env`의 `INITIAL_ADMIN_PASSWORD` 값 (최초 설치 시에만 사용)
 
 [INFO] 유용한 명령어:
   - 서비스 상태: docker compose ps
@@ -768,7 +780,7 @@ Database schema is up to date!
 
 [INFO] DB 관련 명령어:
   - 마이그레이션 상태: docker compose exec backend npx prisma migrate status
-  - DB 백업: docker exec customer_db mysqldump -u root -p<PASSWORD> customer_db > backup.sql
+  - DB 백업: `import-package.sh`가 생성한 암호화 `.sql.gz.enc` 백업을 사용하세요. 비밀번호를 명령행에 넣지 마세요.
 ```
 
 ---
@@ -882,7 +894,7 @@ cd customer_vault_2.1.2_package
 
 **환경 변수** (.env):
 ```env
-DB_ROOT_PASSWORD=rootpassword  # 필수: DB 백업/마이그레이션에 사용
+DB_ROOT_PASSWORD=강력한_루트_비밀번호  # 필수: DB 백업/마이그레이션에 사용
 DB_NAME=customer_db            # 기본값: customer_db
 DB_USER=customer_user          # 기본값: customer_user
 ```

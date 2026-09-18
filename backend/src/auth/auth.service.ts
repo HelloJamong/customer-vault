@@ -16,8 +16,14 @@ import { cleanIpAddress } from '../common/utils/ip.util';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginDto, ChangePasswordDto } from './dto/login.dto';
+import { getInitialAdminPassword } from '../common/config/initial-password';
 
-import { SESSION_EXPIRY_MS, isPasswordExpired } from './session-policy';
+import {
+  getSessionTimeoutMs,
+  getSessionTimeoutMinutes,
+  isPasswordExpired,
+  SESSION_WARNING_SECONDS,
+} from './session-policy';
 
 // 비밀번호 최대 길이 (SystemSettings에 별도 컬럼이 없어 고정값 사용)
 const PASSWORD_MAX_LENGTH = 20;
@@ -70,7 +76,7 @@ export class AuthService {
     // 중복 로그인 방지가 활성화된 경우 기존 세션 확인
     if (settings.preventDuplicateLogin && !forceLogin) {
       // lastActivity 기준으로 활성 세션만 확인 (브라우저 종료 등으로 만료된 세션 제외)
-      const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MS);
+      const expiryTime = new Date(Date.now() - getSessionTimeoutMs(settings));
       const existingSession = await this.prisma.userSession.findFirst({
         where: { userId: user.id, lastActivity: { gte: expiryTime } },
       });
@@ -92,6 +98,7 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      session: this.buildSessionPolicy(settings),
       user: {
         id: user.id,
         username: user.username,
@@ -137,7 +144,7 @@ export class AuthService {
   async logoutWithAccessToken(accessToken: string, ipAddress?: string) {
     // 창 닫힘/브라우저 종료 시 sendBeacon으로 호출된다.
     // 새로고침에서도 동일하게 발생하므로 세션은 삭제하지 않고 로그만 남긴다.
-    // 실제로 닫힌 세션은 비활성 30분 후 cleanupExpiredSessions가 정리한다.
+    // 실제로 닫힌 세션은 설정된 유휴 타임아웃 후 cleanupExpiredSessions가 정리한다.
     const payload = this.jwtService.verify(accessToken, {
       secret: this.configService.get<string>('JWT_SECRET'),
       algorithms: ['HS256'],
@@ -244,12 +251,19 @@ export class AuthService {
       if (!sessionId) {
         throw new UnauthorizedException('세션이 만료되었습니다.');
       }
+      const settings = await this.getSystemSettings();
+      const now = new Date();
       const session = await this.prisma.userSession.findFirst({
-        where: { userId: user.id, sessionId, lastActivity: { gte: new Date(Date.now() - SESSION_EXPIRY_MS) } },
+        where: { userId: user.id, sessionId, lastActivity: { gte: new Date(now.getTime() - getSessionTimeoutMs(settings)) } },
       });
       if (!session) {
         throw new UnauthorizedException('세션이 만료되었습니다.');
       }
+
+      await this.prisma.userSession.update({
+        where: { id: session.id },
+        data: { lastActivity: now },
+      });
 
       const accessToken = this.jwtService.sign(
         {
@@ -265,7 +279,10 @@ export class AuthService {
         } as any,
       );
 
-      return { accessToken };
+      return {
+        accessToken,
+        session: this.buildSessionPolicy(settings, now),
+      };
     } catch (error) {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
@@ -310,10 +327,12 @@ export class AuthService {
     if (!sessionId) {
       throw new UnauthorizedException('세션이 만료되었습니다.');
     }
+    const settings = await this.getSystemSettings();
+    const now = new Date();
     const whereClause = {
       userId,
       sessionId,
-      lastActivity: { gte: new Date(Date.now() - SESSION_EXPIRY_MS) },
+      lastActivity: { gte: new Date(now.getTime() - getSessionTimeoutMs(settings)) },
     };
 
     const session = await this.prisma.userSession.findFirst({
@@ -327,10 +346,38 @@ export class AuthService {
     // 세션 활성 시간 업데이트
     await this.prisma.userSession.update({
       where: { id: session.id },
-      data: { lastActivity: new Date() },
+      data: { lastActivity: now },
     });
 
-    return { valid: true };
+    return { valid: true, session: this.buildSessionPolicy(settings, now) };
+  }
+
+  async getSessionPolicy() {
+    const settings = await this.getSystemSettings();
+    return this.buildSessionPolicy(settings);
+  }
+
+  async extendSession(userId: number, sessionId?: string) {
+    if (!sessionId) {
+      throw new UnauthorizedException('세션이 만료되었습니다.');
+    }
+
+    const settings = await this.getSystemSettings();
+    const now = new Date();
+    const result = await this.prisma.userSession.updateMany({
+      where: {
+        userId,
+        sessionId,
+        lastActivity: { gte: new Date(now.getTime() - getSessionTimeoutMs(settings)) },
+      },
+      data: { lastActivity: now },
+    });
+
+    if (result.count !== 1) {
+      throw new UnauthorizedException('세션이 만료되었습니다.');
+    }
+
+    return this.buildSessionPolicy(settings, now);
   }
 
   // Helper Methods
@@ -546,7 +593,8 @@ export class AuthService {
   // 5분마다 실행: lastActivity 기준으로 만료된 세션 자동 삭제
   @Cron('0 */5 * * * *')
   async cleanupExpiredSessions() {
-    const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MS);
+    const settings = await this.getSystemSettings();
+    const expiryTime = new Date(Date.now() - getSessionTimeoutMs(settings));
     await this.prisma.userSession.deleteMany({
       where: { lastActivity: { lt: expiryTime } },
     });
@@ -558,10 +606,19 @@ export class AuthService {
     if (!settings) {
       // 설정이 없으면 기본 설정 생성
       settings = await this.prisma.systemSettings.create({
-        data: {},
+        data: { defaultPassword: getInitialAdminPassword() },
       });
     }
 
     return settings;
+  }
+
+  private buildSessionPolicy(settings: any, now = new Date()) {
+    return {
+      timeoutMinutes: getSessionTimeoutMinutes(settings),
+      warningEnabled: settings.sessionTimeoutWarningEnabled ?? true,
+      warningSeconds: SESSION_WARNING_SECONDS,
+      expiresAt: new Date(now.getTime() + getSessionTimeoutMs(settings)).toISOString(),
+    };
   }
 }

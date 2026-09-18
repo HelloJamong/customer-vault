@@ -1,0 +1,32 @@
+services:
+  db:
+    container_name: customer_vault_e2e_${E2E_RUN_ID}
+    ports:
+      - "127.0.0.1:${E2E_DB_PORT:-13306}:3306"
+    volumes:
+      - e2e_db:/var/lib/mysql
+
+  backend:
+    container_name: customer_vault_e2e_backend_${E2E_RUN_ID}
+    ports:
+      - "127.0.0.1:${E2E_BACKEND_PORT:-15000}:5000"
+    environment:
+      NODE_ENV: test
+      LOG_LEVEL: error
+      CLAMAV_ENABLED: "false"
+    volumes:
+      - e2e_uploads:/app/uploads
+      - e2e_logs:/app/logs
+      - e2e_backups:/app/backups
+
+  clamav:
+    container_name: customer_vault_e2e_clamav_${E2E_RUN_ID}
+    volumes:
+      - e2e_clamav:/var/lib/clamav
+
+volumes:
+  e2e_db:
+  e2e_uploads:
+  e2e_logs:
+  e2e_backups:
+  e2e_clamav:

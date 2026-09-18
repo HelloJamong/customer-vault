@@ -11,6 +11,8 @@ const PASSWORD_CHANGE_ALLOWED_SUFFIXES = [
   '/auth/password-requirements',
   '/auth/validate-session',
   '/auth/session-events',
+  '/auth/session-policy',
+  '/auth/extend-session',
 ];
 
 @Injectable()

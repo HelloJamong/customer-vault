@@ -36,6 +36,7 @@ DB_NAME=customer_db
 DB_USER=customer_user
 DB_PASSWORD=...
 DB_PORT=3306
+INITIAL_ADMIN_PASSWORD=...  # 빈 DB 최초 설치 시 admin 계정 비밀번호
 
 # JWT
 JWT_SECRET=...              # 충분히 긴 랜덤 값
@@ -46,9 +47,17 @@ JWT_REFRESH_EXPIRATION=7d
 PROXY_PORT=2082
 # Backend는 Docker 내부 네트워크에서 5000번으로 고정됩니다.
 MAX_UPLOAD_SIZE=16777216
+CLAMAV_ENABLED=true
+CLAMAV_HOST=clamav
+CLAMAV_PORT=3310
+CLAMAV_SCAN_TIMEOUT_MS=30000
 CORS_ORIGIN=http://localhost:2082
 LOG_DIR=./logs
 UPLOAD_DIR=./uploads
+
+# 애플리케이션 필드 암호화 키와 반드시 다른 백업 파일 암호화 키
+ENCRYPTION_KEY=64자리_hex_문자열
+BACKUP_ENCRYPTION_KEY=별도_보관할_64자리_hex_문자열
 
 # Frontend는 프록시를 통해 제공되므로 상대 경로를 사용합니다.
 VITE_API_BASE_URL=/api
@@ -77,11 +86,17 @@ docker compose logs -f backend
 ## 데이터/로그 경로
 - DB: `data/mariadb/` (로컬 볼륨 → 컨테이너 `/var/lib/mysql`)
 - 업로드: `uploads/` (→ 컨테이너 `/app/uploads`)
+- 업로드 파일은 먼저 서버 내부 격리 단계에서 확장자·매직바이트·ClamAV 검사를 통과한 후 최종 저장됩니다.
+- ClamAV가 준비되지 않았거나 검사에 실패하면 신규 업로드는 차단됩니다(fail-closed).
 - 로그: `logs/` (→ 컨테이너 `/app/logs`)
   - 필요 시 `LOG_DIR`/`UPLOAD_DIR`를 .env에서 변경
+- DB/문서 백업은 AES-256-GCM으로 암호화된 `.enc` 파일로 저장되며, 원격 SFTP에도 암호화된 파일만 전송됩니다.
+- `BACKUP_ENCRYPTION_KEY`는 `ENCRYPTION_KEY`와 다른 값을 사용하고 업그레이드/복원에 필요한 별도 보안 저장소에 보관하세요. 키를 잃으면 백업을 복호화할 수 없습니다.
 
 ## 초기 계정/설정
-- DB가 비어 있을 경우 서버 기동 시 `admin / 1111` 계정과 기본 시스템 설정이 자동 생성됩니다.
+- DB가 비어 있을 경우 서버 기동 시 `.env`의 `INITIAL_ADMIN_PASSWORD`로 `admin` 계정과 기본 시스템 설정이 자동 생성됩니다.
+- `INITIAL_ADMIN_PASSWORD`가 없으면 빈 DB의 초기화가 중단됩니다.
+- 생성된 admin 계정은 최초 로그인 후 비밀번호 변경이 필요합니다.
 
 ## 문제 해결 팁
 - 퍼미션 오류 시: `sudo chown -R <deploy_user>:<deploy_group> logs uploads data`

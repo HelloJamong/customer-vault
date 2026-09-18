@@ -7,12 +7,14 @@ interface PrivateRouteProps {
 }
 
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const authenticated = useAuthStore((state) => {
-    const hasToken = !!sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    return !!state.user && hasToken;
-  });
+  const user = useAuthStore((state) => state.user);
+  const authenticated = !!user && !!sessionStorage.getItem(ACCESS_TOKEN_KEY);
 
   if (!authenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.isFirstLogin || user?.passwordExpired) {
     return <Navigate to="/login" replace />;
   }
 

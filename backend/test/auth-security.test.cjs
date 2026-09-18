@@ -96,9 +96,46 @@ test('logout endpoint only ends the requesting session', async () => {
   assert.deepEqual(args,[1,'current','127.0.0.1']);
 });
 test('refresh allows a live session and binds its query to the same user', async () => {
-  const service = new AuthService({user:{findUnique:async()=>user},userSession:{findFirst:async({where})=>{
+  const service = new AuthService({user:{findUnique:async()=>user},systemSettings:{findFirst:async()=>({sessionTimeoutMinutes:30,sessionTimeoutWarningEnabled:true})},userSession:{findFirst:async({where})=>{
     assert.equal(where.userId,1);assert.equal(where.sessionId,payload.sessionId);assert.ok(where.lastActivity.gte instanceof Date);
     return {lastActivity:new Date()};
-  }}}, {verify:()=>({...payload,type:'refresh'}),sign:()=> 'fresh-token'}, {get:()=> undefined}, {}, {});
-  assert.deepEqual(await service.refreshToken('fixture'),{accessToken:'fresh-token'});
+  }, update:async()=>({})}}, {verify:()=>({...payload,type:'refresh'}),sign:()=> 'fresh-token'}, {get:()=> undefined}, {}, {});
+  const result = await service.refreshToken('fixture');
+  assert.equal(result.accessToken, 'fresh-token');
+  assert.equal(result.session.timeoutMinutes, 30);
+  assert.equal(result.session.warningSeconds, 60);
+});
+
+test('session timeout policy is clamped to the supported 10-60 minute range', () => {
+  const { getSessionTimeoutMinutes, getSessionTimeoutMs } = require('../src/auth/session-policy');
+  assert.equal(getSessionTimeoutMinutes({ sessionTimeoutMinutes: 5 }), 10);
+  assert.equal(getSessionTimeoutMinutes({ sessionTimeoutMinutes: 90 }), 60);
+  assert.equal(getSessionTimeoutMinutes({ sessionTimeoutMinutes: 20 }), 20);
+  assert.equal(getSessionTimeoutMs({ sessionTimeoutMinutes: 20 }), 20 * 60 * 1000);
+});
+
+test('session extension updates only the active session and returns a fixed 60-second warning policy', async () => {
+  let updateArgs;
+  const service = new AuthService(
+    {
+      systemSettings: { findFirst: async () => ({ sessionTimeoutMinutes: 10, sessionTimeoutWarningEnabled: false }) },
+      userSession: {
+        updateMany: async (args) => {
+          updateArgs = args;
+          return { count: 1 };
+        },
+      },
+    },
+    {},
+    {},
+    {},
+    {},
+  );
+
+  const result = await service.extendSession(7, 'active-session');
+  assert.equal(updateArgs.where.userId, 7);
+  assert.equal(updateArgs.where.sessionId, 'active-session');
+  assert.equal(result.timeoutMinutes, 10);
+  assert.equal(result.warningEnabled, false);
+  assert.equal(result.warningSeconds, 60);
 });

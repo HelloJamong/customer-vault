@@ -2,6 +2,9 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { assertCustomerEditable } from '../common/utils/customer-access.util';
+import { FileSecurityService } from '../common/file-security/file-security.service';
+import { getFileSecurityFailureReason } from '../common/file-security/file-security.service';
+import { LogsService } from '../logs/logs.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as mime from 'mime-types';
@@ -48,7 +51,11 @@ export class UpdateInspectionTargetDto {
 
 @Injectable()
 export class InspectionTargetsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private fileSecurityService: FileSecurityService,
+    private logsService: LogsService,
+  ) {}
 
   // 편집 권한: 관리자는 제한 없음, 일반 사용자는 담당 고객사의 점검 대상만.
   async assertCanManageCustomer(customerId: number, user: { id: number; role: string }) {
@@ -123,6 +130,7 @@ export class InspectionTargetsService {
     file: Express.Multer.File,
     customerName: string,
     productName: string,
+    audit?: { userId?: number; ipAddress?: string },
   ): Promise<{ message: string; path: string }> {
     const target = await this.prisma.inspectionTarget.findUnique({
       where: { id: targetId },
@@ -131,6 +139,22 @@ export class InspectionTargetsService {
 
     if (!target) {
       throw new NotFoundException('점검 항목을 찾을 수 없습니다.');
+    }
+
+    try {
+      await this.fileSecurityService.inspectBuffer(file.originalname, file.buffer);
+    } catch (error) {
+      const securityFailure = getFileSecurityFailureReason(error);
+      if (securityFailure) {
+        await this.logsService.createServiceLog({
+          userId: audit?.userId,
+          logType: '보안',
+          action: '파일 보안 검사 차단',
+          description: `점검서 양식 업로드가 파일 보안 검사에서 차단되었습니다. (점검 대상 ID: ${targetId}, 사유: ${securityFailure})`,
+          ipAddress: audit?.ipAddress,
+        }).catch(() => {});
+      }
+      throw error;
     }
 
     // 파일 확장자 검증 (허용 목록)

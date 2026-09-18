@@ -176,7 +176,7 @@ const CustomerSourceManagementDetailPage = () => {
     if (revealedData || isRevealLoading) return;
     setIsRevealLoading(true);
     try {
-      const response = await apiClient.get(`/customers/${customerId}/source-management/edit`);
+      const response = await apiClient.get(`/customers/${customerId}/source-management/reveal`);
       setRevealedData(response.data);
     } catch (error) {
       console.error('민감정보 조회 실패:', error);
@@ -194,6 +194,9 @@ const CustomerSourceManagementDetailPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setRevealedAccessInfo(new Set());
+        setRevealedData(null);
+
         // 고객사 이름 조회
         const customerResponse = await apiClient.get(`/customers/${customerId}`);
         setCustomerName(customerResponse.data.name);

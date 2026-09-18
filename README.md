@@ -77,12 +77,16 @@ vi .env
 | `JWT_SECRET` | 128자 이상 랜덤 문자열 (아래 생성 명령 참고) |
 | `DB_ROOT_PASSWORD` | 강력한 DB root 비밀번호 |
 | `DB_PASSWORD` | 강력한 DB 사용자 비밀번호 |
+| `INITIAL_ADMIN_PASSWORD` | 빈 DB 최초 설치 시 생성되는 admin 계정의 초기 비밀번호 |
 | `CORS_ORIGIN` | 실제 접속 도메인 또는 IP (예: `http://10.0.0.5:3003`) |
 | `VERSION` | 다운로드한 버전과 동일하게 설정 (예: `26.03.03`) |
 
 ```bash
 # JWT_SECRET 생성
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+# 초기 관리자 비밀번호 생성 (최초 설치 시에만 사용)
+openssl rand -base64 24
 ```
 
 ### 3️⃣ 서비스 실행
@@ -96,7 +100,7 @@ docker compose up -d
 
 **최초 로그인 계정:**
 - ID: `admin`
-- PW: `1111`
+- PW: `.env`의 `INITIAL_ADMIN_PASSWORD` 값
 
 > ⚠️ 최초 로그인 후 반드시 비밀번호를 변경하세요.
 
@@ -131,7 +135,7 @@ customer-vault/
 │   └── nginx.conf.example        # 외부 Nginx 설정 예시
 │
 ├── data/                         # MariaDB 데이터 볼륨 (영구 저장)
-├── uploads/                      # 업로드된 점검서 파일 저장소 (영구 저장)
+├── uploads/                      # 보안 검사 통과 후 저장되는 점검서 파일 저장소 (영구 저장)
 ├── logs/                         # 애플리케이션 로그 파일 (영구 저장)
 │
 ├── docker-compose.yml            # Docker Compose 설정 파일
@@ -142,7 +146,7 @@ customer-vault/
 **주요 디렉토리 설명:**
 - `proxy/`: Nginx 컨테이너에서 사용하는 리버스 프록시 설정
 - `data/`: MariaDB 데이터베이스 파일이 저장되는 볼륨 (백업 필수)
-- `uploads/`: 사용자가 업로드한 점검서 파일이 저장됨 (백업 필수)
+- `uploads/`: 보안 검사(매직바이트·ClamAV) 통과 후 저장된 점검서 파일 (백업 필수)
 - `logs/`: 애플리케이션 로그 파일 (문제 발생 시 확인)
 ---
 

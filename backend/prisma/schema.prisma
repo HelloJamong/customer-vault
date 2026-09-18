@@ -203,7 +203,7 @@ model SystemSettings {
   id                          Int       @id @default(autoincrement())
 
   // 초기 패스워드
-  defaultPassword             String    @default("1111") @map("default_password") @db.VarChar(50)
+  defaultPassword             String    @map("default_password") @db.VarChar(50)
 
   // 비밀번호 복잡성
   passwordMinLength           Int       @default(8) @map("password_min_length")
@@ -217,6 +217,10 @@ model SystemSettings {
 
   // 중복 로그인 방지
   preventDuplicateLogin       Boolean   @default(false) @map("prevent_duplicate_login")
+
+  // 세션 타임아웃
+  sessionTimeoutMinutes       Int       @default(30) @map("session_timeout_minutes")
+  sessionTimeoutWarningEnabled Boolean   @default(true) @map("session_timeout_warning_enabled")
 
   // 로그인 실패 횟수
   loginFailureLimitEnabled    Boolean   @default(false) @map("login_failure_limit_enabled")

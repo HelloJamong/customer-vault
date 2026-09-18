@@ -56,7 +56,10 @@ backend/dist/
 backend/build/
 
 # Backend specific
-backend/prisma/migrations/
+backend/prisma/migrations/*
+!backend/prisma/migrations/
+!backend/prisma/migrations/*/
+!backend/prisma/migrations/*/*
 backend/generated/prisma
 
 # Offline test environment (로컬 폐쇄망 테스트 환경)

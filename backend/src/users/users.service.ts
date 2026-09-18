@@ -3,6 +3,8 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
+import { Role } from '../common/enums/role.enum';
+import { getInitialAdminPassword } from '../common/config/initial-password';
 
 @Injectable()
 export class UsersService {
@@ -120,8 +122,23 @@ export class UsersService {
     return result;
   }
 
-  async create(createUserDto: CreateUserDto, currentUserId: number, ipAddress?: string) {
+  async create(
+    createUserDto: CreateUserDto,
+    currentUserId: number,
+    currentUserRole: string,
+    ipAddress?: string,
+  ) {
     const { customerIds, ...userData } = createUserDto;
+    const actorRole = String(currentUserRole ?? '').trim().toLowerCase();
+
+    if (actorRole !== Role.ADMIN && actorRole !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('사용자 계정을 생성할 권한이 없습니다.');
+    }
+
+    // 일반 관리자는 일반 사용자만 생성할 수 있다.
+    if (actorRole === Role.ADMIN && userData.role !== Role.USER) {
+      throw new ForbiddenException('일반 관리자는 일반 사용자 계정만 생성할 수 있습니다.');
+    }
 
     // 슈퍼 관리자 생성 시 최대 3명 제한 확인
     if (userData.role === 'super_admin') {
@@ -199,7 +216,6 @@ export class UsersService {
       id: user.id,
       username: user.username,
       name: user.name,
-      defaultPassword: settings.defaultPassword,
       message: '사용자가 생성되었습니다. 최초 로그인 시 비밀번호 변경이 필요합니다.',
     };
   }
@@ -323,14 +339,31 @@ export class UsersService {
     };
   }
 
-  async resetPassword(id: number, currentUserId: number, ipAddress?: string) {
+  async resetPassword(
+    id: number,
+    currentUserId: number,
+    currentUserRole: string,
+    ipAddress?: string,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { username: true, name: true },
+      select: { username: true, name: true, role: true },
     });
 
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const actorRole = String(currentUserRole ?? '').trim().toLowerCase();
+    if (actorRole !== Role.ADMIN && actorRole !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('비밀번호를 초기화할 권한이 없습니다.');
+    }
+
+    if (
+      actorRole !== Role.SUPER_ADMIN &&
+      (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN)
+    ) {
+      throw new ForbiddenException('관리자 계정의 비밀번호는 슈퍼 관리자만 초기화할 수 있습니다.');
     }
 
     const settings = await this.getSystemSettings();
@@ -356,7 +389,6 @@ export class UsersService {
 
     return {
       message: '비밀번호가 초기화되었습니다.',
-      defaultPassword: settings.defaultPassword,
     };
   }
 
@@ -469,7 +501,9 @@ export class UsersService {
     let settings = await this.prisma.systemSettings.findFirst();
 
     if (!settings) {
-      settings = await this.prisma.systemSettings.create({ data: {} });
+      settings = await this.prisma.systemSettings.create({
+        data: { defaultPassword: getInitialAdminPassword() },
+      });
     }
 
     return settings;

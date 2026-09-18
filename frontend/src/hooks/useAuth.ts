@@ -23,8 +23,12 @@ export const useAuth = () => {
   const loginMutation = useMutation({
     mutationFn: (credentials: LoginRequest) => authAPI.login(credentials),
     onSuccess: (data) => {
-      setAuth(data.accessToken, data.refreshToken, data.user);
-      navigate('/dashboard');
+      setAuth(data.accessToken, data.refreshToken, data.user, data.session);
+      // 최초 로그인/비밀번호 만료 상태에서는 대시보드로 이동하지 않고
+      // 로그인 화면의 강제 변경 다이얼로그를 표시한다.
+      if (!data.user.isFirstLogin && !data.user.passwordExpired) {
+        navigate('/dashboard');
+      }
     },
   });
 

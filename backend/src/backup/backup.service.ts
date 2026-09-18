@@ -14,6 +14,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { SettingsService } from '../settings/settings.service';
 import { CryptoService } from '../common/crypto/crypto.service';
+import { BackupFileCryptoService } from './backup-file-crypto.service';
 
 @Injectable()
 export class BackupService implements OnModuleInit {
@@ -27,10 +28,12 @@ export class BackupService implements OnModuleInit {
     private settingsService: SettingsService,
     private schedulerRegistry: SchedulerRegistry,
     private cryptoService: CryptoService,
+    private backupFileCryptoService: BackupFileCryptoService,
   ) {}
 
   async onModuleInit() {
     try {
+      await this.migrateLegacyBackups();
       const settings = await this.settingsService.getSettings();
       if (settings.backupEnabled) {
         this.scheduleBackup(settings);
@@ -48,7 +51,9 @@ export class BackupService implements OnModuleInit {
 
     try {
       this.schedulerRegistry.deleteCronJob('auto-backup');
-    } catch {}
+    } catch {
+      // The job may not exist during the first schedule registration.
+    }
 
     // 스케줄 시각은 KST 기준. cron 라이브러리에 타임존을 직접 지정해
     // 서버 시간대(UTC 등)와 무관하게 동작하도록 한다.
@@ -69,7 +74,9 @@ export class BackupService implements OnModuleInit {
     try {
       this.schedulerRegistry.deleteCronJob('auto-backup');
       this.logger.log('백업 스케줄 취소됨');
-    } catch {}
+    } catch {
+      // Cancelling an already-removed job is idempotent.
+    }
   }
 
   private buildCronExpression(settings: any): string {
@@ -163,18 +170,21 @@ export class BackupService implements OnModuleInit {
       // 로컬 디렉토리 준비
       const dbBackupDir = path.join(this.backupDir, 'db-backup');
       const docBackupDir = path.join(this.backupDir, 'doc-backup');
-      fs.mkdirSync(dbBackupDir, { recursive: true });
-      fs.mkdirSync(docBackupDir, { recursive: true });
+      fs.mkdirSync(dbBackupDir, { recursive: true, mode: 0o700 });
+      fs.mkdirSync(docBackupDir, { recursive: true, mode: 0o700 });
+      fs.chmodSync(this.backupDir, 0o700);
+      fs.chmodSync(dbBackupDir, 0o700);
+      fs.chmodSync(docBackupDir, 0o700);
 
       // DB 백업
       if (targets.includes('db')) {
         const filename = `db_${timestamp}.sql.gz`;
         const destPath = path.join(dbBackupDir, filename);
         await this.backupDatabase(destPath);
-        localDbPath = destPath;
-        totalSize += fs.statSync(destPath).size;
-        savedPaths.push(destPath);
-        this.logger.log(`DB 백업 완료: ${destPath}`);
+        localDbPath = await this.backupFileCryptoService.encryptFile(destPath);
+        totalSize += fs.statSync(localDbPath).size;
+        savedPaths.push(localDbPath);
+        this.logger.log(`암호화 DB 백업 완료: ${localDbPath}`);
       }
 
       // 문서 백업
@@ -182,10 +192,10 @@ export class BackupService implements OnModuleInit {
         const filename = `docs_${timestamp}.tar.gz`;
         const destPath = path.join(docBackupDir, filename);
         await this.backupDocuments(destPath);
-        localDocsPath = destPath;
-        totalSize += fs.statSync(destPath).size;
-        savedPaths.push(destPath);
-        this.logger.log(`문서 백업 완료: ${destPath}`);
+        localDocsPath = await this.backupFileCryptoService.encryptFile(destPath);
+        totalSize += fs.statSync(localDocsPath).size;
+        savedPaths.push(localDocsPath);
+        this.logger.log(`암호화 문서 백업 완료: ${localDocsPath}`);
       }
 
       // 원격 SFTP 전송
@@ -235,6 +245,12 @@ export class BackupService implements OnModuleInit {
       return { ...updated, fileSize: updated.fileSize?.toString() };
     } catch (error) {
       this.logger.error('백업 실행 오류: ' + error.message);
+
+      for (const backupPath of [localDbPath, localDocsPath, ...savedPaths]) {
+        if (backupPath && fs.existsSync(backupPath)) {
+          fs.unlinkSync(backupPath);
+        }
+      }
 
       const updated = await this.prisma.backupLog.update({
         where: { id: log.id },
@@ -321,7 +337,7 @@ export class BackupService implements OnModuleInit {
         return;
       }
 
-      const outStream = fs.createWriteStream(destPath);
+      const outStream = fs.createWriteStream(destPath, { mode: 0o600 });
 
       // 비밀번호는 인자(argv) 대신 환경변수로 전달해 ps/proc 노출을 막는다.
       const mysqldump = spawn('mysqldump', [
@@ -352,7 +368,11 @@ export class BackupService implements OnModuleInit {
         if (settled) return;
         settled = true;
         // 실패 시 불완전한 파일을 남기지 않는다.
-        try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch {}
+        try {
+          if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+        } catch {
+          // Cleanup is best effort after a failed backup stream.
+        }
         reject(err);
       };
 
@@ -391,7 +411,7 @@ export class BackupService implements OnModuleInit {
     return new Promise((resolve, reject) => {
       if (!fs.existsSync(this.uploadsDir)) {
         // 폴더 없으면 빈 아카이브 생성
-        const output = fs.createWriteStream(destPath);
+        const output = fs.createWriteStream(destPath, { mode: 0o600 });
         const archive = archiver('tar', { gzip: true });
         archive.pipe(output);
         output.on('close', resolve);
@@ -400,7 +420,7 @@ export class BackupService implements OnModuleInit {
         return;
       }
 
-      const output = fs.createWriteStream(destPath);
+      const output = fs.createWriteStream(destPath, { mode: 0o600 });
       const archive = archiver('tar', { gzip: true });
 
       archive.pipe(output);
@@ -419,7 +439,6 @@ export class BackupService implements OnModuleInit {
     settings: any,
     subDir: 'db-backup' | 'doc-backup',
   ): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const SftpClient = require('ssh2-sftp-client');
     const sftp = new SftpClient();
 
@@ -471,7 +490,7 @@ export class BackupService implements OnModuleInit {
 
     const files = fs
       .readdirSync(dir)
-      .filter((f) => f.endsWith('.gz'))
+      .filter((f) => f.endsWith('.enc'))
       .map((f) => ({ name: f, mtime: fs.statSync(path.join(dir, f)).mtime }))
       .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
@@ -519,13 +538,84 @@ export class BackupService implements OnModuleInit {
 
     // filePath에 여러 파일이 있을 수 있으므로 첫 번째 파일 반환
     const firstPath = log.filePath.split(',')[0].trim();
-    if (!fs.existsSync(firstPath)) {
+    const backupRoot = `${path.resolve(this.backupDir)}${path.sep}`;
+    const resolvedPath = path.resolve(firstPath);
+    if (!resolvedPath.startsWith(backupRoot) || !resolvedPath.endsWith('.enc')) {
+      throw new NotFoundException('암호화된 백업 파일만 다운로드할 수 있습니다.');
+    }
+    if (!fs.existsSync(resolvedPath)) {
       throw new NotFoundException('백업 파일이 존재하지 않습니다.');
+    }
+    const realPath = fs.realpathSync(resolvedPath);
+    if (!realPath.startsWith(backupRoot) || !realPath.endsWith('.enc')) {
+      throw new NotFoundException('백업 파일 경로가 올바르지 않습니다.');
     }
 
     return {
-      filePath: firstPath,
-      filename: path.basename(firstPath),
+      filePath: realPath,
+      filename: path.basename(realPath),
     };
+  }
+
+  private async migrateLegacyBackups(): Promise<void> {
+    for (const directory of [
+      this.backupDir,
+      path.join(this.backupDir, 'db-backup'),
+      path.join(this.backupDir, 'doc-backup'),
+    ]) {
+      if (fs.existsSync(directory)) {
+        fs.chmodSync(directory, 0o700);
+      }
+    }
+
+    const legacyLogs = await this.prisma.backupLog.findMany({
+      where: { status: 'success', filePath: { not: null } },
+      select: { id: true, filePath: true },
+    });
+    const backupRoot = `${path.resolve(this.backupDir)}${path.sep}`;
+
+    for (const log of legacyLogs) {
+      if (!log.filePath) continue;
+      const paths = log.filePath.split(',').map((value) => value.trim()).filter(Boolean);
+      const migratedPaths: string[] = [];
+      const legacyPairs: Array<{ original: string; encrypted: string }> = [];
+
+      for (const filePath of paths) {
+        if (filePath.endsWith('.enc')) {
+          migratedPaths.push(filePath);
+          continue;
+        }
+
+        const resolvedPath = path.resolve(filePath);
+        if (!resolvedPath.startsWith(backupRoot) || !fs.existsSync(resolvedPath)) {
+          migratedPaths.push(filePath);
+          continue;
+        }
+        const stat = fs.lstatSync(resolvedPath);
+        if (!stat.isFile()) {
+          migratedPaths.push(filePath);
+          continue;
+        }
+
+        const encryptedPath = `${resolvedPath}.enc`;
+        if (!fs.existsSync(encryptedPath)) {
+          await this.backupFileCryptoService.encryptFile(resolvedPath, encryptedPath, false);
+        }
+
+        migratedPaths.push(encryptedPath);
+        legacyPairs.push({ original: resolvedPath, encrypted: encryptedPath });
+      }
+
+      if (legacyPairs.length > 0) {
+        await this.prisma.backupLog.update({
+          where: { id: log.id },
+          data: { filePath: migratedPaths.join(',') },
+        });
+        for (const pair of legacyPairs) {
+          await fs.promises.unlink(pair.original).catch(() => {});
+        }
+        this.logger.log(`기존 백업을 암호화 형식으로 마이그레이션했습니다: ${log.id}`);
+      }
+    }
   }
 }

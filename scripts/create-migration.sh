@@ -102,7 +102,15 @@ fi
 
 # 마이그레이션 생성
 log_info "마이그레이션 생성 중..."
-docker compose exec backend npx prisma migrate dev --name "$MIGRATION_NAME"
+docker compose run --rm --no-deps \
+    -v "${PROJECT_ROOT}/backend/prisma:/app/prisma" \
+    --entrypoint npx \
+    backend prisma migrate dev --name "$MIGRATION_NAME"
+
+if ! find backend/prisma/migrations -mindepth 2 -maxdepth 2 -type f -name migration.sql -print -quit | grep -q .; then
+    log_error "호스트의 backend/prisma/migrations에 migration.sql이 생성되지 않았습니다."
+    exit 1
+fi
 
 log_success "마이그레이션 생성 완료!"
 

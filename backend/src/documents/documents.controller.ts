@@ -50,7 +50,7 @@ export class DocumentsController {
           const month = String(date.getMonth() + 1).padStart(2, '0');
 
           // customerId는 아직 파싱되지 않았을 수 있으므로 임시 디렉토리 사용
-          const dir = path.join(uploadDir, String(year), month, 'temp');
+          const dir = path.join(uploadDir, '.quarantine', String(year), month);
 
           if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -188,8 +188,8 @@ export class DocumentsController {
           const date = new Date();
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
-          const customerId = req.params.customerId;
-          const dir = path.join(uploadDir, `customer_${customerId}`, String(year), month);
+          // 권한 및 보안 검사가 끝나기 전까지는 고객사 최종 디렉터리에 저장하지 않는다.
+          const dir = path.join(uploadDir, '.quarantine', String(year), month);
 
           if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -227,7 +227,12 @@ export class DocumentsController {
     @Body() body: any,
     @Request() req,
   ) {
-    await this.service.assertCanUpload(customerId, req.user);
+    try {
+      await this.service.assertCanUpload(customerId, req.user);
+    } catch (error) {
+      if (file?.path) await fsp.unlink(file.path).catch(() => {});
+      throw error;
+    }
 
     return this.service.create({
       customerId,

@@ -6,21 +6,25 @@
   "scripts": {
     "prebuild": "prisma generate",
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.{ts,cjs}\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.{ts,cjs}\"",
+    "test": "npm run test:security",
     "test:security": "node -r ts-node/register/transpile-only --test test/*.test.cjs",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:watch": "node -r ts-node/register/transpile-only --test --watch test/*.test.cjs",
+    "test:cov": "node --experimental-test-coverage -r ts-node/register/transpile-only --test test/*.test.cjs",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register --test test/*.test.cjs",
+    "test:e2e": "bash ../scripts/e2e-test.sh",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.{ts,cjs}\" --fix",
+    "test:unit": "npm run test:security",
+    "test:e2e:runner": "node --test test/e2e/*.e2e.test.cjs",
+    "test:all": "npm run lint && npm run build && npm run test:security && npm run test:e2e"
   },
   "keywords": [
     "nestjs",
@@ -72,6 +76,7 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@nestjs/cli": "^11.0.14",
     "@nestjs/testing": "^11.1.9",
     "@types/archiver": "^7.0.0",
@@ -83,8 +88,12 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/sanitize-html": "^2.16.1",
     "@types/uuid": "^10.0.0",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
+    "prettier": "^3.9.8",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0"
   }
 }

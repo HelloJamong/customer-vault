@@ -746,6 +746,28 @@ export class CustomersService {
     return result;
   }
 
+  // 운영 지원을 위해 모든 사내 사용자가 클릭으로 민감정보를 조회할 수 있다. 조회 이력은 남기되 비밀번호 값은 기록하지 않는다.
+  async revealSourceManagement(customerId: number, userId: number, ipAddress: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { name: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다.');
+    }
+
+    const result = await this.getSourceManagement(customerId, { revealSecrets: true });
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '보안',
+      action: '소스 관리 민감정보 열람',
+      description: `${customer.name} 고객사의 전체 서버 접속·인사연동 DB 자격증명을 열람했습니다.`,
+      ipAddress,
+    });
+    return result;
+  }
+
   private buildVirtualPcImageCreateData(
     image: VirtualPcImageDto,
     userId: number,

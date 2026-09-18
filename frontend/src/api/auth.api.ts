@@ -1,5 +1,12 @@
 import apiClient from './axios';
-import type { LoginRequest, LoginResponse, User, ChangePasswordRequest } from '@/types/auth.types';
+import type {
+  LoginRequest,
+  LoginResponse,
+  User,
+  ChangePasswordRequest,
+  SessionPolicy,
+  RefreshTokenResponse,
+} from '@/types/auth.types';
 
 export const authAPI = {
   // 로그인
@@ -20,10 +27,20 @@ export const authAPI = {
   },
 
   // 토큰 갱신
-  refreshToken: async (refreshToken: string): Promise<{ accessToken: string }> => {
+  refreshToken: async (refreshToken: string): Promise<RefreshTokenResponse> => {
     const { data } = await apiClient.post('/auth/refresh', {
       refreshToken: refreshToken,
     });
+    return data;
+  },
+
+  extendSession: async (): Promise<SessionPolicy> => {
+    const { data } = await apiClient.post('/auth/extend-session');
+    return data;
+  },
+
+  getSessionPolicy: async (): Promise<SessionPolicy> => {
+    const { data } = await apiClient.get('/auth/session-policy');
     return data;
   },
 

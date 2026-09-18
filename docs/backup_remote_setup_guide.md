@@ -11,12 +11,12 @@
 [운영 서버]                         [원격 백업 서버]
  Docker 컨테이너 (backend)
  /app/backups/
-   db-backup/db_YYYY-MM-DD_*.sql.gz  →  SFTP 전송  →  /home/backup/customer-vault/db-backup/
-   doc-backup/docs_YYYY-MM-DD_*.tar.gz →  SFTP 전송  →  /home/backup/customer-vault/doc-backup/
+   db-backup/db_YYYY-MM-DD_*.sql.gz.enc  →  SFTP 전송  →  /home/backup/customer-vault/db-backup/
+   doc-backup/docs_YYYY-MM-DD_*.tar.gz.enc →  SFTP 전송  →  /home/backup/customer-vault/doc-backup/
 ```
 
 - 백업은 **운영 서버의 backend 컨테이너**에서 실행됩니다.
-- 백업 파일을 생성한 후 SFTP 프로토콜을 통해 원격 서버로 전송합니다.
+- DB/문서 백업은 생성 단계에서 AES-256-GCM으로 암호화되며, 암호화된 `.enc` 파일만 SFTP를 통해 원격 서버로 전송합니다. SFTP는 전송 보안이고 파일 자체 암호화를 대체하지 않습니다.
 - 인증 방식은 **계정+패스워드** 또는 **SSH 키** 중 선택합니다.
 
 ---
@@ -154,10 +154,14 @@ docker compose exec backend ssh -i /app/backups/.ssh/backup_key -p 22 backupuser
 # SFTP 패스워드 암호화 키 (32바이트 hex, 반드시 변경)
 # 생성 명령: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ENCRYPTION_KEY=여기에_64자리_hex_문자열_입력
+
+# 백업 파일 암호화 키 (ENCRYPTION_KEY와 반드시 다른 64자리 hex 값)
+BACKUP_ENCRYPTION_KEY=여기에_별도_보관할_64자리_hex_문자열_입력
 ```
 
 > ⚠️ `ENCRYPTION_KEY`는 SFTP 패스워드를 AES-256-CBC로 암호화하는 데 사용됩니다.
 > 기본값(`000...`)을 그대로 사용하면 보안에 취약하므로 반드시 변경하세요.
+> `BACKUP_ENCRYPTION_KEY`는 DB/문서 백업 파일을 AES-256-GCM으로 암호화합니다. 두 키를 동일하게 사용하지 말고, 백업 파일과 다른 위치에 별도로 보관하세요.
 
 ### 3-2. `ENCRYPTION_KEY` 생성
 
@@ -215,9 +219,9 @@ ls -lh /home/backupuser/customer-vault/doc-backup/
 ```
 /home/backupuser/customer-vault/
 ├── db-backup/
-│   └── db_2026-02-23_11-30-00.sql.gz
+│   └── db_2026-02-23_11-30-00.sql.gz.enc
 └── doc-backup/
-    └── docs_2026-02-23_11-30-00.tar.gz
+    └── docs_2026-02-23_11-30-00.tar.gz.enc
 ```
 
 ### 5-3. 백업 이력 확인
@@ -247,4 +251,6 @@ ls -lh /home/backupuser/customer-vault/doc-backup/
 - 원격 서버의 백업 계정은 백업 디렉토리에만 쓰기 권한을 부여하고, 다른 경로 접근을 제한하세요.
 - SFTP 전용 chroot 환경을 구성하면 보안을 더욱 강화할 수 있습니다 (`/etc/ssh/sshd_config`의 `ChrootDirectory` 옵션).
 - `ENCRYPTION_KEY`는 `.env` 파일로만 관리하고, 별도의 안전한 장소에 백업해두세요.
+- `BACKUP_ENCRYPTION_KEY`도 별도의 안전한 장소에 백업하세요. 이 키가 없으면 `.enc` 백업을 복원할 수 없습니다.
+- SFTP 서버에 도착한 파일은 `.enc` 상태로 보관하고, 복원 작업이 끝난 뒤 복호화된 평문 파일을 즉시 삭제하세요.
 - 운영 서버와 원격 서버 간의 네트워크는 사설망(VPN 또는 전용선)을 통해 연결하는 것을 권장합니다.

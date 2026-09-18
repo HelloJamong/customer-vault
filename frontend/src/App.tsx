@@ -7,6 +7,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useAutoLogoutOnClose } from '@/hooks/useAutoLogoutOnClose';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useColorMode } from '@/hooks/useColorMode';
+import { SessionTimeoutManager } from '@/components/auth/SessionTimeoutManager';
 
 const createAppTheme = (mode: PaletteMode) =>
   createTheme({
@@ -63,6 +64,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
+        <SessionTimeoutManager />
         <Suspense
           fallback={(
             <Box

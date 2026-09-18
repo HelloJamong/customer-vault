@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
+import { getInitialAdminPassword } from '../common/config/initial-password';
 
 @Injectable()
 export class SettingsService {
@@ -16,7 +17,9 @@ export class SettingsService {
     let settings = await this.prisma.systemSettings.findFirst();
 
     if (!settings) {
-      settings = await this.prisma.systemSettings.create({ data: {} });
+      settings = await this.prisma.systemSettings.create({
+        data: { defaultPassword: getInitialAdminPassword() },
+      });
     }
 
     return settings;
@@ -94,6 +97,21 @@ export class SettingsService {
       changes.push('중복 로그인 방지');
       beforeValues.push(settings.preventDuplicateLogin ? '활성화' : '비활성화');
       afterValues.push(data.preventDuplicateLogin ? '활성화' : '비활성화');
+    }
+
+    if (data.sessionTimeoutMinutes !== undefined && data.sessionTimeoutMinutes !== settings.sessionTimeoutMinutes) {
+      changes.push('세션 타임아웃');
+      beforeValues.push(`${settings.sessionTimeoutMinutes}분`);
+      afterValues.push(`${data.sessionTimeoutMinutes}분`);
+    }
+
+    if (
+      data.sessionTimeoutWarningEnabled !== undefined &&
+      data.sessionTimeoutWarningEnabled !== settings.sessionTimeoutWarningEnabled
+    ) {
+      changes.push('세션 타임아웃 안내 팝업');
+      beforeValues.push(settings.sessionTimeoutWarningEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.sessionTimeoutWarningEnabled ? '활성화' : '비활성화');
     }
 
     if (data.loginFailureLimitEnabled !== undefined && data.loginFailureLimitEnabled !== settings.loginFailureLimitEnabled) {
@@ -199,6 +217,11 @@ export class SettingsService {
           '계정 잠금 시간은 5분 단위로 설정해야 합니다.',
         );
       }
+    }
+
+    if (data.sessionTimeoutMinutes !== undefined &&
+        (data.sessionTimeoutMinutes < 10 || data.sessionTimeoutMinutes > 60)) {
+      throw new BadRequestException('세션 타임아웃은 10분 이상 60분 이하로 설정해야 합니다.');
     }
   }
 }

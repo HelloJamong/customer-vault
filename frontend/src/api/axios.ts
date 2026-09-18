@@ -27,6 +27,15 @@ const refreshAccessToken = (): Promise<string> => {
       .post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
       .then(({ data }) => {
         sessionStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+        if (data.session) {
+          useAuthStore.getState().setSessionPolicy(data.session);
+          window.dispatchEvent(new CustomEvent('session-activity', {
+            detail: {
+              sessionExpiresAt: data.session.expiresAt,
+              warningEnabled: data.session.warningEnabled,
+            },
+          }));
+        }
         return data.accessToken as string;
       })
       .finally(() => {
@@ -63,7 +72,21 @@ apiClient.interceptors.request.use(
 
 // 응답 인터셉터: 토큰 만료 시 자동 갱신
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const sessionExpiresAt = response.headers?.['x-session-expires-at'];
+    if (sessionExpiresAt) {
+      const warningEnabledHeader = response.headers?.['x-session-warning-enabled'];
+      window.dispatchEvent(new CustomEvent('session-activity', {
+        detail: {
+          sessionExpiresAt,
+          ...(warningEnabledHeader !== undefined
+            ? { warningEnabled: warningEnabledHeader === 'true' }
+            : {}),
+        },
+      }));
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 

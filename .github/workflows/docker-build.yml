@@ -21,7 +21,56 @@ env:
   FRONTEND_IMAGE_NAME: igor0670/customer-storage-frontend
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install Backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Backend build
+        working-directory: backend
+        run: npm run build
+
+      - name: Backend security tests
+        working-directory: backend
+        run: npm run test:security
+
+      - name: Backend API E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+
+      - name: Install Frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+
   build-and-push-backend:
+    needs: quality
     runs-on: ubuntu-latest
 
     steps:
@@ -72,6 +121,7 @@ jobs:
         run: echo "${{ steps.meta.outputs.tags }}"
 
   build-and-push-frontend:
+    needs: quality
     runs-on: ubuntu-latest
 
     steps:
@@ -151,7 +201,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       # 오프라인(폐쇄망) 배포용 이미지 번들 생성
-      # backend/frontend는 방금 push된 Docker Hub 이미지를, db/proxy는 compose에서 쓰는 베이스 이미지를 포함
+      # backend/frontend는 방금 push된 Docker Hub 이미지를, db/proxy/clamav는 compose에서 쓰는 베이스 이미지를 포함
       - name: Build offline image bundle
         run: |
           V="${{ steps.version.outputs.VERSION }}"
@@ -159,11 +209,13 @@ jobs:
           docker pull "${{ env.FRONTEND_IMAGE_NAME }}:$V"
           docker pull mariadb:10.11
           docker pull nginx:alpine
+          docker pull clamav/clamav:1.4.6
           docker save \
             "${{ env.BACKEND_IMAGE_NAME }}:$V" \
             "${{ env.FRONTEND_IMAGE_NAME }}:$V" \
             mariadb:10.11 \
             nginx:alpine \
+            clamav/clamav:1.4.6 \
             | gzip > "customer-vault-images-$V.tar.gz"
           ls -lh "customer-vault-images-$V.tar.gz"
 
@@ -220,7 +272,7 @@ jobs:
             # → USB 등으로 폐쇄망 서버에 복사
 
             # 폐쇄망 서버에서:
-            docker load -i customer-vault-images-$V.tar.gz   # 4개 이미지(backend/frontend/mariadb/nginx) 로드
+            docker load -i customer-vault-images-$V.tar.gz   # 5개 이미지(backend/frontend/mariadb/nginx/clamav) 로드
             cp env.example .env                              # .env 에 VERSION=$V, NODE_ENV=production, 시크릿 설정
             docker compose up -d                             # 로컬에 이미지가 있으면 pull 하지 않음
             ```

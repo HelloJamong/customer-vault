@@ -48,7 +48,6 @@ const SuperAdminsPage = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
-  const [defaultPassword, setDefaultPassword] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     name: '',
@@ -127,7 +126,7 @@ const SuperAdminsPage = () => {
         role: 'super_admin',
       });
 
-      alert(`${response.data.message}\n초기 패스워드: ${response.data.defaultPassword}`);
+      alert(response.data.message);
       handleCloseDialog();
       fetchUsers();
     } catch (error) {
@@ -193,8 +192,7 @@ const SuperAdminsPage = () => {
     }
 
     try {
-      const response = await apiClient.post(`/users/${selectedUser.id}/reset-password`);
-      setDefaultPassword(response.data.defaultPassword);
+      await apiClient.post(`/users/${selectedUser.id}/reset-password`);
       setOpenPasswordDialog(true);
       fetchUsers();
     } catch (error) {
@@ -399,11 +397,8 @@ const SuperAdminsPage = () => {
           <Typography variant="body1" gutterBottom>
             비밀번호가 초기화되었습니다.
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            새 패스워드: <strong>{defaultPassword}</strong>
-          </Typography>
           <Typography variant="body2" color="text.secondary">
-            최초 로그인 시 비밀번호 변경이 필요합니다.
+            시스템에 설정된 초기 비밀번호로 로그인한 뒤 즉시 비밀번호를 변경해야 합니다.
           </Typography>
         </DialogContent>
         <DialogActions>

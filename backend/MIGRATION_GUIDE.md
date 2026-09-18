@@ -210,7 +210,7 @@ NestJS 버전은 기존 Flask DB 스키마와 **완전히 호환**됩니다.
 ```bash
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"1111"}'
+  -d '{"username":"admin","password":"INITIAL_ADMIN_PASSWORD에_설정한_값"}'
 ```
 
 응답:

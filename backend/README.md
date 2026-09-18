@@ -69,10 +69,15 @@ npm run prisma:migrate     # 마이그레이션 실행
 npm run prisma:studio      # Prisma Studio 실행
 
 # 테스트
-npm run test               # 유닛 테스트
-npm run test:e2e           # E2E 테스트
-npm run test:cov           # 테스트 커버리지
+npm run lint               # Backend lint 검사
+npm run build              # Backend 타입/프로덕션 빌드
+npm run test:security      # 보안 회귀 테스트
+npm run test:e2e           # 격리된 Docker API E2E 테스트
+npm run test:all           # lint/build/security/E2E 전체
+npm run lint:fix           # lint 자동 수정(필요한 경우에만)
 ```
+
+상세한 테스트 환경과 E2E 격리 원칙은 [`../docs/backend_testing.md`](../docs/backend_testing.md)를 참고하세요.
 
 ## 📁 프로젝트 구조
 
@@ -154,9 +159,19 @@ JWT_SECRET=your-secret-key
 JWT_ACCESS_EXPIRATION=1h
 JWT_REFRESH_EXPIRATION=7d
 
+# 최초 빈 DB 초기화
+INITIAL_ADMIN_PASSWORD=설치자가_지정한_초기_비밀번호
+
 # File Upload
 UPLOAD_DIR=./uploads
 MAX_UPLOAD_SIZE=16777216
+CLAMAV_ENABLED=true
+CLAMAV_HOST=clamav
+CLAMAV_PORT=3310
+CLAMAV_SCAN_TIMEOUT_MS=30000
+
+# 백업 파일 암호화 (ENCRYPTION_KEY와 다른 64자리 hex 값)
+BACKUP_ENCRYPTION_KEY=설치자가_별도_보관할_64자리_hex_키
 
 # CORS
 CORS_ORIGIN=*

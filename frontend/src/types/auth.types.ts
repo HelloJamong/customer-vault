@@ -31,6 +31,19 @@ export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
   user: User;
+  session: SessionPolicy;
+}
+
+export interface SessionPolicy {
+  timeoutMinutes: number;
+  warningEnabled: boolean;
+  warningSeconds: number;
+  expiresAt: string;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+  session: SessionPolicy;
 }
 
 export interface ChangePasswordRequest {

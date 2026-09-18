@@ -97,6 +97,14 @@ export class CustomersController {
   }
 
   // 소스 관리
+  @Get(':id/source-management/reveal')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '소스 관리 민감정보 조회 (사내 사용자 공통, 감사 기록)' })
+  async revealSourceManagement(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const ipAddress = getClientIp(req);
+    return this.customersService.revealSourceManagement(id, req.user.id, ipAddress);
+  }
+
   @Get(':id/source-management')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '소스 관리 정보 조회' })

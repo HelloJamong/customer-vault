@@ -7,7 +7,7 @@ export class LoginDto {
   @IsNotEmpty()
   username: string;
 
-  @ApiProperty({ example: '1111', description: '비밀번호' })
+  @ApiProperty({ example: '설정된 비밀번호', description: '비밀번호' })
   @IsString()
   @IsNotEmpty()
   password: string;

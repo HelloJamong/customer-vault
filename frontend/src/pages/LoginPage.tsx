@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import symbolLogo from '@/assets/images/symbol.svg';
 import DuplicateLoginDialog from '@/components/auth/DuplicateLoginDialog';
+import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
 
 const loginSchema = z.object({
   username: z.string().min(1, '아이디를 입력해주세요'),
@@ -25,9 +26,13 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const authenticated = isAuthenticated();
-  const { login, isLoginLoading } = useAuth();
+  const { login, logout, user, isLoginLoading } = useAuth();
   const location = useLocation();
   const passwordChanged = (location.state as { passwordChanged?: boolean } | null)?.passwordChanged;
+  const requiresPasswordChange = Boolean(user?.isFirstLogin || user?.passwordExpired);
+  const forcedPasswordMessage = user?.passwordExpired
+    ? '비밀번호 사용 기간이 만료되었습니다. 계속하려면 비밀번호를 변경해야 합니다.'
+    : '최초 로그인 시 비밀번호를 변경해야 합니다.';
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [pendingCredentials, setPendingCredentials] = useState<LoginForm | null>(null);
 
@@ -39,10 +44,15 @@ const LoginPage = () => {
     resolver: zodResolver(loginSchema),
   });
 
-  // 이미 로그인되어 있으면 대시보드로 리다이렉트
-  if (authenticated) {
+  // 비밀번호 변경이 필요한 사용자는 로그인 화면에 머물러야 한다.
+  if (authenticated && !requiresPasswordChange) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const handlePasswordChangeSuccess = () => {
+    alert('비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해주세요.');
+    logout({ redirectState: { passwordChanged: true } });
+  };
 
   const onSubmit = (data: LoginForm) => {
     login(data, {
@@ -285,6 +295,13 @@ const LoginPage = () => {
         open={showDuplicateDialog}
         onConfirm={handleForceLogin}
         onCancel={handleCancelLogin}
+      />
+
+      <ChangePasswordDialog
+        open={requiresPasswordChange}
+        isForced
+        forcedMessage={forcedPasswordMessage}
+        onSuccess={handlePasswordChangeSuccess}
       />
     </Box>
   );

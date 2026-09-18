@@ -6,6 +6,7 @@ import { CustomLoggerService } from './common/logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import * as express from 'express';
 import * as cors from 'cors';
+import { SessionActivityInterceptor } from './auth/interceptors/session-activity.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -41,6 +42,19 @@ async function bootstrap() {
     process.exit(1);
   }
 
+  const backupEncryptionKey = process.env.BACKUP_ENCRYPTION_KEY;
+  if (
+    !backupEncryptionKey ||
+    !/^[0-9a-fA-F]{64}$/.test(backupEncryptionKey) ||
+    KNOWN_WEAK_SECRETS.has(backupEncryptionKey) ||
+    backupEncryptionKey.toLowerCase() === encryptionKey.toLowerCase()
+  ) {
+    console.error('❌ BACKUP_ENCRYPTION_KEY 환경 변수가 유효하지 않거나 ENCRYPTION_KEY와 동일합니다. 별도의 64자리 hex 문자열이 필요합니다.');
+    console.error('   생성: openssl rand -hex 32');
+    await app.close();
+    process.exit(1);
+  }
+
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret || jwtSecret.length < 32 || KNOWN_WEAK_SECRETS.has(jwtSecret)) {
     console.error('❌ JWT_SECRET 환경 변수가 유효하지 않거나 공개된 기본값입니다. 32자 이상의 문자열이 필요합니다.');
@@ -59,7 +73,7 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
-    exposedHeaders: ['Content-Disposition'],
+    exposedHeaders: ['Content-Disposition', 'X-Session-Expires-At', 'X-Session-Warning-Enabled'],
   }));
 
   // 커스텀 로거 설정
@@ -68,6 +82,7 @@ async function bootstrap() {
 
   // 전역 예외 필터 적용
   app.useGlobalFilters(new AllExceptionsFilter(customLogger));
+  app.useGlobalInterceptors(new SessionActivityInterceptor());
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');

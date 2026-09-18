@@ -13,7 +13,7 @@ import {
 export class UpdateSettingsDto {
   @ApiProperty({
     description: '초기 패스워드',
-    example: '1111',
+    example: '새 초기 비밀번호',
     required: false,
   })
   @IsOptional()
@@ -88,6 +88,28 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsBoolean()
   preventDuplicateLogin?: boolean;
+
+  @ApiProperty({
+    description: '세션 타임아웃 (10-60분)',
+    example: 30,
+    minimum: 10,
+    maximum: 60,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(60)
+  sessionTimeoutMinutes?: number;
+
+  @ApiProperty({
+    description: '세션 만료 1분 전 안내 팝업 표시 여부',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  sessionTimeoutWarningEnabled?: boolean;
 
   @ApiProperty({
     description: '로그인 실패 횟수 제한 활성화 여부',

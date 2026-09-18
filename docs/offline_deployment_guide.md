@@ -42,14 +42,17 @@ cd customer-vault
 
 `customer_vault_2.1.7_package.tar.gz` 파일이 생성됩니다.
 
+> 운영 배포에는 `ENCRYPTION_KEY`와 별도의 `BACKUP_ENCRYPTION_KEY`가 모두 필요합니다. DB/문서 백업은 `.enc` 파일로 암호화되며, 백업 키를 분실하면 복원할 수 없습니다.
+
 **패키지 내용:**
-- `images.tar` - Docker 이미지 (backend, frontend, nginx, mariadb)
+- `images.tar` - Docker 이미지 (backend, frontend, nginx, mariadb, clamav)
 - `docker-compose.yml` - 오프라인용 설정 (build 섹션 제거됨)
 - `proxy/` - Nginx 설정
 - `import-package.sh` - 오프라인 설치 스크립트
 - `DEPLOYMENT_GUIDE.md` - 배포 가이드
-- `MIGRATIONS.md` - DB 마이그레이션 가이드 (변경 있는 경우)
-- `prisma/` - DB 마이그레이션 파일 (변경 있는 경우)
+- `MIGRATIONS.md` - DB 마이그레이션 가이드
+- `prisma/` - DB 마이그레이션 파일 및 `migration_lock.toml`
+- `offline-upgrade.sh` - 기존 운영 서버용 이미지 교체·백업·마이그레이션 사전 적용 스크립트
 
 ### 패키지 전송
 
@@ -95,6 +98,19 @@ cp /path/to/existing/customer-vault/.env .
 ```
 
 #### 3) 자동 설치 스크립트 실행
+
+기존 운영 서버를 업그레이드하는 경우에는 `offline-upgrade.sh`를 사용하세요. 이 스크립트는
+백엔드 컨테이너를 시작하기 전에 DB를 기동하고, 암호화 백업을 생성한 뒤 마이그레이션을 적용합니다.
+기존 DB에 마이그레이션 이력이 없으면 초기 기준 마이그레이션만 명시적으로 적용 처리합니다.
+
+```bash
+./offline-upgrade.sh \
+  --app-dir /opt/customer-vault \
+  --package-dir /mnt/usb/customer_vault_2.1.7_package \
+  --version 2.1.7
+```
+
+신규 설치는 `import-package.sh`를 사용합니다.
 
 ```bash
 # import 스크립트 실행
@@ -197,7 +213,8 @@ docker compose stop
 docker load -i <이전_버전_패키지>/images.tar
 
 # DB 복원
-docker exec -i customer_db mysql -u root -p<PASSWORD> customer_db < backup.sql
+복원 시에는 암호화된 `.sql.gz.enc` 백업을 `BACKUP_ENCRYPTION_KEY`로 복호화한 뒤,
+DB 클라이언트의 `--defaults-extra-file`을 사용하세요. 비밀번호를 명령행에 넣지 마세요.
 
 # 서비스 재시작
 docker compose up -d
@@ -267,4 +284,3 @@ docker compose logs -f backend frontend
 - [Docker 설정 가이드](docker_setup_guide.md)
 - [DB 마이그레이션 가이드](migration_guide.md)
 - [로그 정보](logs_information.md)
-

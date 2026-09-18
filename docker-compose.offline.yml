@@ -5,6 +5,20 @@
 
 services:
   # ==========================================
+  # ClamAV 악성코드 검사 엔진
+  # ==========================================
+  clamav:
+    image: clamav/clamav:1.4.6
+    container_name: customer_clamav
+    restart: unless-stopped
+    expose:
+      - "3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    networks:
+      - customer_network
+
+  # ==========================================
   # MariaDB 데이터베이스
   # ==========================================
   db:
@@ -12,10 +26,10 @@ services:
     container_name: customer_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set}
       MYSQL_DATABASE: ${DB_NAME:-customer_db}
       MYSQL_USER: ${DB_USER:-customer_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-customerpass}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - ./data/mariadb:/var/lib/mysql
     ports:
@@ -24,7 +38,7 @@ services:
     networks:
       - customer_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -41,7 +55,12 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 5000
       TZ: ${TZ:-Asia/Seoul}
-      DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:-customerpass}@db:3306/${DB_NAME:-customer_db}
+      DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:?DB_PASSWORD must be set}@db:3306/${DB_NAME:-customer_db}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_SCAN_TIMEOUT_MS: ${CLAMAV_SCAN_TIMEOUT_MS:-30000}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 64)}
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
@@ -52,6 +71,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       BACKUP_DIR: /app/backups
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env (openssl rand -hex 32)}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY must be set in .env (openssl rand -hex 32)}
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
@@ -63,6 +83,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      clamav:
+        condition: service_started
     networks:
       - customer_network
     healthcheck:
@@ -108,4 +130,6 @@ networks:
 
 volumes:
   mariadb_data:
+    driver: local
+  clamav_data:
     driver: local

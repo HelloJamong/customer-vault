@@ -8,6 +8,8 @@ export interface SystemSettings {
   passwordExpiryEnabled: boolean;
   passwordExpiryDays: number;
   preventDuplicateLogin: boolean;
+  sessionTimeoutMinutes: number;
+  sessionTimeoutWarningEnabled: boolean;
   loginFailureLimitEnabled: boolean;
   loginFailureLimit: number;
   accountLockMinutes: number;
@@ -41,6 +43,8 @@ export interface UpdateSettingsRequest {
   passwordExpiryEnabled?: boolean;
   passwordExpiryDays?: number;
   preventDuplicateLogin?: boolean;
+  sessionTimeoutMinutes?: number;
+  sessionTimeoutWarningEnabled?: boolean;
   loginFailureLimitEnabled?: boolean;
   loginFailureLimit?: number;
   accountLockMinutes?: number;

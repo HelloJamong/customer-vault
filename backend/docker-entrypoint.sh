@@ -12,7 +12,6 @@ npx prisma generate
 MIGRATIONS_DIR="/app/prisma/migrations"
 if [ -d "$MIGRATIONS_DIR" ] && [ "$(ls -A "$MIGRATIONS_DIR")" ]; then
   echo "[entrypoint] Applying Prisma migrations..."
-  # Capture the real migrate exit status without relying on non-POSIX pipefail.
   set +e
   npx prisma migrate deploy >/tmp/migrate.log 2>&1
   migrate_status=$?
@@ -20,23 +19,15 @@ if [ -d "$MIGRATIONS_DIR" ] && [ "$(ls -A "$MIGRATIONS_DIR")" ]; then
   cat /tmp/migrate.log
 
   if [ "$migrate_status" -ne 0 ]; then
-    if grep -q "P3005" /tmp/migrate.log; then
-      initial_migration=$(find "$MIGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | head -n 1)
-      if [ -z "$initial_migration" ]; then
-        echo "[entrypoint] Migration failed: no initial migration directory found for P3005 recovery." >&2
-        exit 1
-      fi
-      echo "[entrypoint] Database is not empty. Marking initial migration as applied: $initial_migration"
-      npx prisma migrate resolve --applied "$initial_migration"
-      echo "[entrypoint] Retrying migration deployment..."
-      npx prisma migrate deploy
-    else
-      echo "[entrypoint] Migration failed with unexpected error"
-      exit 1
-    fi
+    echo "[entrypoint] Migration failed. Resolve an existing database baseline explicitly before restarting." >&2
+    exit "$migrate_status"
   fi
 else
-  echo "[entrypoint] No migrations found; pushing schema to database..."
+  if [ "${NODE_ENV:-production}" = "production" ]; then
+    echo "[entrypoint] No Prisma migrations found in the production image. Refusing to run db push." >&2
+    exit 1
+  fi
+  echo "[entrypoint] No migrations found; using db push in non-production environment..."
   npx prisma db push
 fi
 

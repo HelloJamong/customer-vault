@@ -94,7 +94,7 @@ docker-compose logs -f     # 로그
 ```bash
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"1111"}'
+  -d '{"username":"admin","password":"INITIAL_ADMIN_PASSWORD에_설정한_값"}'
 ```
 
 ### 사용자 목록 조회 (토큰 필요)

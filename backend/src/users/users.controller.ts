@@ -75,7 +75,7 @@ export class UsersController {
   @ApiResponse({ status: 201, description: '생성 성공' })
   create(@Body() createUserDto: CreateUserDto, @Request() req) {
     const ipAddress = getClientIp(req);
-    return this.usersService.create(createUserDto, req.user.id, ipAddress);
+    return this.usersService.create(createUserDto, req.user.id, req.user.role, ipAddress);
   }
 
   @Patch(':id')
@@ -115,7 +115,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: '초기화 성공' })
   resetPassword(@Param('id', ParseIntPipe) id: number, @Request() req) {
     const ipAddress = getClientIp(req);
-    return this.usersService.resetPassword(id, req.user.id, ipAddress);
+    return this.usersService.resetPassword(id, req.user.id, req.user.role, ipAddress);
   }
 
   @Delete(':id')

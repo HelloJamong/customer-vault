@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { assertCustomerEditable } from '../common/utils/customer-access.util';
+import {
+  FileSecurityService,
+  getFileSecurityFailureReason,
+} from '../common/file-security/file-security.service';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 
@@ -12,6 +16,7 @@ export class DocumentsService {
   constructor(
     private prisma: PrismaService,
     private logsService: LogsService,
+    private fileSecurityService: FileSecurityService,
   ) {}
 
   async findByCustomer(customerId: number, filters?: {
@@ -88,6 +93,9 @@ export class DocumentsService {
       if (!data.inspectionTargetId || isNaN(data.inspectionTargetId)) {
         throw new Error(`유효하지 않은 점검 대상 ID입니다. (inspectionTargetId: ${data.inspectionTargetId})`);
       }
+
+      // 임시 격리 파일은 형식 및 악성코드 검사에 통과한 뒤에만 최종 경로로 이동한다.
+      await this.fileSecurityService.inspectFile(data.originalFilename, data.tempFilepath);
 
       // 고객사 및 점검 대상 정보 병렬 조회
       const [customer, inspectionTarget] = await Promise.all([
@@ -188,6 +196,16 @@ export class DocumentsService {
         message: '문서가 업로드되었습니다.',
       };
     } catch (error) {
+      const securityFailure = getFileSecurityFailureReason(error);
+      if (securityFailure) {
+        await this.logsService.createServiceLog({
+          userId: data.uploadedBy,
+          logType: '보안',
+          action: '파일 보안 검사 차단',
+          description: `점검서 업로드가 파일 보안 검사에서 차단되었습니다. (고객사 ID: ${data.customerId}, 사유: ${securityFailure})`,
+        }).catch(() => {});
+      }
+
       // 에러 발생 시 임시 파일 / 옮겨진 최종 파일 정리
       if (data.tempFilepath && await fileExists(data.tempFilepath)) {
         await fsp.unlink(data.tempFilepath).catch(() => {});

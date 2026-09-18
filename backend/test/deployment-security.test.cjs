@@ -46,12 +46,8 @@ case "$*" in
         exit 42
         ;;
       p3005)
-        if [ "$count" -eq 1 ]; then
-          echo "Error: P3005 database schema is not empty" >&2
-          exit 1
-        fi
-        echo "deploy ok after resolve"
-        exit 0
+        echo "Error: P3005 database schema is not empty" >&2
+        exit 1
         ;;
     esac
     echo "unknown scenario: $MOCK_MIGRATE_SCENARIO" >&2
@@ -88,8 +84,6 @@ function runEntrypointScenario(scenario, includeInitialMigration = true) {
     const initialMigrationDir = path.join(migrationsDir, '20260106000000_init');
     fs.mkdirSync(initialMigrationDir, { recursive: true });
     fs.writeFileSync(path.join(initialMigrationDir, 'migration.sql'), '-- migration exists\n');
-  } else {
-    fs.writeFileSync(path.join(migrationsDir, 'unexpected-file.txt'), 'not a migration directory\n');
   }
   makeMockNpx(binDir);
 
@@ -107,6 +101,7 @@ function runEntrypointScenario(scenario, includeInitialMigration = true) {
     env: {
       ...process.env,
       DATABASE_URL: 'mysql://user:pass@db:3306/customer_db',
+      NODE_ENV: 'production',
       MOCK_COMMAND_LOG: commandLog,
       MOCK_MIGRATE_SCENARIO: scenario,
       MOCK_STATE_DIR: stateDir,
@@ -129,15 +124,84 @@ test('backend service is not published to host in online and offline compose fil
     const backend = serviceBlock(compose, 'backend');
     const proxy = serviceBlock(compose, 'proxy');
 
-    assert.doesNotMatch(backend, /\n    ports:\n/, `${file} backend must not publish host ports`);
-    assert.match(backend, /\n    expose:\n      - "5000"\n/, `${file} backend should document internal port 5000`);
-    assert.match(proxy, /\n    ports:\n      - "\$\{PROXY_PORT:-2082\}:80"\n/, `${file} proxy remains the host entrypoint`);
+    assert.doesNotMatch(backend, /\n {4}ports:\n/, `${file} backend must not publish host ports`);
+    assert.match(backend, /\n {4}expose:\n {6}- "5000"\n/, `${file} backend should document internal port 5000`);
+    assert.match(proxy, /\n {4}ports:\n {6}- "\$\{PROXY_PORT:-2082\}:80"\n/, `${file} proxy remains the host entrypoint`);
   }
 });
 
 test('nginx proxy reaches backend through the internal compose network', () => {
   const nginx = fs.readFileSync(path.join(repoRoot, 'proxy', 'nginx.conf'), 'utf8');
   assert.match(nginx, /upstream backend_api \{\n\s*server backend:5000;\n\s*\}/);
+});
+
+test('database passwords have no public fallback in compose files', () => {
+  for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
+    const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    assert.match(compose, /DB_ROOT_PASSWORD:\?DB_ROOT_PASSWORD must be set/);
+    assert.match(compose, /DB_PASSWORD:\?DB_PASSWORD must be set/);
+    assert.doesNotMatch(compose, /rootpassword|customerpass/);
+  }
+});
+
+test('both compose files configure the internal ClamAV scanner without publishing its port', () => {
+  for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
+    const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    const clamav = serviceBlock(compose, 'clamav');
+    const backend = serviceBlock(compose, 'backend');
+
+    assert.match(clamav, /image: clamav\/clamav:1\.4\.6/);
+    assert.match(clamav, /- "3310"/);
+    assert.doesNotMatch(clamav, /\n {4}ports:\n/);
+    assert.match(backend, /CLAMAV_ENABLED: \$\{CLAMAV_ENABLED:-true\}/);
+    assert.match(backend, /CLAMAV_HOST: \$\{CLAMAV_HOST:-clamav\}/);
+  }
+});
+
+test('both compose files require a separate backup encryption key', () => {
+  for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
+    const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    const backend = serviceBlock(compose, 'backend');
+    assert.match(backend, /BACKUP_ENCRYPTION_KEY: \$\{BACKUP_ENCRYPTION_KEY:\?BACKUP_ENCRYPTION_KEY must be set/);
+    assert.match(compose, /BACKUP_ENCRYPTION_KEY/);
+  }
+  const example = fs.readFileSync(path.join(repoRoot, '.env.example'), 'utf8');
+  assert.match(example, /BACKUP_ENCRYPTION_KEY=/);
+});
+
+test('backup downloads are restricted to encrypted files and audited', () => {
+  const backupService = fs.readFileSync(
+    path.join(repoRoot, 'backend', 'src', 'backup', 'backup.service.ts'),
+    'utf8',
+  );
+  const backupController = fs.readFileSync(
+    path.join(repoRoot, 'backend', 'src', 'backup', 'backup.controller.ts'),
+    'utf8',
+  );
+  assert.match(backupService, /resolvedPath\.endsWith\('\.enc'\)/);
+  assert.match(backupService, /realPath\.endsWith\('\.enc'\)/);
+  assert.match(backupController, /암호화 백업 파일 다운로드/);
+});
+
+test('production images require committed Prisma migrations', () => {
+  const migrationDir = path.join(repoRoot, 'backend', 'prisma', 'migrations');
+  const migrations = fs.readdirSync(migrationDir).filter((entry) =>
+    fs.existsSync(path.join(migrationDir, entry, 'migration.sql')),
+  );
+  assert.ok(migrations.length > 0, 'at least one baseline migration must be committed');
+  assert.ok(fs.existsSync(path.join(repoRoot, 'backend', 'prisma', 'migration_lock.toml')));
+
+  const entrypoint = fs.readFileSync(entrypointPath, 'utf8');
+  assert.match(entrypoint, /NODE_ENV.*production/);
+  assert.match(entrypoint, /refusing to run db push/i);
+
+  const upgradeScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'offline-upgrade.sh'), 'utf8');
+  assert.match(upgradeScript, /run_migration_preflight/);
+  assert.match(upgradeScript, /migrate resolve --applied/);
+
+  const createMigrationScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'create-migration.sh'), 'utf8');
+  assert.match(createMigrationScript, /-v .*backend\/prisma:\/app\/prisma/);
+  assert.match(createMigrationScript, /--entrypoint npx/);
 });
 
 test('entrypoint preserves successful migrate deploy exit status', () => {
@@ -160,34 +224,26 @@ test('entrypoint exits on non-P3005 migrate deploy failure', () => {
     'prisma migrate deploy',
   ]);
   assert.match(result.stdout, /unexpected migration failure/);
-  assert.match(result.stdout, /Migration failed with unexpected error/);
+  assert.match(`${result.stdout}${result.stderr}`, /Migration failed\. Resolve an existing database baseline explicitly/i);
   assert.doesNotMatch(result.stdout, /Starting application/);
 });
 
-test('entrypoint preserves P3005 fallback resolve and retry path', () => {
+test('entrypoint fails closed on P3005 until an explicit baseline is resolved', () => {
   const result = runEntrypointScenario('p3005');
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.notEqual(result.status, 0);
   assert.deepEqual(result.commands, [
     'prisma generate',
     'prisma migrate deploy',
-    'prisma migrate resolve --applied 20260106000000_init',
-    'prisma migrate deploy',
-    'prisma db execute --stdin',
   ]);
-  assert.match(result.stdout, /P3005/);
-  assert.match(result.stdout, /Retrying migration deployment/);
-  assert.match(result.stdout, /deploy ok after resolve/);
-  assert.match(result.stdout, /Starting application/);
+  assert.match(`${result.stdout}${result.stderr}`, /Resolve an existing database baseline explicitly/i);
+  assert.doesNotMatch(result.stdout, /Starting application/);
 });
 
-test('entrypoint fails closed when P3005 has no migration to resolve', () => {
+test('entrypoint refuses production startup when migrations are missing', () => {
   const result = runEntrypointScenario('p3005', false);
-  assert.notEqual(result.status, 0, 'P3005 recovery must fail without an initial migration');
-  assert.deepEqual(result.commands, [
-    'prisma generate',
-    'prisma migrate deploy',
-  ]);
+  assert.notEqual(result.status, 0, 'production must not fall back to db push');
+  assert.deepEqual(result.commands, ['prisma generate']);
   const output = `${result.stdout}${result.stderr}`;
-  assert.match(output, /no initial migration directory found/i);
+  assert.match(output, /No Prisma migrations found.*refusing to run db push/i);
   assert.doesNotMatch(output, /Starting application/);
 });

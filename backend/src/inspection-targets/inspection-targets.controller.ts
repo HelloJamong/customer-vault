@@ -98,26 +98,12 @@ export class InspectionTargetsController {
 
     await this.service.assertCanManageTarget(parseInt(inspectionTargetId), req.user);
 
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/haansofthwp',
-      'application/x-hwp',
-      'application/vnd.hancom.hwp',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    ];
-
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('허용되지 않은 파일 형식입니다.');
-    }
-
     return this.service.uploadTemplate(
       parseInt(inspectionTargetId),
       file,
       customerName,
       productName,
+      { userId: req.user?.id, ipAddress: req.ip },
     );
   }
 }
