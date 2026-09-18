@@ -13,7 +13,9 @@ export interface PendingNotification {
 export const supportLogsAPI = {
   // 진행 중인 지원 현황 알림 조회
   getPendingNotifications: async (): Promise<PendingNotification[]> => {
-    const { data } = await apiClient.get('/support-logs/pending-notifications');
+    const { data } = await apiClient.get('/support-logs/pending-notifications', {
+      headers: { 'X-Session-Activity': 'false' },
+    });
     return data;
   },
 

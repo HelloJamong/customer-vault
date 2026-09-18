@@ -14,6 +14,8 @@ export interface User {
   is_active?: boolean;
   isFirstLogin?: boolean;
   passwordExpired?: boolean;
+  mfaEnabled?: boolean;
+  mfaSetupRequired?: boolean;
   lastLogin?: string;
   createdAt?: string;
   created_at?: string;
@@ -28,10 +30,26 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   user: User;
-  session: SessionPolicy;
+  session?: SessionPolicy;
+  mfaRequired?: boolean;
+  mfaChallengeToken?: string;
+}
+
+export interface MfaSetupResponse {
+  qrCode: string;
+  manualKey: string;
+  issuer: string;
+  account: string;
+  periodSeconds: number;
+}
+
+export interface MfaChallengeResponse {
+  mfaRequired: true;
+  mfaChallengeToken: string;
+  user: Pick<User, 'id' | 'username' | 'name'>;
 }
 
 export interface SessionPolicy {

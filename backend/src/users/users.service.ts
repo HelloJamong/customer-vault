@@ -392,6 +392,54 @@ export class UsersService {
     };
   }
 
+  async resetOtp(
+    id: number,
+    currentUserId: number,
+    currentUserRole: string,
+    ipAddress?: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { username: true, name: true, role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const actorRole = String(currentUserRole ?? '').trim().toLowerCase();
+    if (actorRole !== Role.ADMIN && actorRole !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('OTP를 초기화할 권한이 없습니다.');
+    }
+
+    if (
+      actorRole !== Role.SUPER_ADMIN &&
+      (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN)
+    ) {
+      throw new ForbiddenException('관리자 계정의 OTP는 슈퍼 관리자만 초기화할 수 있습니다.');
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        mfaEnabled: false,
+        mfaSecretEncrypted: null,
+        mfaConfirmedAt: null,
+        mfaLastUsedStep: null,
+      },
+    });
+
+    await this.logsService.createServiceLog({
+      userId: currentUserId,
+      logType: '경고',
+      action: 'OTP 등록 초기화',
+      description: `사용자 "${user.username} (${user.name})"의 OTP 등록을 초기화했습니다.`,
+      ipAddress,
+    });
+
+    return { message: 'OTP 등록이 초기화되었습니다.' };
+  }
+
   async getAssignmentStatus() {
     // 기술팀 소속 사용자 조회
     const users = await this.prisma.user.findMany({

@@ -14,7 +14,7 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.isFirstLogin || user?.passwordExpired) {
+  if (user?.isFirstLogin || user?.passwordExpired || user?.mfaSetupRequired) {
     return <Navigate to="/login" replace />;
   }
 

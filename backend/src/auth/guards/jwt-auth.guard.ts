@@ -13,6 +13,9 @@ const PASSWORD_CHANGE_ALLOWED_SUFFIXES = [
   '/auth/session-events',
   '/auth/session-policy',
   '/auth/extend-session',
+  '/auth/mfa/setup',
+  '/auth/mfa/setup/confirm',
+  '/auth/mfa/status',
 ];
 
 @Injectable()
@@ -31,6 +34,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
           message: req.user.isFirstLogin
             ? '초기 비밀번호를 변경해야 합니다.'
             : '비밀번호 사용 기간이 만료되었습니다. 비밀번호를 변경해야 합니다.',
+        });
+      }
+    }
+
+    if (req.user?.mfaSetupRequired) {
+      const path = (req.path || req.url || '').split('?')[0];
+      const allowed = PASSWORD_CHANGE_ALLOWED_SUFFIXES.some((s) => path.endsWith(s));
+      if (!allowed) {
+        throw new ForbiddenException({
+          code: 'MFA_SETUP_REQUIRED',
+          message: 'OTP 등록을 완료해야 합니다.',
         });
       }
     }

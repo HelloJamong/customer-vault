@@ -114,6 +114,12 @@ export class SettingsService {
       afterValues.push(data.sessionTimeoutWarningEnabled ? '활성화' : '비활성화');
     }
 
+    if (data.otpEnabled !== undefined && data.otpEnabled !== settings.otpEnabled) {
+      changes.push('OTP 기능');
+      beforeValues.push(settings.otpEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.otpEnabled ? '활성화' : '비활성화');
+    }
+
     if (data.loginFailureLimitEnabled !== undefined && data.loginFailureLimitEnabled !== settings.loginFailureLimitEnabled) {
       changes.push('로그인 실패 횟수 제한 활성화');
       beforeValues.push(settings.loginFailureLimitEnabled ? '활성화' : '비활성화');

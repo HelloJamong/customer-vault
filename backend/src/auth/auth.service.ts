@@ -15,8 +15,10 @@ import { SessionEventService } from './session-event.service';
 import { cleanIpAddress } from '../common/utils/ip.util';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { LoginDto, ChangePasswordDto } from './dto/login.dto';
+import { LoginDto, ChangePasswordDto, MfaVerifyDto } from './dto/login.dto';
 import { getInitialAdminPassword } from '../common/config/initial-password';
+import { CryptoService } from '../common/crypto/crypto.service';
+import { TotpService } from './totp.service';
 
 import {
   getSessionTimeoutMs,
@@ -37,6 +39,8 @@ export class AuthService {
     @Inject(forwardRef(() => LogsService))
     private logsService: LogsService,
     private sessionEventService: SessionEventService,
+    private cryptoService: CryptoService,
+    private totpService: TotpService,
   ) {}
 
   async login(loginDto: LoginDto, ipAddress: string) {
@@ -65,7 +69,7 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
-      await this.handleFailedLogin(user.id, ipAddress);
+      await this.handleFailedLogin(user.id, ipAddress, 'PASSWORD');
       throw new UnauthorizedException('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
 
@@ -86,27 +90,170 @@ export class AuthService {
       }
     }
 
-    // 로그인 성공 처리
-    await this.handleSuccessfulLogin(user.id, ipAddress);
+    if (settings.otpEnabled && user.mfaEnabled) {
+      return {
+        mfaRequired: true,
+        mfaChallengeToken: this.generateMfaChallengeToken(user, forceLogin),
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+        },
+      };
+    }
 
-    // 세션 관리 (토큰 생성 전에 세션 ID 필요)
-    const sessionId = await this.manageUserSession(user.id, ipAddress, settings, forceLogin);
+    return this.completeLogin(user, settings, ipAddress, forceLogin, passwordExpired);
+  }
 
-    // 토큰 생성 (세션 ID 포함)
-    const tokens = await this.generateTokens(user.id, user.username, user.role, sessionId);
+  async verifyMfa(dto: MfaVerifyDto, ipAddress: string) {
+    let payload: { sub?: number; type?: string; forceLogin?: boolean };
+    try {
+      payload = this.jwtService.verify(dto.challengeToken, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+        algorithms: ['HS256'],
+      });
+    } catch {
+      throw new UnauthorizedException('OTP 인증 요청이 만료되었거나 유효하지 않습니다.');
+    }
+
+    if (payload.type !== 'mfa_challenge' || !payload.sub) {
+      throw new UnauthorizedException('OTP 인증 요청이 유효하지 않습니다.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || !user.isActive || !user.mfaEnabled || !user.mfaSecretEncrypted) {
+      throw new UnauthorizedException('OTP 인증을 사용할 수 없는 계정입니다.');
+    }
+
+    const settings = await this.getSystemSettings();
+    if (!settings.otpEnabled) {
+      throw new UnauthorizedException('OTP 기능이 비활성화되었습니다.');
+    }
+
+    let secret: string;
+    try {
+      secret = this.cryptoService.decrypt(user.mfaSecretEncrypted);
+    } catch {
+      throw new UnauthorizedException('OTP 설정을 읽을 수 없습니다. 관리자에게 문의하세요.');
+    }
+
+    const usedStep = this.totpService.verifyCode(secret, dto.code);
+    if (usedStep === null) {
+      await this.handleFailedLogin(user.id, ipAddress, 'OTP');
+      throw new UnauthorizedException('OTP 코드가 올바르지 않습니다.');
+    }
+
+    const consumed = await this.prisma.user.updateMany({
+      where: {
+        id: user.id,
+        OR: [{ mfaLastUsedStep: null }, { mfaLastUsedStep: { lt: usedStep } }],
+      },
+      data: { mfaLastUsedStep: usedStep },
+    });
+    if (consumed.count !== 1) {
+      throw new UnauthorizedException('이미 사용된 OTP 코드입니다.');
+    }
+
+    const passwordExpired = await this.isPasswordExpired(user.id, settings);
+    return this.completeLogin(user, settings, ipAddress, payload.forceLogin, passwordExpired);
+  }
+
+  async setupMfa(userId: number) {
+    const settings = await this.getSystemSettings();
+    if (!settings.otpEnabled) {
+      throw new ForbiddenException('OTP 기능이 비활성화되어 있습니다.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, mfaEnabled: true },
+    });
+    if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    if (user.mfaEnabled) throw new BadRequestException('이미 OTP가 등록되어 있습니다.');
+
+    const secret = this.totpService.generateSecret();
+    const otpauthUri = this.totpService.buildOtpAuthUri(user.username, secret);
+    const qrCode = await this.totpService.createQrCode(otpauthUri);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfaSecretEncrypted: this.cryptoService.encrypt(secret),
+        mfaEnabled: false,
+        mfaConfirmedAt: null,
+        mfaLastUsedStep: null,
+      },
+    });
 
     return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      session: this.buildSessionPolicy(settings),
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        isFirstLogin: user.isFirstLogin,
-        passwordExpired,
-      },
+      qrCode,
+      manualKey: secret,
+      issuer: 'Customer Vault',
+      account: user.username,
+      periodSeconds: 30,
+    };
+  }
+
+  async confirmMfaSetup(userId: number, code: string, ipAddress?: string) {
+    const settings = await this.getSystemSettings();
+    if (!settings.otpEnabled) {
+      throw new ForbiddenException('OTP 기능이 비활성화되어 있습니다.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, mfaEnabled: true, mfaSecretEncrypted: true },
+    });
+    if (!user || !user.mfaSecretEncrypted) {
+      throw new BadRequestException('먼저 OTP QR 코드를 발급받아야 합니다.');
+    }
+    if (user.mfaEnabled) return { enabled: true, message: 'OTP가 이미 등록되어 있습니다.' };
+
+    let secret: string;
+    try {
+      secret = this.cryptoService.decrypt(user.mfaSecretEncrypted);
+    } catch {
+      throw new BadRequestException('OTP 설정을 읽을 수 없습니다. QR 코드를 다시 발급하세요.');
+    }
+
+    const usedStep = this.totpService.verifyCode(secret, code);
+    if (usedStep === null) {
+      await this.logsService.createServiceLog({
+        userId,
+        logType: '경고',
+        action: 'OTP 등록 실패',
+        description: `${user.username} 사용자의 OTP 등록 확인에 실패했습니다.`,
+        ipAddress,
+      });
+      throw new BadRequestException('OTP 코드가 올바르지 않습니다. 휴대폰의 시간을 확인하세요.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mfaEnabled: true, mfaConfirmedAt: new Date(), mfaLastUsedStep: usedStep },
+    });
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '정보',
+      action: 'OTP 등록 완료',
+      description: `${user.username} 사용자가 OTP를 등록했습니다.`,
+      ipAddress,
+    });
+
+    return { enabled: true, message: 'OTP 등록이 완료되었습니다.' };
+  }
+
+  async getMfaStatus(userId: number) {
+    const settings = await this.getSystemSettings();
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { mfaEnabled: true },
+    });
+    if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    return {
+      otpEnabled: settings.otpEnabled,
+      mfaEnabled: user.mfaEnabled,
+      setupRequired: settings.otpEnabled && !user.mfaEnabled,
     };
   }
 
@@ -299,6 +446,7 @@ export class AuthService {
         email: true,
         isActive: true,
         isFirstLogin: true,
+        mfaEnabled: true,
         lastLogin: true,
         createdAt: true,
       },
@@ -381,6 +529,53 @@ export class AuthService {
   }
 
   // Helper Methods
+  private generateMfaChallengeToken(
+    user: { id: number; username: string; role: string },
+    forceLogin?: boolean,
+  ) {
+    return this.jwtService.sign(
+      {
+        sub: user.id,
+        username: user.username,
+        role: user.role,
+        forceLogin: Boolean(forceLogin),
+        type: 'mfa_challenge',
+      },
+      {
+        secret: this.configService.get<string>('JWT_SECRET'),
+        expiresIn: '5m',
+      } as any,
+    );
+  }
+
+  private async completeLogin(
+    user: any,
+    settings: any,
+    ipAddress: string,
+    forceLogin?: boolean,
+    passwordExpired = false,
+  ) {
+    await this.handleSuccessfulLogin(user.id, ipAddress);
+    const sessionId = await this.manageUserSession(user.id, ipAddress, settings, forceLogin);
+    const tokens = await this.generateTokens(user.id, user.username, user.role, sessionId);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      session: this.buildSessionPolicy(settings),
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        isFirstLogin: user.isFirstLogin,
+        passwordExpired,
+        mfaEnabled: user.mfaEnabled,
+        mfaSetupRequired: Boolean(settings.otpEnabled && !user.mfaEnabled),
+      },
+    };
+  }
+
   private async generateTokens(userId: number, username: string, role: string, sessionId: string) {
     const base = { sub: userId, username, role, sessionId };
 
@@ -444,7 +639,11 @@ export class AuthService {
     return isPasswordExpired(user.passwordChangedAt, settings);
   }
 
-  private async handleFailedLogin(userId: number, ipAddress: string) {
+  private async handleFailedLogin(
+    userId: number,
+    ipAddress: string,
+    failureReason = 'PASSWORD',
+  ) {
     const settings = await this.getSystemSettings();
     const cleanedIp = cleanIpAddress(ipAddress);
 
@@ -461,6 +660,7 @@ export class AuthService {
       data: {
         userId,
         success: false,
+        failureReason,
         ipAddress: cleanedIp,
       },
     });

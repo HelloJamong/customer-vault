@@ -112,6 +112,15 @@ export class UpdateSettingsDto {
   sessionTimeoutWarningEnabled?: boolean;
 
   @ApiProperty({
+    description: '폐쇄망 TOTP OTP 기능 활성화 여부',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  otpEnabled?: boolean;
+
+  @ApiProperty({
     description: '로그인 실패 횟수 제한 활성화 여부',
     example: false,
     required: false,

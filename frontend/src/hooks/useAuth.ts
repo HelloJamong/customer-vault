@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/api/auth.api';
 import { useAuthStore } from '@/store/authStore';
 import { queryClient } from '@/lib/queryClient';
-import type { LoginRequest } from '@/types/auth.types';
+import type { LoginRequest, LoginResponse } from '@/types/auth.types';
 import { getApiErrorMessage } from '@/utils/api-error';
 
 interface LogoutOptions {
@@ -13,23 +13,16 @@ interface LogoutOptions {
 
 interface LoginOptions {
   onDuplicateSession?: () => void;
+  onMfaRequired?: (data: LoginResponse) => void;
 }
 
 export const useAuth = () => {
   const navigate = useNavigate();
-  const { login: setAuth, logout: clearAuth, user } = useAuthStore();
+  const { login: setAuth, logout: clearAuth, setUser, user } = useAuthStore();
 
   // 로그인 뮤테이션
   const loginMutation = useMutation({
     mutationFn: (credentials: LoginRequest) => authAPI.login(credentials),
-    onSuccess: (data) => {
-      setAuth(data.accessToken, data.refreshToken, data.user, data.session);
-      // 최초 로그인/비밀번호 만료 상태에서는 대시보드로 이동하지 않고
-      // 로그인 화면의 강제 변경 다이얼로그를 표시한다.
-      if (!data.user.isFirstLogin && !data.user.passwordExpired) {
-        navigate('/dashboard');
-      }
-    },
   });
 
   // 로그아웃 뮤테이션
@@ -55,6 +48,20 @@ export const useAuth = () => {
 
   const login = (credentials: LoginRequest, options?: LoginOptions) => {
     loginMutation.mutate(credentials, {
+      onSuccess: (data) => {
+        if (data.mfaRequired) {
+          options?.onMfaRequired?.(data);
+          return;
+        }
+        if (!data.accessToken || !data.refreshToken || !data.session) {
+          alert('로그인 응답이 올바르지 않습니다.');
+          return;
+        }
+        setAuth(data.accessToken, data.refreshToken, data.user, data.session);
+        if (!data.user.isFirstLogin && !data.user.passwordExpired && !data.user.mfaSetupRequired) {
+          navigate('/dashboard');
+        }
+      },
       onError: (error) => {
         console.error('Login failed:', error);
 
@@ -73,10 +80,29 @@ export const useAuth = () => {
     });
   };
 
+  const completeMfaLogin = (data: LoginResponse) => {
+    if (!data.accessToken || !data.refreshToken || !data.session) {
+      throw new Error('OTP 로그인 응답이 올바르지 않습니다.');
+    }
+    setAuth(data.accessToken, data.refreshToken, data.user, data.session);
+    if (!data.user.isFirstLogin && !data.user.passwordExpired && !data.user.mfaSetupRequired) {
+      navigate('/dashboard');
+    }
+  };
+
+  const completeMfaSetup = () => {
+    if (user) {
+      setUser({ ...user, mfaEnabled: true, mfaSetupRequired: false });
+    }
+    navigate('/dashboard');
+  };
+
   return {
     user,
     isAuthenticated: !!user,
     login,
+    completeMfaLogin,
+    completeMfaSetup,
     logout: logoutMutation.mutate,
     isLoginLoading: loginMutation.isPending,
   };

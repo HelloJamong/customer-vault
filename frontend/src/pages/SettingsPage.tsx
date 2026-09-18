@@ -23,9 +23,11 @@ import Grid from '@/mui-grid2';
 import { useSettings } from '../hooks/useSettings';
 import type { UpdateSettingsRequest } from '../types/settings.types';
 import { getApiErrorMessage } from '@/utils/api-error';
+import { useAuth } from '@/hooks/useAuth';
 
 const SettingsPage = () => {
   const { settings, loading, error, updateSettings } = useSettings();
+  const { user, logout } = useAuth();
   const [formData, setFormData] = useState<UpdateSettingsRequest>({});
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -47,6 +49,7 @@ const SettingsPage = () => {
         preventDuplicateLogin: settings.preventDuplicateLogin,
         sessionTimeoutMinutes: settings.sessionTimeoutMinutes ?? 30,
         sessionTimeoutWarningEnabled: settings.sessionTimeoutWarningEnabled ?? true,
+        otpEnabled: settings.otpEnabled ?? false,
         loginFailureLimitEnabled: settings.loginFailureLimitEnabled,
         loginFailureLimit: settings.loginFailureLimit,
         accountLockMinutes: settings.accountLockMinutes,
@@ -73,12 +76,18 @@ const SettingsPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
+      const enablingOtpForUnregisteredUser =
+        settings?.otpEnabled === false && formData.otpEnabled === true && !user?.mfaEnabled;
       await updateSettings(formData);
       setSnackbar({
         open: true,
         message: '시스템 설정이 저장되었습니다.',
         severity: 'success',
       });
+      if (enablingOtpForUnregisteredUser) {
+        alert('OTP가 활성화되었습니다. OTP 등록을 위해 다시 로그인해주세요.');
+        logout({});
+      }
     } catch (err) {
       setSnackbar({
         open: true,
@@ -330,10 +339,33 @@ const SettingsPage = () => {
           </Grid>
         </Paper>
 
-        {/* 6. 로그인 실패 횟수 */}
+        {/* 6. OTP 설정 */}
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            6. 로그인 실패 횟수 제한
+            6. OTP 2차 인증
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            폐쇄망에서도 사용할 수 있는 Authenticator 앱 기반 TOTP 인증을 적용합니다.
+            활성화하면 OTP를 등록하지 않은 사용자는 다음 로그인 시 등록 절차를 진행해야 합니다.
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={formData.otpEnabled ?? false}
+                onChange={(e) => setFormData({ ...formData, otpEnabled: e.target.checked })}
+              />
+            }
+            label="OTP 2차 인증 활성화"
+          />
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Google Authenticator 또는 Microsoft Authenticator에서 QR 코드를 등록합니다. OTP를 분실한 경우 사용자 관리 화면에서 관리자만 등록을 초기화할 수 있습니다.
+          </Alert>
+        </Paper>
+
+        {/* 7. 로그인 실패 횟수 */}
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            7. 로그인 실패 횟수 제한
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
             연속된 로그인 실패 시 계정을 일시적으로 잠금합니다
@@ -404,10 +436,10 @@ const SettingsPage = () => {
           </Grid>
         </Paper>
 
-        {/* 6. JIRA 연결 설정 */}
+        {/* 8. JIRA 연결 설정 */}
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            6. JIRA 연결 설정
+            8. JIRA 연결 설정
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
             지원 로그의 JIRA 티켓 연동 기능을 설정합니다

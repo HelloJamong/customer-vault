@@ -32,6 +32,12 @@ model User {
   // 최초 로그인
   isFirstLogin          Boolean   @default(true) @map("is_first_login")
 
+  // TOTP 2차 인증
+  mfaEnabled             Boolean   @default(false) @map("mfa_enabled")
+  mfaSecretEncrypted     String?   @map("mfa_secret_encrypted") @db.VarChar(512)
+  mfaConfirmedAt         DateTime? @map("mfa_confirmed_at")
+  mfaLastUsedStep        Int?      @map("mfa_last_used_step")
+
   // 타임스탬프
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
@@ -222,6 +228,9 @@ model SystemSettings {
   sessionTimeoutMinutes       Int       @default(30) @map("session_timeout_minutes")
   sessionTimeoutWarningEnabled Boolean   @default(true) @map("session_timeout_warning_enabled")
 
+  // OTP 정책
+  otpEnabled                 Boolean   @default(false) @map("otp_enabled")
+
   // 로그인 실패 횟수
   loginFailureLimitEnabled    Boolean   @default(false) @map("login_failure_limit_enabled")
   loginFailureLimit           Int       @default(5) @map("login_failure_limit")
@@ -261,6 +270,7 @@ model LoginAttempt {
   userId      Int       @map("user_id")
   attemptTime DateTime  @default(now()) @map("attempt_time")
   success     Boolean   @default(false)
+  failureReason String?  @map("failure_reason") @db.VarChar(30)
   ipAddress   String?   @map("ip_address") @db.VarChar(45)
 
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)

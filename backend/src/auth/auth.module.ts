@@ -7,6 +7,8 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { SessionEventService } from './session-event.service';
 import { LogsModule } from '../logs/logs.module';
+import { CryptoModule } from '../common/crypto/crypto.module';
+import { TotpService } from './totp.service';
 
 @Module({
   imports: [
@@ -22,9 +24,10 @@ import { LogsModule } from '../logs/logs.module';
       inject: [ConfigService],
     }),
     forwardRef(() => LogsModule),
+    CryptoModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, SessionEventService],
+  providers: [AuthService, JwtStrategy, SessionEventService, TotpService],
   exports: [AuthService],
 })
 export class AuthModule {}

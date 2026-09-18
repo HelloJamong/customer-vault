@@ -13,6 +13,10 @@ export interface JwtPayload {
   type?: 'access' | 'refresh';
 }
 
+interface RequestLike {
+  headers?: Record<string, string | string[] | undefined>;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -24,10 +28,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'),
       algorithms: ['HS256'],
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(requestOrPayload: RequestLike | JwtPayload, maybePayload?: JwtPayload) {
+    // 기존 직접 호출 호환성을 위해 payload 단독 호출도 허용한다.
+    const request = maybePayload ? requestOrPayload as RequestLike : undefined;
+    const payload = maybePayload ?? requestOrPayload as JwtPayload;
+    const isPassiveRequest = request?.headers?.['x-session-activity'] === 'false';
+
     // refresh 토큰을 Authorization 헤더로 재사용하지 못하도록 차단
     if (payload.type === 'refresh') {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
@@ -57,12 +67,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('세션이 만료되었습니다.');
     }
 
-    // 유효한 세션만 활동 시각을 갱신한다. 삭제되거나 만료된 세션은 부활시키지 않는다.
-    await this.prisma.userSession.updateMany({
-      where: { id: session.id },
-      data: { lastActivity: now },
-    });
+    // 백그라운드 polling은 유휴 세션을 연장하지 않는다. 사용자 요청만 활동으로 기록한다.
+    if (!isPassiveRequest) {
+      await this.prisma.userSession.updateMany({
+        where: { id: session.id },
+        data: { lastActivity: now },
+      });
+    }
     const timeoutMinutes = getSessionTimeoutMinutes(settings);
+    const activityAt = isPassiveRequest ? session.lastActivity : now;
 
     return {
       id: user.id,
@@ -71,10 +84,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       isFirstLogin: user.isFirstLogin,
       passwordExpired: isPasswordExpired(user.passwordChangedAt, settings),
+      mfaEnabled: user.mfaEnabled,
+      mfaSetupRequired: Boolean(settings?.otpEnabled && !user.mfaEnabled),
       sessionId: payload.sessionId, // JWT에서 sessionId 전달
       sessionTimeoutMinutes: timeoutMinutes,
       sessionTimeoutWarningEnabled: settings?.sessionTimeoutWarningEnabled ?? true,
-      sessionExpiresAt: new Date(now.getTime() + timeoutMinutes * 60 * 1000).toISOString(),
+      sessionExpiresAt: new Date(activityAt.getTime() + timeoutMinutes * 60 * 1000).toISOString(),
     };
   }
 }

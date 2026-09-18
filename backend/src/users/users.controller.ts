@@ -118,6 +118,15 @@ export class UsersController {
     return this.usersService.resetPassword(id, req.user.id, req.user.role, ipAddress);
   }
 
+  @Post(':id/reset-otp')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: 'OTP 등록 초기화' })
+  @ApiResponse({ status: 200, description: 'OTP 등록 초기화 성공' })
+  resetOtp(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    const ipAddress = getClientIp(req);
+    return this.usersService.resetOtp(id, req.user.id, req.user.role, ipAddress);
+  }
+
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: '사용자 삭제' })

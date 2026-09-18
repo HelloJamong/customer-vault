@@ -40,3 +40,22 @@ export class RefreshTokenDto {
   @IsNotEmpty()
   refreshToken: string;
 }
+
+export class MfaVerifyDto {
+  @ApiProperty({ description: 'OTP 로그인 검증 토큰' })
+  @IsString()
+  @IsNotEmpty()
+  challengeToken: string;
+
+  @ApiProperty({ description: 'Authenticator 앱의 6자리 코드', example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+}
+
+export class MfaConfirmSetupDto {
+  @ApiProperty({ description: 'Authenticator 앱의 6자리 등록 확인 코드', example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+}

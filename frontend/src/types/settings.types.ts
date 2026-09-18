@@ -10,6 +10,7 @@ export interface SystemSettings {
   preventDuplicateLogin: boolean;
   sessionTimeoutMinutes: number;
   sessionTimeoutWarningEnabled: boolean;
+  otpEnabled: boolean;
   loginFailureLimitEnabled: boolean;
   loginFailureLimit: number;
   accountLockMinutes: number;
@@ -45,6 +46,7 @@ export interface UpdateSettingsRequest {
   preventDuplicateLogin?: boolean;
   sessionTimeoutMinutes?: number;
   sessionTimeoutWarningEnabled?: boolean;
+  otpEnabled?: boolean;
   loginFailureLimitEnabled?: boolean;
   loginFailureLimit?: number;
   accountLockMinutes?: number;

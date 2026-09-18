@@ -23,6 +23,16 @@ test('valid session returns password expiry from current server policy', async (
   assert.equal(result.id, 1);
   assert.equal(result.passwordExpired, true);
 });
+test('passive polling does not extend an idle session', async () => {
+  const lastActivity = new Date(Date.now() - 5 * 60 * 1000);
+  const result = await strategy({lastActivity}).validate(
+    { headers: { 'x-session-activity': 'false' } },
+    payload,
+  );
+  const expiresAt = new Date(result.sessionExpiresAt).getTime();
+  assert.ok(expiresAt < Date.now() + 26 * 60 * 1000);
+  assert.ok(expiresAt > Date.now() + 24 * 60 * 1000);
+});
 test('expired passwords block business APIs but allow password change', async () => {
   const parent = Object.getPrototypeOf(JwtAuthGuard.prototype);
   const original = parent.canActivate;

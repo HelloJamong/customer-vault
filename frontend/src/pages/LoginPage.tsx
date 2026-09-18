@@ -16,6 +16,9 @@ import {
 import symbolLogo from '@/assets/images/symbol.svg';
 import DuplicateLoginDialog from '@/components/auth/DuplicateLoginDialog';
 import ChangePasswordDialog from '@/components/auth/ChangePasswordDialog';
+import MfaSetupDialog from '@/components/auth/MfaSetupDialog';
+import MfaVerifyDialog from '@/components/auth/MfaVerifyDialog';
+import type { LoginResponse } from '@/types/auth.types';
 
 const loginSchema = z.object({
   username: z.string().min(1, '아이디를 입력해주세요'),
@@ -26,7 +29,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const authenticated = isAuthenticated();
-  const { login, logout, user, isLoginLoading } = useAuth();
+  const { login, logout, user, isLoginLoading, completeMfaLogin, completeMfaSetup } = useAuth();
   const location = useLocation();
   const passwordChanged = (location.state as { passwordChanged?: boolean } | null)?.passwordChanged;
   const requiresPasswordChange = Boolean(user?.isFirstLogin || user?.passwordExpired);
@@ -35,6 +38,7 @@ const LoginPage = () => {
     : '최초 로그인 시 비밀번호를 변경해야 합니다.';
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [pendingCredentials, setPendingCredentials] = useState<LoginForm | null>(null);
+  const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
 
   const {
     register,
@@ -45,7 +49,7 @@ const LoginPage = () => {
   });
 
   // 비밀번호 변경이 필요한 사용자는 로그인 화면에 머물러야 한다.
-  if (authenticated && !requiresPasswordChange) {
+  if (authenticated && !requiresPasswordChange && !user?.mfaSetupRequired) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -56,6 +60,11 @@ const LoginPage = () => {
 
   const onSubmit = (data: LoginForm) => {
     login(data, {
+      onMfaRequired: (response: LoginResponse) => {
+        if (response.mfaChallengeToken) {
+          setMfaChallengeToken(response.mfaChallengeToken);
+        }
+      },
       onDuplicateSession: () => {
         // 중복 세션이 감지되면 다이얼로그 표시
         setPendingCredentials(data);
@@ -302,6 +311,22 @@ const LoginPage = () => {
         isForced
         forcedMessage={forcedPasswordMessage}
         onSuccess={handlePasswordChangeSuccess}
+      />
+
+      <MfaVerifyDialog
+        open={Boolean(mfaChallengeToken)}
+        challengeToken={mfaChallengeToken}
+        onCancel={() => setMfaChallengeToken(null)}
+        onSuccess={(response) => {
+          setMfaChallengeToken(null);
+          completeMfaLogin(response);
+        }}
+      />
+
+      <MfaSetupDialog
+        open={Boolean(authenticated && user?.mfaSetupRequired && !requiresPasswordChange)}
+        onSuccess={completeMfaSetup}
+        onLogout={() => logout({})}
       />
     </Box>
   );

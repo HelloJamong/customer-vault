@@ -41,7 +41,9 @@ export interface IncompleteInspection {
 
 export const dashboardApi = {
   getStats: async (): Promise<DashboardStats> => {
-    const response = await apiClient.get<DashboardStats>('/dashboard/stats');
+    const response = await apiClient.get<DashboardStats>('/dashboard/stats', {
+      headers: { 'X-Session-Activity': 'false' },
+    });
     return response.data;
   },
 

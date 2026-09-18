@@ -129,8 +129,13 @@ export class LogsService {
     const limit = filters?.limit || 30;
     const skip = (page - 1) * limit;
 
-    // 서비스 로그 조회 조건 구성
-    const serviceLogWhere: any = {};
+    // 로그인/로그아웃 이력은 별도 로그인 이력 화면에서 조회한다.
+    const serviceLogWhere: any = {
+      NOT: [
+        { action: { contains: '로그인' } },
+        { action: { contains: '로그아웃' } },
+      ],
+    };
 
     if (filters?.logType) {
       serviceLogWhere.logType = filters.logType;
@@ -155,47 +160,14 @@ export class LogsService {
       };
     }
 
-    // 로그인 시도 조회 조건 구성
-    const loginAttemptWhere: any = {};
+    const serviceLogs = await this.prisma.serviceLog.findMany({
+      where: serviceLogWhere,
+      include: {
+        user: { select: { id: true, username: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    if (filters?.ipAddress) {
-      loginAttemptWhere.ipAddress = { contains: filters.ipAddress };
-    }
-
-    Object.assign(loginAttemptWhere, buildKstDateWhere('attemptTime', filters?.startDate, filters?.endDate));
-
-    if (filters?.username) {
-      loginAttemptWhere.user = {
-        username: { contains: filters.username },
-      };
-    }
-
-    // 로그 타입 필터가 있는 경우 해당 타입만 조회
-    let serviceLogs = [];
-    let loginAttempts = [];
-
-    if (!filters?.logType || filters.logType === '정상' || filters.logType === '경고' || filters.logType === '오류' || filters.logType === '정보') {
-      serviceLogs = await this.prisma.serviceLog.findMany({
-        where: serviceLogWhere,
-        include: {
-          user: { select: { id: true, username: true, name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-
-    // 로그인 시도는 로그 타입 필터가 없거나 '정상', '경고', '오류'인 경우에만 포함
-    if (!filters?.logType || filters.logType === '정상' || filters.logType === '경고' || filters.logType === '오류') {
-      loginAttempts = await this.prisma.loginAttempt.findMany({
-        where: loginAttemptWhere,
-        include: {
-          user: { select: { id: true, username: true, name: true } },
-        },
-        orderBy: { attemptTime: 'desc' },
-      });
-    }
-
-    // 통합 로그 생성
     const allLogs: SystemLogEntry[] = [];
 
     // 서비스 로그 변환
@@ -215,30 +187,10 @@ export class LogsService {
       });
     }
 
-    // 로그인 시도 로그 변환
-    for (const attempt of loginAttempts) {
-      const logType = attempt.success ? '정상' : '경고';
-      const action = attempt.success ? '로그인 성공' : '로그인 실패';
-
-      allLogs.push({
-        id: attempt.id,
-        rowKey: `attempt-${attempt.id}`,
-        timestamp: attempt.attemptTime,
-        username: attempt.user?.username || '알 수 없음',
-        userId: attempt.userId,
-        logType,
-        action,
-        description: attempt.success
-          ? `${attempt.user?.username} 사용자가 로그인했습니다.`
-          : `${attempt.user?.username} 사용자의 로그인이 실패했습니다.`,
-        ipAddress: attempt.ipAddress || '-',
-      });
-    }
-
     // 시간순 정렬 (최신순)
     allLogs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    // 검색 텍스트 필터링 (로그인 시도 포함)
+    // 검색 텍스트 필터링
     let filteredLogs = allLogs;
     if (filters?.searchText) {
       filteredLogs = filteredLogs.filter(log =>
@@ -247,7 +199,7 @@ export class LogsService {
       );
     }
 
-    // logType 후처리 필터링 (loginAttempt는 DB에서 필터 불가하므로 여기서 적용)
+    // logType 후처리 필터링
     if (filters?.logType) {
       filteredLogs = filteredLogs.filter(log => log.logType === filters.logType);
     }
@@ -579,7 +531,11 @@ export class LogsService {
     // 로그인 시도 로그 변환
     const loginAttemptEntries: SystemLogEntry[] = loginAttempts.map((attempt) => {
       const logType = attempt.success ? '정상' : '경고';
-      const action = attempt.success ? '로그인 성공' : '로그인 실패';
+      const action = attempt.success
+        ? '로그인 성공'
+        : attempt.failureReason === 'OTP'
+          ? 'OTP 로그인 실패'
+          : '로그인 실패';
 
       return {
         id: attempt.id,
@@ -591,7 +547,9 @@ export class LogsService {
         action,
         description: attempt.success
           ? `${attempt.user?.username} 사용자가 로그인했습니다.`
-          : `${attempt.user?.username} 사용자의 로그인이 실패했습니다.`,
+          : attempt.failureReason === 'OTP'
+            ? `${attempt.user?.username} 사용자의 OTP 인증에 실패했습니다.`
+            : `${attempt.user?.username} 사용자의 로그인이 실패했습니다.`,
         ipAddress: attempt.ipAddress || '-',
       };
     });

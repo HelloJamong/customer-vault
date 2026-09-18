@@ -209,6 +209,23 @@ const UsersPage = () => {
     handleMenuClose();
   };
 
+  const handleResetOtp = async () => {
+    if (!selectedUser) return;
+    if (!confirm('이 사용자의 OTP 등록을 초기화하시겠습니까?')) {
+      handleMenuClose();
+      return;
+    }
+    try {
+      const response = await apiClient.post(`/users/${selectedUser.id}/reset-otp`);
+      alert(response.data.message);
+      fetchUsers();
+    } catch (error) {
+      console.error('OTP 초기화 실패:', error);
+      alert(getApiErrorMessage(error, 'OTP 초기화에 실패했습니다.'));
+    }
+    handleMenuClose();
+  };
+
   const handleDelete = async () => {
     if (!selectedUser) return;
 
@@ -336,6 +353,7 @@ const UsersPage = () => {
           {selectedUser?.id === currentUser?.id && selectedUser?.isActive && ' (본인)'}
         </MenuItem>
         <MenuItem onClick={handleResetPassword}>패스워드 초기화</MenuItem>
+        <MenuItem onClick={handleResetOtp}>OTP 등록 초기화</MenuItem>
         <MenuItem
           onClick={handleDelete}
           disabled={selectedUser?.id === currentUser?.id}

@@ -6,6 +6,7 @@ import type {
   ChangePasswordRequest,
   SessionPolicy,
   RefreshTokenResponse,
+  MfaSetupResponse,
 } from '@/types/auth.types';
 
 export const authAPI = {
@@ -47,5 +48,25 @@ export const authAPI = {
   // 비밀번호 변경
   changePassword: async (req: ChangePasswordRequest): Promise<void> => {
     await apiClient.post('/auth/change-password', req);
+  },
+
+  verifyMfa: async (challengeToken: string, code: string): Promise<LoginResponse> => {
+    const { data } = await apiClient.post('/auth/mfa/verify', { challengeToken, code });
+    return data;
+  },
+
+  setupMfa: async (): Promise<MfaSetupResponse> => {
+    const { data } = await apiClient.post('/auth/mfa/setup');
+    return data;
+  },
+
+  confirmMfaSetup: async (code: string): Promise<{ enabled: boolean; message: string }> => {
+    const { data } = await apiClient.post('/auth/mfa/setup/confirm', { code });
+    return data;
+  },
+
+  getMfaStatus: async (): Promise<{ otpEnabled: boolean; mfaEnabled: boolean; setupRequired: boolean }> => {
+    const { data } = await apiClient.get('/auth/mfa/status');
+    return data;
   },
 };

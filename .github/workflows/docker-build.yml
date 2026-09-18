@@ -37,6 +37,9 @@ jobs:
             backend/package-lock.json
             frontend/package-lock.json
 
+      - name: Secret pattern scan
+        run: bash scripts/check-secrets.sh
+
       - name: Install Backend dependencies
         working-directory: backend
         run: npm ci

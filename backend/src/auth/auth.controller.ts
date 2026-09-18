@@ -13,7 +13,13 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto, ChangePasswordDto, RefreshTokenDto } from './dto/login.dto';
+import {
+  LoginDto,
+  ChangePasswordDto,
+  RefreshTokenDto,
+  MfaVerifyDto,
+  MfaConfirmSetupDto,
+} from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { getClientIp } from '../common/utils/ip.util';
 import { SessionEventService } from './session-event.service';
@@ -85,6 +91,40 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '토큰 갱신 성공' })
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);
+  }
+
+  @Post('mfa/verify')
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'OTP 로그인 검증' })
+  async verifyMfa(@Body() dto: MfaVerifyDto, @Request() req) {
+    return this.authService.verifyMfa(dto, getClientIp(req));
+  }
+
+  @Post('mfa/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'OTP 등록 QR 생성' })
+  async setupMfa(@Request() req) {
+    return this.authService.setupMfa(req.user.id);
+  }
+
+  @Post('mfa/setup/confirm')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'OTP 등록 확인' })
+  async confirmMfaSetup(@Body() dto: MfaConfirmSetupDto, @Request() req) {
+    return this.authService.confirmMfaSetup(req.user.id, dto.code, getClientIp(req));
+  }
+
+  @Get('mfa/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '현재 사용자 OTP 상태 조회' })
+  async getMfaStatus(@Request() req) {
+    return this.authService.getMfaStatus(req.user.id);
   }
 
   @Post('extend-session')
