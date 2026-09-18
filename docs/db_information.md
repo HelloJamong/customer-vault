@@ -7,7 +7,7 @@
 - `user_sessions`: 로그인 세션 정보(세션 ID, 로그인/마지막 활동 시간, IP).
 - `login_attempts`: 로그인 성공/실패 이력(시간, 성공 여부, IP).
 - `user_customers`: 사용자와 고객사 매핑(담당 고객사 권한).
-- `system_settings`: 시스템 정책(초기 비밀번호, 비밀번호 정책, 로그인 시도 제한, 중복 로그인 방지 등).
+- `system_settings`: 시스템 정책(초기 비밀번호, 비밀번호 정책, 로그인 시도 제한, 중복 로그인 방지, 세션 타임아웃 등).
 
 ## 고객사 및 점검 관련
 - `customers`: 고객사 기본 정보(이름, 위치, 담당자/부담당자, 계약/점검 정보, 내부 담당자 등).
@@ -18,8 +18,17 @@
 
 ## 로그
 - `service_logs`: 서비스 활동 이력(로그인/로그아웃, 설정 변경, 내보내기 등).
+- `backup_logs`: DB·문서 백업 실행 상태, 대상, 암호화 백업 파일 경로, 보관 이력.
 - `support_logs`: 고객 문의/지원 이력(문의자, 대상, 카테고리, 조치 내용 등).
+
+## 보안 관련 운영 데이터
+
+- `user_sessions.last_activity`: 세션 유휴 만료 기준으로 사용됩니다. 기본 타임아웃은 30분이며 시스템 설정에서 10~60분으로 조정할 수 있습니다.
+- `system_settings.session_timeout_warning_enabled`: 만료 1분 전 프론트엔드 안내 팝업 표시 여부입니다. 안내 시간은 60초로 고정됩니다.
+- 소스관리 자격증명은 암호화 저장되며, 기본 조회는 마스킹됩니다. 전체 열람 시 서비스 로그에 열람 사실만 기록되고 실제 비밀번호는 기록되지 않습니다.
+- 백업 파일은 `BACKUP_ENCRYPTION_KEY`로 암호화된 `.enc` 파일만 운영·원격 저장 대상입니다.
 
 ## 기타
 - 스키마/마이그레이션 파일 위치: `backend/prisma/`
-- 초기 admin 계정/설정은 서비스 기동 시 자동 생성(`PrismaService.ensureDefaultAdmin`).
+- 빈 DB의 초기 admin 계정/설정은 서비스 기동 시 `INITIAL_ADMIN_PASSWORD`를 사용해 한 번만 생성됩니다(`PrismaService.ensureDefaultAdmin`). 기존 계정이 있는 DB의 비밀번호는 재설정하지 않습니다.
+- 스키마 변경은 `backend/prisma/migrations/`에 커밋된 Prisma migration으로 관리합니다.

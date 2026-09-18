@@ -78,8 +78,11 @@ vi .env
 | `DB_ROOT_PASSWORD` | 강력한 DB root 비밀번호 |
 | `DB_PASSWORD` | 강력한 DB 사용자 비밀번호 |
 | `INITIAL_ADMIN_PASSWORD` | 빈 DB 최초 설치 시 생성되는 admin 계정의 초기 비밀번호 |
-| `CORS_ORIGIN` | 실제 접속 도메인 또는 IP (예: `http://10.0.0.5:3003`) |
-| `VERSION` | 다운로드한 버전과 동일하게 설정 (예: `26.03.03`) |
+| `ENCRYPTION_KEY` | 서버 접속정보·SFTP 자격증명 암호화용 64자리 hex 키 |
+| `BACKUP_ENCRYPTION_KEY` | DB·문서 백업 암호화용 별도 64자리 hex 키 |
+| `CLAMAV_ENABLED` | 악성코드 검사 활성화 여부 (운영 환경에서는 항상 활성화) |
+| `CORS_ORIGIN` | 실제 접속 도메인 또는 IP (예: `http://10.0.0.5:2082`) |
+| `VERSION` | 다운로드한 릴리즈 버전과 동일하게 설정 (예: `26.9.0`) |
 
 ```bash
 # JWT_SECRET 생성
@@ -87,7 +90,15 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 # 초기 관리자 비밀번호 생성 (최초 설치 시에만 사용)
 openssl rand -base64 24
+
+# 애플리케이션 암호화 키
+openssl rand -hex 32
+
+# 백업 암호화 키 — ENCRYPTION_KEY와 다른 값을 사용
+openssl rand -hex 32
 ```
+
+> `INITIAL_ADMIN_PASSWORD`는 빈 DB 최초 설치 시에만 사용됩니다. 기존 DB가 있으면 계정이나 비밀번호를 초기화하지 않으므로 기존 운영값을 유지해야 합니다. `ENCRYPTION_KEY`와 `BACKUP_ENCRYPTION_KEY`는 백업·복호화에 필요하므로 서로 다른 안전한 장소에 보관하세요.
 
 ### 3️⃣ 서비스 실행
 
@@ -95,6 +106,8 @@ openssl rand -base64 24
 docker compose pull
 docker compose up -d
 ```
+
+Backend 컨테이너가 기동될 때 커밋된 Prisma 마이그레이션을 자동 적용합니다. 마이그레이션 실패 시 애플리케이션은 기동하지 않으며, DB를 자동 롤백하지 않습니다.
 
 ### 4️⃣ 접속 정보
 
@@ -132,7 +145,10 @@ customer-vault/
 │   └── nginx.conf                # Nginx 설정 파일
 │
 ├── docs/                         # 운영/구성 가이드 문서
-│   └── nginx.conf.example        # 외부 Nginx 설정 예시
+│   ├── docker_setup_guide.md     # Docker/Compose 설치·운영
+│   ├── migration_guide.md        # Prisma 마이그레이션·오프라인 업그레이드
+│   ├── offline_deployment_guide.md # 폐쇄망 배포
+│   └── backend_testing.md        # lint·보안 테스트·E2E
 │
 ├── data/                         # MariaDB 데이터 볼륨 (영구 저장)
 ├── uploads/                      # 보안 검사 통과 후 저장되는 점검서 파일 저장소 (영구 저장)
@@ -157,3 +173,7 @@ customer-vault/
 - [DB 테이블 역할](docs/db_information.md)
 - [점검서 저장 경로](docs/documents_storage.md)
 - [DB 마이그레이션 및 배포](docs/migration_guide.md)
+- [오프라인 배포](docs/offline_deployment_guide.md)
+- [원격 SFTP 백업](docs/backup_remote_setup_guide.md)
+- [Backend 테스트·E2E](docs/backend_testing.md)
+- [릴리즈 절차](docs/RELEASE_GUIDE.md)

@@ -2,6 +2,8 @@
 
 이 문서는 기존 Flask 백엔드를 NestJS로 마이그레이션한 내용과 실행 방법을 설명합니다.
 
+> 이 문서는 전환 이력을 보존하기 위한 참고 문서입니다. 현재 운영 배포·DB 마이그레이션 절차는 저장소 루트의 [`docs/migration_guide.md`](../docs/migration_guide.md)를 기준으로 합니다.
+
 ## 📊 마이그레이션 완료 현황
 
 ### ✅ 완료된 모듈
@@ -124,20 +126,20 @@ JWT_SECRET=최소_32자_이상의_강력한_시크릿키
 
 ```bash
 # 빌드 및 실행
-docker-compose up -d
+docker compose up -d
 
 # 로그 확인
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # 중지
-docker-compose down
+docker compose down
 ```
 
 ### 3. 데이터베이스 마이그레이션 (Docker 환경)
 
 ```bash
 # 컨테이너 내에서 마이그레이션 실행
-docker-compose exec backend npx prisma migrate deploy
+docker compose exec backend npx prisma migrate deploy
 ```
 
 ---
@@ -314,7 +316,8 @@ npm run prisma:generate
 
 - [NestJS 공식 문서](https://docs.nestjs.com/)
 - [Prisma 공식 문서](https://www.prisma.io/docs/)
-- [BACKEND_SPEC.md](../BACKEND_SPEC.md) - 백엔드 기능 정의서
+- [운영 배포·마이그레이션](../docs/migration_guide.md)
+- [테스트·E2E](../docs/backend_testing.md)
 - [README.md](./README.md) - 백엔드 사용 가이드
 
 ---

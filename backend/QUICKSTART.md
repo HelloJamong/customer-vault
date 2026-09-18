@@ -16,8 +16,8 @@ cp .env.example .env
 # 4. Prisma Client 생성
 npm run prisma:generate
 
-# 5. 데이터베이스 마이그레이션 (새 DB인 경우)
-npx prisma migrate dev --name init
+# 5. 데이터베이스 마이그레이션 (커밋된 migration 적용)
+npx prisma migrate deploy
 
 # 6. 개발 서버 실행
 npm run start:dev
@@ -34,19 +34,20 @@ Swagger: http://localhost:5000/api/docs
 # 1. 환경 변수 설정
 cd backend
 cp .env.example .env
-# .env 파일 수정 (DB_PASSWORD, JWT_SECRET 등)
+# .env 파일 수정 (DB_PASSWORD, INITIAL_ADMIN_PASSWORD, JWT_SECRET,
+# ENCRYPTION_KEY, BACKUP_ENCRYPTION_KEY 등)
 
 # 2. Docker Compose 실행
-docker-compose up -d
+docker compose up -d
 
 # 3. 로그 확인
-docker-compose logs -f backend
+docker compose logs -f backend
 
-# 4. 데이터베이스 마이그레이션 (최초 1회)
-docker-compose exec backend npx prisma migrate deploy
+# 4. 데이터베이스 마이그레이션 상태 확인
+docker compose exec backend npx prisma migrate status
 
 # 5. 중지
-docker-compose down
+docker compose down
 ```
 
 ---
@@ -59,6 +60,11 @@ DATABASE_URL="mysql://user:password@localhost:3306/customer_db"
 
 # JWT_SECRET (32자 이상 권장)
 JWT_SECRET=your-very-strong-secret-key-here
+
+# 빈 DB 최초 설치 시에만 사용
+INITIAL_ADMIN_PASSWORD=설치자가_지정한_초기_비밀번호
+ENCRYPTION_KEY=64자리_hex_문자열
+BACKUP_ENCRYPTION_KEY=ENCRYPTION_KEY와_다른_64자리_hex_문자열
 
 # 기타
 PORT=5000
@@ -81,9 +87,9 @@ npm run prisma:migrate     # 마이그레이션
 npm run prisma:studio      # DB GUI
 
 # Docker
-docker-compose up -d       # 시작
-docker-compose down        # 중지
-docker-compose logs -f     # 로그
+docker compose up -d       # 시작
+docker compose down        # 중지
+docker compose logs -f     # 로그
 ```
 
 ---

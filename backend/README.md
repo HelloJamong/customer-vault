@@ -43,13 +43,13 @@ Swagger 문서: `http://localhost:5000/api/docs`
 
 ```bash
 # Docker Compose로 실행 (백엔드 + MariaDB)
-docker-compose up -d
+docker compose up -d
 
 # 로그 확인
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # 중지
-docker-compose down
+docker compose down
 ```
 
 ## 📦 사용 가능한 명령어
@@ -112,7 +112,7 @@ backend/
 
 - `super_admin`: 슈퍼 관리자 (전체 시스템 관리)
 - `admin`: 관리자 (사용자 관리, 고객사 조회)
-- `user`: 일반 사용자 (담당 고객사만 접근)
+- `user`: 일반 사용자 (전체 고객사·문서 조회, 담당 고객사 중심의 변경 작업)
 
 ### API 인증
 
@@ -128,6 +128,8 @@ Authorization: Bearer <access_token>
 - `POST /api/auth/login` - 로그인
 - `POST /api/auth/logout` - 로그아웃
 - `POST /api/auth/refresh` - 토큰 갱신
+- `POST /api/auth/extend-session` - 현재 세션 연장
+- `GET /api/auth/session-policy` - 현재 세션 정책 조회
 - `POST /api/auth/change-password` - 비밀번호 변경
 
 ### 사용자
@@ -158,6 +160,10 @@ DATABASE_URL="mysql://user:password@localhost:3306/customer_db"
 JWT_SECRET=your-secret-key
 JWT_ACCESS_EXPIRATION=1h
 JWT_REFRESH_EXPIRATION=7d
+
+# 애플리케이션 암호화 키와 백업 파일 암호화 키는 서로 다른 64자리 hex 값 사용
+ENCRYPTION_KEY=64자리_hex_문자열
+BACKUP_ENCRYPTION_KEY=별도_보관할_64자리_hex_문자열
 
 # 최초 빈 DB 초기화
 INITIAL_ADMIN_PASSWORD=설치자가_지정한_초기_비밀번호
@@ -238,7 +244,8 @@ npm run prisma:generate
 
 - [NestJS 공식 문서](https://docs.nestjs.com/)
 - [Prisma 공식 문서](https://www.prisma.io/docs/)
-- [BACKEND_SPEC.md](../BACKEND_SPEC.md) - 백엔드 기능 정의서
+- [운영 배포·마이그레이션](../docs/migration_guide.md)
+- [테스트·E2E](../docs/backend_testing.md)
 
 ## ⚠️ 주의사항
 

@@ -18,7 +18,7 @@
 ## 2) docker-compose.yml 예시 확인
 ```yaml
 services:
-  nginx:
+  proxy:
     image: nginx:alpine
     container_name: customer_proxy
     volumes:
@@ -45,8 +45,8 @@ networks:
 ```
 
 ## 3) 적용/테스트 절차
-1. `docker compose build` (필요 시 `backend`, `frontend`, `nginx` 대상)
-2. `docker compose up -d nginx backend frontend`
+1. `docker compose build` (필요 시 `backend`, `frontend` 대상)
+2. `docker compose up -d proxy backend frontend`
 3. 헬스체크: `curl http://<domain>:2082/api/health`
 4. 프런트 접속: `http://<domain>:2082`
 5. Cloudflare 사용 시: DNS 레코드 프록시(오렌지 구름) 상태에서 2082가 허용되는지 확인. 방화벽은 2082만 개방.
@@ -69,6 +69,7 @@ networks:
 
 ## 5) 트러블슈팅
 - `/api/health`가 프런트로 리디렉트 → `location /api/` 블록이 `/`보다 앞에 있는지 확인.
+- Backend 또는 Frontend 컨테이너를 교체한 뒤 502가 발생하면 Proxy를 재시작해 upstream DNS를 갱신합니다: `docker compose restart proxy`
 - 504/타임아웃 → `proxy_read_timeout`, `proxy_connect_timeout`, `proxy_send_timeout`을 60s 이상으로 조정. 백엔드 처리 시간도 점검.
 - `ERR_BLOCKED_BY_CLIENT` → 브라우저 광고/추적 차단 확장 가능성. Cloudflare beacon이 차단되는 경우가 있음.
 - 업로드 413 → `client_max_body_size`가 충분한지 확인(기본 20m, `MAX_UPLOAD_SIZE` 16MB 기준 여유).

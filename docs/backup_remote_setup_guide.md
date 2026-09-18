@@ -103,9 +103,10 @@ SSH 키는 **backend 컨테이너 내부**에서 접근 가능한 경로에 생�
 컨테이너와 호스트 간에 공유되는 볼륨 경로를 활용합니다.
 
 ```bash
-# 호스트 서버에서 키 생성 (backups 볼륨 내 .ssh 폴더 활용)
-mkdir -p /home/dev/project/customer-vault/backups/.ssh
-ssh-keygen -t ed25519 -f /home/dev/project/customer-vault/backups/.ssh/backup_key -N "" -C "customer-vault-backup"
+# 호스트 서버에서 키 생성 (프로젝트의 backups 볼륨 내 .ssh 폴더 활용)
+mkdir -p ./backups/.ssh
+chmod 700 ./backups/.ssh
+ssh-keygen -t ed25519 -f ./backups/.ssh/backup_key -N "" -C "customer-vault-backup"
 ```
 
 생성 결과:
@@ -159,8 +160,8 @@ ENCRYPTION_KEY=여기에_64자리_hex_문자열_입력
 BACKUP_ENCRYPTION_KEY=여기에_별도_보관할_64자리_hex_문자열_입력
 ```
 
-> ⚠️ `ENCRYPTION_KEY`는 SFTP 패스워드를 AES-256-CBC로 암호화하는 데 사용됩니다.
-> 기본값(`000...`)을 그대로 사용하면 보안에 취약하므로 반드시 변경하세요.
+> ⚠️ `ENCRYPTION_KEY`는 SFTP 패스워드와 서버 접속정보를 암호화하는 애플리케이션 키입니다. 신규 값은 AES-256-GCM으로 저장되며, 기존 AES-256-CBC 값도 하위호환으로 읽을 수 있습니다.
+> 기본값(`000...`)을 그대로 사용하면 서버가 기동하지 않으므로 반드시 변경하세요.
 > `BACKUP_ENCRYPTION_KEY`는 DB/문서 백업 파일을 AES-256-GCM으로 암호화합니다. 두 키를 동일하게 사용하지 말고, 백업 파일과 다른 위치에 별도로 보관하세요.
 
 ### 3-2. `ENCRYPTION_KEY` 생성
@@ -175,9 +176,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```bash
 # 호스트에서 backups 디렉토리가 컨테이너에서 쓰기 가능한지 확인
-ls -la /home/dev/project/customer-vault/backups/
+ls -la ./backups/
 # 필요 시 권한 조정
-sudo chmod -R 755 /home/dev/project/customer-vault/backups/
+chmod -R 700 ./backups/
 ```
 
 ---

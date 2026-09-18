@@ -1,286 +1,219 @@
 # 오프라인 환경 배포 가이드
 
-## 개요
+Customer Vault를 인터넷이 없는 운영 서버에 신규 설치하거나 기존 설치에서 업그레이드하는 방법입니다.
 
-이 가이드는 Customer Vault를 폐쇄망(오프라인) 환경에 배포하는 방법을 설명합니다.
+## 배포 파일
 
-## 워크플로우
+GitHub Release에서 버전별로 다음 파일을 제공합니다.
 
-```
-[온라인 환경]                    [오프라인 환경]
-    │                                 │
-    ├─ 1. 이미지 빌드                 │
-    ├─ 2. export-package.sh 실행      │
-    ├─ 3. tar 파일 생성               │
-    │                                 │
-    └──── USB/파일전송 ────────────→  ├─ 4. tar 파일 압축 해제
-                                      ├─ 5. import-package.sh 실행
-                                      └─ 6. 서비스 시작
-```
+- docker-compose.yml
+- env.example
+- customer-vault-images-<버전>.tar.gz
+- offline-upgrade.sh
 
-## 1. 온라인 환경 (개발/빌드 서버)
+이미지 번들은 Backend, Frontend, MariaDB, Nginx, ClamAV를 포함합니다. 폐쇄망 서버에는 Docker Engine과 Docker Compose v2가 미리 설치되어 있어야 합니다.
 
-### 전제 조건
-- Docker 및 Docker Compose 설치
-- 프로젝트 소스 코드 접근 가능
-- 인터넷 연결 가능
+## 신규 설치
 
-### 배포 패키지 생성
+### 1. 파일 반입
 
-```bash
-# 프로젝트 디렉토리로 이동
-cd customer-vault
+온라인 환경에서 Release 파일을 다운로드해 USB 등으로 운영 서버에 반입합니다.
 
-# export 스크립트 실행 (버전 지정)
-./scripts/export-package.sh 2.1.7
+~~~bash
+V=26.9.0
+mkdir -p /opt/customer-vault-$V
+cd /opt/customer-vault-$V
+~~~
 
-# 또는 기본 버전 사용
-./scripts/export-package.sh
-```
+### 2. 이미지 로드와 환경 설정
 
-### 생성되는 파일
+~~~bash
+docker load -i customer-vault-images-$V.tar.gz
+cp env.example .env
+vi .env
+~~~
 
-`customer_vault_2.1.7_package.tar.gz` 파일이 생성됩니다.
+운영 환경에서 반드시 설정할 값:
 
-> 운영 배포에는 `ENCRYPTION_KEY`와 별도의 `BACKUP_ENCRYPTION_KEY`가 모두 필요합니다. DB/문서 백업은 `.enc` 파일로 암호화되며, 백업 키를 분실하면 복원할 수 없습니다.
+- NODE_ENV=production
+- VERSION=26.9.0
+- DB_ROOT_PASSWORD
+- DB_PASSWORD
+- INITIAL_ADMIN_PASSWORD
+- JWT_SECRET
+- ENCRYPTION_KEY
+- BACKUP_ENCRYPTION_KEY
+- CORS_ORIGIN
+- PROXY_PORT
 
-**패키지 내용:**
-- `images.tar` - Docker 이미지 (backend, frontend, nginx, mariadb, clamav)
-- `docker-compose.yml` - 오프라인용 설정 (build 섹션 제거됨)
-- `proxy/` - Nginx 설정
-- `import-package.sh` - 오프라인 설치 스크립트
-- `DEPLOYMENT_GUIDE.md` - 배포 가이드
-- `MIGRATIONS.md` - DB 마이그레이션 가이드
-- `prisma/` - DB 마이그레이션 파일 및 `migration_lock.toml`
-- `offline-upgrade.sh` - 기존 운영 서버용 이미지 교체·백업·마이그레이션 사전 적용 스크립트
+ENCRYPTION_KEY와 BACKUP_ENCRYPTION_KEY는 서로 다른 64자리 hex 값이어야 합니다. 두 키는 백업 파일과 분리된 보안 저장소에 보관합니다.
 
-### 패키지 전송
+### 3. 서비스 시작
 
-```bash
-# USB로 복사
-cp customer_vault_2.1.7_package.tar.gz /media/usb/
+~~~bash
+docker compose up -d
+docker compose ps
+docker compose exec backend npx prisma migrate status
+curl --fail http://127.0.0.1:2082/api/health
+~~~
 
-# 또는 scp로 전송 (가능한 경우)
-scp customer_vault_2.1.7_package.tar.gz user@offline-server:/tmp/
-```
+Backend entrypoint가 커밋된 Prisma migration을 자동 적용합니다. ClamAV가 healthy가 되지 않으면 신규 파일 업로드는 차단됩니다.
 
-## 2. 오프라인 환경 (운영 서버)
+## 기존 설치 업그레이드
 
-### 전제 조건
-- Docker 및 Docker Compose 설치 (미리 설치 필요)
-- 기존 `.env` 파일 (기존 환경인 경우)
+### 1. 사전 준비
 
-### 배포 절차
+기존 운영 디렉터리의 다음 값을 보존합니다.
 
-#### 1) 패키지 압축 해제
+- .env
+- data/mariadb
+- uploads
+- logs
+- backups
+- proxy/nginx.conf
 
-```bash
-# 패키지 복사 (USB에서)
-cp /media/usb/customer_vault_2.1.7_package.tar.gz ~/
+특히 기존 ENCRYPTION_KEY와 BACKUP_ENCRYPTION_KEY를 변경하지 않습니다.
 
-# 압축 해제
-tar -xzf customer_vault_2.1.7_package.tar.gz
-cd customer_vault_2.1.7_package
-```
+Release에서 다음 파일을 기존 운영 서버 또는 별도 작업 디렉터리로 반입합니다.
 
-#### 2) 환경 설정 준비
+- docker-compose.yml
+- customer-vault-images-<버전>.tar.gz
+- offline-upgrade.sh
 
-**신규 설치:**
-```bash
-# .env 파일 생성 필요
-vi .env  # 설정 입력
-```
+### 2. Dry run
 
-**기존 환경 업데이트:**
-```bash
-# 기존 .env 파일 복사
-cp /path/to/existing/customer-vault/.env .
-```
-
-#### 3) 자동 설치 스크립트 실행
-
-기존 운영 서버를 업그레이드하는 경우에는 `offline-upgrade.sh`를 사용하세요. 이 스크립트는
-백엔드 컨테이너를 시작하기 전에 DB를 기동하고, 암호화 백업을 생성한 뒤 마이그레이션을 적용합니다.
-기존 DB에 마이그레이션 이력이 없으면 초기 기준 마이그레이션만 명시적으로 적용 처리합니다.
-
-```bash
+~~~bash
+chmod +x offline-upgrade.sh
 ./offline-upgrade.sh \
   --app-dir /opt/customer-vault \
-  --package-dir /mnt/usb/customer_vault_2.1.7_package \
-  --version 2.1.7
-```
+  --package-dir /mnt/usb/customer-vault-26.9.0 \
+  --version 26.9.0 \
+  --dry-run
+~~~
 
-신규 설치는 `import-package.sh`를 사용합니다.
+### 3. 업그레이드 실행
 
-```bash
-# import 스크립트 실행
-./import-package.sh
-```
+~~~bash
+./offline-upgrade.sh \
+  --app-dir /opt/customer-vault \
+  --package-dir /mnt/usb/customer-vault-26.9.0 \
+  --version 26.9.0
+~~~
 
-스크립트는 다음 작업을 자동으로 수행합니다:
-- 필수 파일 확인
-- Docker 설치 확인
-- 기존 서비스 확인 및 중지 (선택)
-- DB 백업 (선택)
-- Docker 이미지 로드
-- 서비스 시작
-- DB 마이그레이션 적용 (필요시)
+자동화 환경에서는 --yes를 추가할 수 있습니다.
 
-## 3. 이미지 태그 관리
+~~~bash
+./offline-upgrade.sh \
+  --app-dir /opt/customer-vault \
+  --package-dir /mnt/usb/customer-vault-26.9.0 \
+  --version 26.9.0 \
+  --yes
+~~~
 
-### 온라인 환경에서의 이미지
+스크립트는 다음 순서로 동작합니다.
 
-**GitHub Actions 빌드 후:**
-```bash
-# Docker Hub 이미지
-igor0670/customer-storage-backend:2.1.7
-igor0670/customer-storage-frontend:2.1.7
+1. .env의 JWT_SECRET, ENCRYPTION_KEY, BACKUP_ENCRYPTION_KEY 검증
+2. 이미지 번들 무결성·필수 이미지 확인
+3. MariaDB와 애플리케이션 파일 암호화 백업
+4. 기존 서비스 종료 및 Compose 파일 교체
+5. migration 사전 적용
+6. 서비스 시작과 Backend/Proxy health check
+7. 실패 시 Compose와 .env 복원
 
-# export 스크립트가 자동으로 로컬 태그로 변환
-customer_backend:2.1.7
-customer_frontend:2.1.7
-```
+DB는 자동 복원하지 않습니다. 업그레이드 전 생성된 .enc 백업과 체크섬을 보관하고, 복원이 필요할 때 백업 키를 검증한 뒤 별도 절차로 복원합니다.
 
-### 오프라인 환경에서의 이미지
+## export-package.sh로 전체 패키지 생성
 
-```bash
-# import 후 확인
-docker images | grep customer
+온라인 개발 서버에서 저장소 전체와 migration 파일이 포함된 패키지를 만들 수 있습니다.
 
-# 출력 예시:
-# customer_backend     2.1.7    ...
-# customer_frontend    2.1.7    ...
-# mariadb              10.11    ...
-# nginx                alpine   ...
-```
+~~~bash
+./scripts/export-package.sh 26.9.0
+~~~
 
-### docker-compose.yml
+생성물:
 
-**온라인 환경 (docker-compose.yml):**
-```yaml
-backend:
-  image: igor0670/customer-storage-backend:${VERSION:-latest}
-  build:  # 빌드 가능
-    context: ./backend
-```
+~~~text
+customer_vault_26.9.0_package.tar.gz
+└── customer_vault_26.9.0_package/
+    ├── images.tar
+    ├── docker-compose.yml
+    ├── proxy/
+    ├── prisma/
+    ├── DEPLOYMENT_GUIDE.md
+    ├── MIGRATIONS.md
+    └── import-package.sh
+~~~
 
-**오프라인 환경 (패키지의 docker-compose.yml):**
-```yaml
-backend:
-  image: customer_backend:2.1.7
-  # build 섹션 없음 - 인터넷 불필요
-```
+오프라인 서버에서는 패키지를 풀고 images.tar를 로드합니다.
 
-## 4. 트러블슈팅
-
-### 이미지 로드 실패
-
-```bash
-# 수동으로 이미지 로드
+~~~bash
+tar -xzf customer_vault_26.9.0_package.tar.gz
+cd customer_vault_26.9.0_package
 docker load -i images.tar
+cp .env.example .env
+vi .env
+docker compose up -d
+~~~
 
-# 이미지 확인
+기존 설치 업그레이드에는 Release의 offline-upgrade.sh를 우선 사용합니다. 전체 패키지의 images.tar를 사용할 경우 다음처럼 이미지 파일을 명시할 수 있습니다.
+
+~~~bash
+./offline-upgrade.sh \
+  --app-dir /opt/customer-vault \
+  --package-dir /mnt/usb/customer_vault_26.9.0_package \
+  --images /mnt/usb/customer_vault_26.9.0_package/images.tar \
+  --version 26.9.0
+~~~
+
+## 문제 해결
+
+### 이미지가 없는 경우
+
+~~~bash
 docker images
-```
+docker load -i customer-vault-images-26.9.0.tar.gz
+~~~
 
-### 기존 서비스와 충돌
+Compose의 이미지 이름과 실제 로드된 이미지 태그가 일치하는지 확인합니다.
 
-```bash
-# 기존 서비스 확인
-docker ps -a | grep customer
+### Backend가 기동하지 않는 경우
 
-# 기존 서비스 중지
-docker stop customer_backend customer_frontend customer_proxy
-```
-
-### DB 마이그레이션 실패
-
-```bash
-# 수동 마이그레이션
-docker compose exec backend npx prisma migrate deploy
-
-# 마이그레이션 상태 확인
+~~~bash
+docker compose logs backend --tail=200
 docker compose exec backend npx prisma migrate status
-```
+~~~
+
+필수 환경변수, migration 실패, ClamAV 연결 실패를 순서대로 확인합니다.
+
+### Health check 실패
+
+~~~bash
+docker compose ps
+curl --fail http://127.0.0.1:2082/api/health
+docker compose logs proxy backend db clamav --tail=100
+~~~
 
 ### 롤백
 
-```bash
-# 서비스 중지
-docker compose stop
+1. 서비스를 중지합니다.
+2. 이전 릴리즈 Compose와 이미지를 복원합니다.
+3. DB 복원이 필요하면 .enc 백업을 BACKUP_ENCRYPTION_KEY로 복호화합니다.
+4. DB 클라이언트의 안전한 인증 설정을 사용해 복원합니다.
+5. 이전 Compose로 서비스를 시작하고 health check를 확인합니다.
 
-# 이전 이미지로 복원
-docker load -i <이전_버전_패키지>/images.tar
+Prisma migration은 자동 롤백하지 않습니다. DB 복원은 백업 상태와 데이터 변경 범위를 확인한 뒤 수행합니다.
 
-# DB 복원
-복원 시에는 암호화된 `.sql.gz.enc` 백업을 `BACKUP_ENCRYPTION_KEY`로 복호화한 뒤,
-DB 클라이언트의 `--defaults-extra-file`을 사용하세요. 비밀번호를 명령행에 넣지 마세요.
+## 보안 주의사항
 
-# 서비스 재시작
-docker compose up -d
-```
+- .env와 두 암호화 키를 Git·문서·메신저에 저장하지 않습니다.
+- 백업 키를 잃으면 .enc 백업을 복원할 수 없습니다.
+- 외부에는 Proxy 포트만 노출하고 DB 3306은 localhost 바인딩을 유지합니다.
+- ClamAV를 끄지 않습니다. 운영 환경에서는 검사 실패 시 업로드가 차단됩니다.
+- 배포 전후에 migration status와 health endpoint를 확인합니다.
 
-## 5. 주의사항
+## 참고
 
-### ⚠️ DB 백업 필수
-- **매 배포 전 반드시 DB 백업**
-- import 스크립트가 자동 백업 수행
-- 백업 파일 위치 확인: `backup_YYYYMMDD_HHMMSS.sql`
-
-### ⚠️ 버전 관리
-- 패키지 파일명에 버전 명시
-- 여러 버전 보관 권장
-- 롤백용 이전 버전 유지
-
-### ⚠️ 환경 설정
-- `.env` 파일 보안 주의
-- 프로덕션 환경에서는 강력한 비밀번호 사용
-- `JWT_SECRET` 변경 필수
-
-### ⚠️ 디스크 공간
-- 이미지 tar 파일: 약 1-2GB
-- DB 백업 파일: 사용량에 따라 다름
-- 충분한 여유 공간 확보
-
-## 6. 빠른 참조
-
-### 온라인 환경 (개발 서버)
-
-```bash
-# 1. 최신 코드 pull
-git pull
-
-# 2. 태그 생성 (선택)
-git tag v2.1.7
-git push origin v2.1.7
-
-# 3. 패키지 생성
-./scripts/export-package.sh 2.1.7
-
-# 4. 패키지 전송
-cp customer_vault_2.1.7_package.tar.gz /media/usb/
-```
-
-### 오프라인 환경 (운영 서버)
-
-```bash
-# 1. 패키지 복사 및 압축 해제
-tar -xzf customer_vault_2.1.7_package.tar.gz
-cd customer_vault_2.1.7_package
-
-# 2. .env 파일 준비
-cp /기존/경로/.env .
-
-# 3. 배포 실행
-./import-package.sh
-
-# 4. 서비스 확인
-docker compose ps
-docker compose logs -f backend frontend
-```
-
-## 7. 참고 자료
-
-- [Docker 설정 가이드](docker_setup_guide.md)
-- [DB 마이그레이션 가이드](migration_guide.md)
-- [로그 정보](logs_information.md)
+- Docker 설정: docker_setup_guide.md
+- 마이그레이션: migration_guide.md
+- 릴리즈: RELEASE_GUIDE.md
+- 원격 백업: backup_remote_setup_guide.md
