@@ -13,6 +13,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Checkbox,
   Accordion,
   AccordionDetails,
   AccordionSummary,
@@ -115,6 +116,10 @@ interface VirtualPcChecklistItem {
   checkedBy?: { id: number; name: string } | null;
   checkedByName?: string | null;
   checkedAt?: string | null;
+  verified: boolean;
+  verifiedBy?: { id: number; name: string } | null;
+  verifiedByName?: string | null;
+  verifiedAt?: string | null;
 }
 
 interface VirtualPcImage {
@@ -409,7 +414,14 @@ const CustomerSourceManagementDetailPage = () => {
       usedSheetNames.add(sheetName);
 
       const worksheet = workbook.addWorksheet(sheetName);
-      worksheet.columns = [{ width: 32 }, { width: 52 }, { width: 28 }, { width: 52 }];
+      worksheet.columns = [
+        { width: 32 },
+        { width: 18 },
+        { width: 24 },
+        { width: 18 },
+        { width: 24 },
+        { width: 52 },
+      ];
       worksheet.addRows([
         ['가상PC 이미지 정보', '', ''],
         ['이미지 이름', image.name, ''],
@@ -426,12 +438,19 @@ const CustomerSourceManagementDetailPage = () => {
           ? image.installedPrograms.map((program) => [program.name, program.version || '-', program.description || '-'])
           : [['등록된 프로그램 없음', '-', '-']]),
         ['', '', ''],
-        ['체크리스트 항목', '확인', '점검자', '비고'],
+        ['체크리스트 항목', '검토', '검토자', '검증', '검증자', '비고'],
         ...(image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length
           ? image.checklistItems
             .filter((item) => item.itemKey !== 'vmft_hash_value')
-            .map((item) => [CHECKLIST_LABELS[item.itemKey] || item.itemKey, item.checked ? '확인 완료' : '미확인', item.checkedBy?.name || item.checkedByName || '-', item.note || '-'])
-          : [['등록된 체크리스트 없음', '-', '-', '-']]),
+            .map((item) => [
+              CHECKLIST_LABELS[item.itemKey] || item.itemKey,
+              item.checked ? '완료' : '미완료',
+              item.checkedBy?.name || item.checkedByName || '-',
+              item.verified ? '완료' : '미완료',
+              item.verifiedBy?.name || item.verifiedByName || '-',
+              item.note || '-',
+            ])
+          : [['등록된 체크리스트 없음', '-', '-', '-', '-', '-']]),
       ]);
       worksheet.eachRow((row) => {
         row.eachCell((cell) => {
@@ -638,9 +657,16 @@ const CustomerSourceManagementDetailPage = () => {
                     {image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length > 0 ? (
                       <TableContainer>
                         <Table size="small">
-                          <TableHead><TableRow><TableCell>항목</TableCell><TableCell>확인</TableCell><TableCell>점검자</TableCell><TableCell>비고</TableCell></TableRow></TableHead>
+                          <TableHead><TableRow><TableCell>항목</TableCell><TableCell>검토</TableCell><TableCell>검토자</TableCell><TableCell>검증</TableCell><TableCell>검증자</TableCell><TableCell>비고</TableCell></TableRow></TableHead>
                           <TableBody>{image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').map((item, itemIndex) => (
-                            <TableRow key={item.id || itemIndex}><TableCell>{CHECKLIST_LABELS[item.itemKey] || item.itemKey}</TableCell><TableCell>{item.checked ? '확인 완료' : '미확인'}</TableCell><TableCell>{item.checkedBy?.name || item.checkedByName || (item.checked ? '저장 시 기록' : '-')}</TableCell><TableCell>{item.note || '-'}</TableCell></TableRow>
+                            <TableRow key={item.id || itemIndex}>
+                              <TableCell>{CHECKLIST_LABELS[item.itemKey] || item.itemKey}</TableCell>
+                              <TableCell><Checkbox checked={item.checked} disabled size="small" inputProps={{ 'aria-label': `${CHECKLIST_LABELS[item.itemKey] || item.itemKey} 검토 여부` }} /></TableCell>
+                              <TableCell>{item.checkedBy?.name || item.checkedByName || '-'}</TableCell>
+                              <TableCell><Checkbox checked={item.verified} disabled size="small" inputProps={{ 'aria-label': `${CHECKLIST_LABELS[item.itemKey] || item.itemKey} 검증 여부` }} /></TableCell>
+                              <TableCell>{item.verifiedBy?.name || item.verifiedByName || '-'}</TableCell>
+                              <TableCell>{item.note || '-'}</TableCell>
+                            </TableRow>
                           ))}</TableBody>
                         </Table>
                       </TableContainer>

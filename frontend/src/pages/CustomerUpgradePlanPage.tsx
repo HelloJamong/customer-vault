@@ -44,12 +44,25 @@ interface Consideration {
 
 interface UpgradePlan {
   id: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   status: '예정' | '미정' | '완료';
   currentVersion: string | null;
   targetVersion: string | null;
   scheduleEstimate: string | null;
   considerations: Consideration[];
 }
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const InfoItem = ({ label, value }: { label: string; value: string | null | undefined }) => (
   <Grid xs={12} sm={4}>
@@ -157,9 +170,14 @@ const CustomerUpgradePlanPage = () => {
           목록으로
         </Button>
         <Box flex={1}>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            {customer?.name || '고객사'} - 업그레이드 계획
-          </Typography>
+          <Box display="flex" alignItems="baseline" gap={2} flexWrap="wrap">
+            <Typography variant="h4" fontWeight="bold">
+              {customer?.name || '고객사'} - 업그레이드 계획
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              최종 수정: {formatDateTime(upgradePlan?.updatedAt)}
+            </Typography>
+          </Box>
           <Typography variant="body2" color="text.secondary">
             메이저 버전 업그레이드 시 고려해야 할 항목을 관리합니다
           </Typography>

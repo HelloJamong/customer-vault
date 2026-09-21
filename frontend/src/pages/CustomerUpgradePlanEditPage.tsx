@@ -228,15 +228,13 @@ const CustomerUpgradePlanEditPage = () => {
     return (
       <Box>
         <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 1120 }}>
+          <Table size="small" sx={{ minWidth: 900 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ minWidth: 160, whiteSpace: 'nowrap' }}>기능</TableCell>
-                <TableCell sx={{ minWidth: 220 }}>설명</TableCell>
+                <TableCell sx={{ minWidth: 360 }}>설명</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">검토</TableCell>
-                <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>검토자</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">검증</TableCell>
-                <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>검증자</TableCell>
                 <TableCell sx={{ minWidth: 180 }}>비고</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>작업</TableCell>
               </TableRow>
@@ -269,9 +267,6 @@ const CustomerUpgradePlanEditPage = () => {
                       inputProps={{ 'aria-label': `${item.feature || '항목'} 검토 여부` }}
                     />
                   </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {item.checked ? (item.checkedBy?.name || item.checkedByName || `저장 시 ${currentUser?.name || '로그인 사용자'}`) : '-'}
-                  </TableCell>
                   <TableCell align="center">
                     <Checkbox
                       checked={item.verified}
@@ -283,9 +278,6 @@ const CustomerUpgradePlanEditPage = () => {
                       onChange={(e) => handleConsiderationChange(originalIndex, 'verified', e.target.checked)}
                       inputProps={{ 'aria-label': `${item.feature || '항목'} 검증 여부` }}
                     />
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {item.verified ? (item.verifiedBy?.name || item.verifiedByName || `저장 시 ${currentUser?.name || '로그인 사용자'}`) : '-'}
                   </TableCell>
                   <TableCell>
                     <TextField

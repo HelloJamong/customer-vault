@@ -582,7 +582,10 @@ export class CustomersService {
             installedPrograms: { orderBy: { id: 'asc' } },
             checklistItems: {
               orderBy: { displayOrder: 'asc' },
-              include: { checkedBy: { select: { id: true, name: true } } },
+              include: {
+                checkedBy: { select: { id: true, name: true } },
+                verifiedBy: { select: { id: true, name: true } },
+              },
             },
           },
         },
@@ -665,10 +668,17 @@ export class CustomersService {
           note: item.note,
           checkedBy: item.checkedBy ? {
             id: item.checkedBy.id,
-            name: item.checkedByName || item.checkedBy.name,
+            name: item.checkedBy.name,
           } : null,
-          checkedByName: item.checkedByName,
+          checkedByName: item.checkedBy?.name || item.checkedByName,
           checkedAt: item.checkedAt,
+          verified: item.verified,
+          verifiedBy: item.verifiedBy ? {
+            id: item.verifiedBy.id,
+            name: item.verifiedBy.name,
+          } : null,
+          verifiedByName: item.verifiedBy?.name || item.verifiedByName,
+          verifiedAt: item.verifiedAt,
           displayOrder: item.displayOrder,
         })),
       })),
@@ -778,7 +788,16 @@ export class CustomersService {
     image: VirtualPcImageDto,
     userId: number,
     userName: string | null,
-    previousChecklistItems?: Map<string, { checked: boolean; checkedByUserId: number | null; checkedByName: string | null; checkedAt: Date | null }>,
+    previousChecklistItems?: Map<string, {
+      checked: boolean;
+      checkedByUserId: number | null;
+      checkedByName: string | null;
+      checkedAt: Date | null;
+      verified: boolean;
+      verifiedByUserId: number | null;
+      verifiedByName: string | null;
+      verifiedAt: Date | null;
+    }>,
     previousCreatedAt?: Date,
   ) {
     return {
@@ -802,15 +821,33 @@ export class CustomersService {
       checklistItems: image.checklistItems?.length ? {
         create: image.checklistItems.map((item, index) => {
           const previous = previousChecklistItems?.get(item.itemKey);
-          const newlyChecked = item.checked && !previous?.checked;
+          const checked = !!item.checked;
+          const verified = !!item.verified;
+          const newlyChecked = checked && !previous?.checked;
+          const checkedByUserId = checked ? (newlyChecked ? userId : (previous?.checkedByUserId ?? userId)) : null;
+          const checkedByName = checked ? (newlyChecked ? userName : (previous?.checkedByName || userName)) : null;
+
+          if (verified && !checked) {
+            throw new BadRequestException('검토가 완료된 항목만 검증할 수 있습니다');
+          }
+
+          const newlyVerified = verified && !previous?.verified;
+          if (newlyVerified && checkedByUserId === userId) {
+            throw new BadRequestException('검토자와 검증자는 서로 다른 사용자여야 합니다');
+          }
+
           return {
             category: item.itemKey.startsWith('vmft_') ? 'VMFT 설정' : '구동 테스트',
             itemKey: item.itemKey,
-            checked: item.checked,
+            checked,
             note: item.note,
-            checkedByUserId: item.checked ? (newlyChecked ? userId : (previous?.checkedByUserId ?? userId)) : null,
-            checkedByName: item.checked ? (newlyChecked ? userName : (previous?.checkedByName || userName)) : null,
-            checkedAt: item.checked ? (newlyChecked ? new Date() : (previous?.checkedAt || new Date())) : null,
+            checkedByUserId,
+            checkedByName,
+            checkedAt: checked ? (newlyChecked ? new Date() : (previous?.checkedAt || new Date())) : null,
+            verified,
+            verifiedByUserId: verified ? (newlyVerified ? userId : (previous?.verifiedByUserId ?? userId)) : null,
+            verifiedByName: verified ? (newlyVerified ? userName : (previous?.verifiedByName || userName)) : null,
+            verifiedAt: verified ? (newlyVerified ? new Date() : (previous?.verifiedAt || new Date())) : null,
             displayOrder: item.displayOrder ?? index,
           };
         }),
@@ -971,7 +1008,10 @@ export class CustomersService {
         virtualPcImages: {
           include: {
             checklistItems: {
-              include: { checkedBy: { select: { name: true } } },
+              include: {
+                checkedBy: { select: { name: true } },
+                verifiedBy: { select: { name: true } },
+              },
             },
           },
         },
@@ -994,6 +1034,10 @@ export class CustomersService {
       checkedByUserId: number | null;
       checkedByName: string | null;
       checkedAt: Date | null;
+      verified: boolean;
+      verifiedByUserId: number | null;
+      verifiedByName: string | null;
+      verifiedAt: Date | null;
     }>>();
     existing.virtualPcImages.forEach((image) => {
       previousChecklistByImageId.set(
@@ -1003,6 +1047,10 @@ export class CustomersService {
           checkedByUserId: item.checkedByUserId,
           checkedByName: item.checkedByName || item.checkedBy?.name || null,
           checkedAt: item.checkedAt,
+          verified: item.verified,
+          verifiedByUserId: item.verifiedByUserId,
+          verifiedByName: item.verifiedByName || item.verifiedBy?.name || null,
+          verifiedAt: item.verifiedAt,
         }])),
       );
     });
@@ -1233,6 +1281,8 @@ export class CustomersService {
         currentVersion: null,
         targetVersion: null,
         scheduleEstimate: null,
+        createdAt: null,
+        updatedAt: null,
         considerations: [],
       };
     }
@@ -1244,6 +1294,8 @@ export class CustomersService {
       currentVersion: upgradePlan.currentVersion,
       targetVersion: upgradePlan.targetVersion,
       scheduleEstimate: upgradePlan.scheduleEstimate,
+      createdAt: upgradePlan.createdAt,
+      updatedAt: upgradePlan.updatedAt,
       considerations: upgradePlan.considerations.map((item) => ({
         id: item.id,
         category: item.category,

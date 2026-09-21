@@ -52,7 +52,21 @@ test('source management response includes source and virtual PC image timestamps
           licenseNote: null,
           hashValue: null,
           installedPrograms: [],
-          checklistItems: [],
+          checklistItems: [{
+            id: 3,
+            category: '구동 테스트',
+            itemKey: 'boot_server_install',
+            checked: true,
+            note: null,
+            checkedBy: { id: 1, name: '김검토' },
+            checkedByName: 'reviewer-login-id',
+            checkedAt: new Date('2026-09-18T00:00:00Z'),
+            verified: true,
+            verifiedBy: { id: 2, name: '이검증' },
+            verifiedByName: 'verifier-login-id',
+            verifiedAt: new Date('2026-09-19T00:00:00Z'),
+            displayOrder: 0,
+          }],
         }],
       }),
     },
@@ -65,6 +79,8 @@ test('source management response includes source and virtual PC image timestamps
   assert.equal(result.updatedAt, sourceUpdatedAt);
   assert.equal(result.virtualPcImages[0].createdAt, imageCreatedAt);
   assert.equal(result.virtualPcImages[0].updatedAt, imageUpdatedAt);
+  assert.equal(result.virtualPcImages[0].checklistItems[0].checkedByName, '김검토');
+  assert.equal(result.virtualPcImages[0].checklistItems[0].verifiedByName, '이검증');
 });
 
 test('virtual PC image recreation preserves its original creation timestamp', () => {

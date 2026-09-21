@@ -60,6 +60,7 @@ model User {
   backupLogs            BackupLog[]
   meetingMinutes        MeetingMinutes[] @relation("MeetingMinutesCreator")
   checkedVirtualPcChecklistItems VirtualPcChecklistItem[] @relation("VirtualPcChecklistCheckedBy")
+  verifiedVirtualPcChecklistItems VirtualPcChecklistItem[] @relation("VirtualPcChecklistVerifiedBy")
   checkedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationCheckedBy")
   verifiedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationVerifiedBy")
 
@@ -521,16 +522,22 @@ model VirtualPcChecklistItem {
   checkedByUserId  Int?        @map("checked_by_user_id")
   checkedByName    String?     @map("checked_by_name") @db.VarChar(100)
   checkedAt        DateTime?   @map("checked_at")
+  verified         Boolean     @default(false)
+  verifiedByUserId Int?        @map("verified_by_user_id")
+  verifiedByName   String?     @map("verified_by_name") @db.VarChar(100)
+  verifiedAt       DateTime?   @map("verified_at")
   displayOrder     Int         @default(0) @map("display_order")
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
   virtualPcImage VirtualPcImage @relation(fields: [virtualPcImageId], references: [id], onDelete: Cascade)
   checkedBy      User?         @relation("VirtualPcChecklistCheckedBy", fields: [checkedByUserId], references: [id], onDelete: SetNull)
+  verifiedBy     User?         @relation("VirtualPcChecklistVerifiedBy", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([virtualPcImageId, itemKey])
   @@index([virtualPcImageId])
   @@index([checkedByUserId])
+  @@index([verifiedByUserId])
   @@map("virtual_pc_checklist_items")
 }
 

@@ -31,6 +31,7 @@ import { ArrowBack, Save, Add, Delete, ExpandMore } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
+import { useAuthStore } from '@/store/authStore';
 
 type RaidType = '미확인' | 'RAID 미사용' | 'RAID0' | 'RAID1' | 'RAID5' | 'RAID6' | 'RAID10' | '기타';
 type DiskCapacityUnit = 'GB' | 'TB';
@@ -120,6 +121,10 @@ interface VirtualPcChecklistItem {
   checkedBy?: { id: number; name: string } | null;
   checkedByName?: string | null;
   checkedAt?: string | null;
+  verified: boolean;
+  verifiedBy?: { id: number; name: string } | null;
+  verifiedByName?: string | null;
+  verifiedAt?: string | null;
 }
 
 interface VirtualPcImage {
@@ -172,6 +177,7 @@ const createChecklistItems = (): VirtualPcChecklistItem[] =>
   [...VMFT_CHECKLIST, ...BOOT_TEST_CHECKLIST].map((item, index) => ({
     itemKey: item.itemKey,
     checked: false,
+    verified: false,
     note: '',
     displayOrder: index,
   }));
@@ -224,6 +230,7 @@ const createHrMappings = (): HRFieldMapping[] => {
 const CustomerSourceManagementEditPage = () => {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
+  const currentUser = useAuthStore((state) => state.user);
   const [customerName, setCustomerName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -276,7 +283,7 @@ const CustomerSourceManagementEditPage = () => {
                 dDiskCapacity: image.dDiskCapacity ?? '',
                 installedPrograms: image.installedPrograms || [],
                 checklistItems: image.checklistItems?.length
-                  ? image.checklistItems
+                  ? image.checklistItems.map((item) => ({ ...item, verified: !!item.verified }))
                   : createChecklistItems(),
               }))
               : [{
@@ -386,6 +393,7 @@ const CustomerSourceManagementEditPage = () => {
             .map((item) => ({
               itemKey: item.itemKey,
               checked: item.checked,
+              verified: item.verified,
               note: item.note?.trim() || undefined,
               displayOrder: item.displayOrder,
             })),
@@ -610,14 +618,19 @@ const CustomerSourceManagementEditPage = () => {
   const handleChecklistChange = (
     imageIndex: number,
     itemKey: string,
-    field: 'checked' | 'note',
+    field: 'checked' | 'verified' | 'note',
     value: boolean | string,
   ) => {
     const virtualPcImages = [...formData.virtualPcImages];
     const image = virtualPcImages[imageIndex];
-    const checklistItems = image.checklistItems.map((item) =>
-      item.itemKey === itemKey ? { ...item, [field]: value } : item,
-    );
+    const checklistItems = image.checklistItems.map((item) => {
+      if (item.itemKey !== itemKey) return item;
+      return {
+        ...item,
+        [field]: value,
+        ...(field === 'checked' && value === false ? { verified: false } : {}),
+      };
+    });
     virtualPcImages[imageIndex] = { ...image, checklistItems };
     setFormData({ ...formData, virtualPcImages });
   };
@@ -734,9 +747,12 @@ const CustomerSourceManagementEditPage = () => {
             image.checklistItems.find((item) => item.itemKey === itemKey) || {
               itemKey,
               checked: false,
+              verified: false,
               note: '',
               checkedBy: null,
               checkedAt: null,
+              verifiedBy: null,
+              verifiedAt: null,
             };
 
           return (
@@ -919,18 +935,39 @@ const CustomerSourceManagementEditPage = () => {
                         const result = getChecklistItem(item.itemKey);
                         return (
                           <Grid container spacing={1} key={item.itemKey} alignItems="center" sx={{ mb: 1 }}>
-                            <Grid xs={12} sm={5}>
-                              <Box sx={{ minHeight: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <FormControlLabel
-                                  control={<Checkbox checked={result.checked} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'checked', e.target.checked)} />}
-                                  label={item.label}
-                                />
-                                <Typography variant="caption" color="text.secondary" sx={{ pl: 4.5 }}>
-                                  점검자: {result.checked ? (result.checkedBy?.name || result.checkedByName || '저장 시 로그인 계정') : '-'}
-                                </Typography>
-                              </Box>
-                            </Grid>
                             <Grid xs={12} sm={7}>
+                              <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                {item.label}
+                              </Typography>
+                              <Stack direction="row" spacing={2}>
+                                <FormControlLabel
+                                  control={(
+                                    <Checkbox
+                                      checked={result.checked}
+                                      onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'checked', e.target.checked)}
+                                      inputProps={{ 'aria-label': `${item.label} 검토 여부` }}
+                                    />
+                                  )}
+                                  label="검토"
+                                />
+                                <FormControlLabel
+                                  control={(
+                                    <Checkbox
+                                      checked={result.verified}
+                                      disabled={
+                                        !result.checked
+                                        || !(result.checkedBy?.name || result.checkedByName)
+                                        || result.checkedBy?.id === currentUser?.id
+                                      }
+                                      onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'verified', e.target.checked)}
+                                      inputProps={{ 'aria-label': `${item.label} 검증 여부` }}
+                                    />
+                                  )}
+                                  label="검증"
+                                />
+                              </Stack>
+                            </Grid>
+                            <Grid xs={12} sm={5}>
                               <TextField fullWidth size="small" label="비고" value={result.note || ''} onChange={(e) => handleChecklistChange(imageIndex, item.itemKey, 'note', e.target.value)} />
                             </Grid>
                           </Grid>

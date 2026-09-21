@@ -196,6 +196,11 @@ export class VirtualPcChecklistItemDto {
   @IsBoolean()
   checked: boolean;
 
+  @ApiProperty({ required: false, default: false, description: '검증 여부' })
+  @IsOptional()
+  @IsBoolean()
+  verified?: boolean;
+
   @ApiProperty({ required: false, description: '비고' })
   @IsOptional()
   @IsString()

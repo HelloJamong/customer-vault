@@ -10,6 +10,7 @@ const { CustomersService } = require('../src/customers/customers.service');
 const createService = (prisma = {}) => new CustomersService(prisma, {}, {});
 
 test('upgrade plan response exposes reviewer and verifier display names instead of stored login identifiers', async () => {
+  const updatedAt = new Date('2026-09-21T01:02:03Z');
   const prisma = {
     upgradePlan: {
       findUnique: async () => ({
@@ -19,6 +20,8 @@ test('upgrade plan response exposes reviewer and verifier display names instead 
         currentVersion: '4.2',
         targetVersion: '6.1',
         scheduleEstimate: '2026-10',
+        createdAt: new Date('2026-09-01T00:00:00Z'),
+        updatedAt,
         considerations: [{
           id: 4,
           category: '클라이언트',
@@ -46,6 +49,7 @@ test('upgrade plan response exposes reviewer and verifier display names instead 
   assert.equal(item.checkedByName, '김검토');
   assert.equal(item.verifiedBy.name, '이검증');
   assert.equal(item.verifiedByName, '이검증');
+  assert.equal(result.updatedAt, updatedAt);
 });
 
 test('upgrade consideration verification records a different user and preserves the reviewer', () => {
