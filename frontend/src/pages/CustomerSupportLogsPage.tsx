@@ -34,6 +34,7 @@ import { settingsApi } from '@/api/settings.api';
 import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/types/support-log.types';
 import type { Customer } from '@/types/customer.types';
 import ExcelJS from 'exceljs';
+import { downloadBlob } from '@/utils/download';
 
 dayjs.locale('ko');
 
@@ -298,13 +299,7 @@ const CustomerSupportLogsPage = () => {
 
     // 파일 다운로드
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // 로그 기록
     try {

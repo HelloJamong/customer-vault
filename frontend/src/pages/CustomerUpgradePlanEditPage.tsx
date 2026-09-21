@@ -24,9 +24,11 @@ import {
   ToggleButtonGroup,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Save, Add, Delete, ExpandMore } from '@mui/icons-material';
+import { ArrowBack, Save, Add, Delete, ExpandMore, PlaylistAddCheck } from '@mui/icons-material';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
+import { useAuthStore } from '@/store/authStore';
+import { UPGRADE_PLAN_DEFAULT_CONSIDERATIONS } from '@/utils/upgrade-plan-template';
 
 type ConsiderationCategory = '클라이언트' | '관리서버' | '커스텀';
 type PlanStatus = '예정' | '미정' | '완료';
@@ -40,6 +42,9 @@ interface Consideration {
   note: string;
   checkedBy?: { id: number; name: string } | null;
   checkedByName?: string | null;
+  verified: boolean;
+  verifiedBy?: { id: number; name: string } | null;
+  verifiedByName?: string | null;
   displayOrder: number;
 }
 
@@ -57,6 +62,7 @@ const createConsideration = (category: ConsiderationCategory, displayOrder: numb
   feature: '',
   description: '',
   checked: false,
+  verified: false,
   note: '',
   displayOrder,
 });
@@ -64,6 +70,7 @@ const createConsideration = (category: ConsiderationCategory, displayOrder: numb
 const CustomerUpgradePlanEditPage = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
+  const currentUser = useAuthStore((state) => state.user);
   const [customerName, setCustomerName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,7 +97,10 @@ const CustomerUpgradePlanEditPage = () => {
             currentVersion: planResponse.data.currentVersion || '',
             targetVersion: planResponse.data.targetVersion || '',
             scheduleEstimate: planResponse.data.scheduleEstimate || '',
-            considerations: planResponse.data.considerations || [],
+            considerations: (planResponse.data.considerations || []).map((item: Consideration) => ({
+              ...item,
+              verified: !!item.verified,
+            })),
           });
         }
       } catch (error) {
@@ -118,7 +128,12 @@ const CustomerUpgradePlanEditPage = () => {
     value: Consideration[K],
   ) => {
     const considerations = [...formData.considerations];
-    considerations[index] = { ...considerations[index], [field]: value };
+    const invalidatesReview = field === 'category' || field === 'feature' || field === 'description';
+    considerations[index] = {
+      ...considerations[index],
+      [field]: value,
+      ...(invalidatesReview ? { checked: false, verified: false } : {}),
+    };
     setFormData({ ...formData, considerations });
   };
 
@@ -127,6 +142,36 @@ const CustomerUpgradePlanEditPage = () => {
       ...formData,
       considerations: formData.considerations.filter((_, i) => i !== index),
     });
+  };
+
+  const handleReviewChange = (index: number, checked: boolean) => {
+    const considerations = [...formData.considerations];
+    considerations[index] = {
+      ...considerations[index],
+      checked,
+      verified: checked ? considerations[index].verified : false,
+    };
+    setFormData({ ...formData, considerations });
+  };
+
+  const handleUseDefaultTemplate = () => {
+    const hasCommonItems = formData.considerations.some((item) => item.category !== '커스텀');
+    if (hasCommonItems && !window.confirm('기존 공통 고려 사항을 기본 양식으로 교체하시겠습니까? 고객사별 커스텀 항목은 유지됩니다.')) {
+      return;
+    }
+
+    const customItems = formData.considerations.filter((item) => item.category === '커스텀');
+    const defaultItems: Consideration[] = UPGRADE_PLAN_DEFAULT_CONSIDERATIONS.map((item) => ({
+      ...item,
+      checked: false,
+      verified: false,
+      note: '',
+      displayOrder: 0,
+    }));
+    const considerations = [...defaultItems, ...customItems]
+      .map((item, displayOrder) => ({ ...item, displayOrder }));
+
+    setFormData({ ...formData, considerations });
   };
 
   const handleSubmit = async () => {
@@ -146,6 +191,7 @@ const CustomerUpgradePlanEditPage = () => {
             feature: item.feature.trim(),
             description: item.description.trim() || undefined,
             checked: item.checked,
+            verified: item.verified,
             note: item.note.trim() || undefined,
             displayOrder,
           })),
@@ -182,13 +228,15 @@ const CustomerUpgradePlanEditPage = () => {
     return (
       <Box>
         <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 900 }}>
+          <Table size="small" sx={{ minWidth: 1120 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ minWidth: 160, whiteSpace: 'nowrap' }}>기능</TableCell>
                 <TableCell sx={{ minWidth: 220 }}>설명</TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">확인여부</TableCell>
-                <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>확인자</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">검토</TableCell>
+                <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>검토자</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">검증</TableCell>
+                <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>검증자</TableCell>
                 <TableCell sx={{ minWidth: 180 }}>비고</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>작업</TableCell>
               </TableRow>
@@ -217,12 +265,27 @@ const CustomerUpgradePlanEditPage = () => {
                   <TableCell align="center">
                     <Checkbox
                       checked={item.checked}
-                      onChange={(e) => handleConsiderationChange(originalIndex, 'checked', e.target.checked)}
-                      inputProps={{ 'aria-label': `${item.feature || '항목'} 확인여부` }}
+                      onChange={(e) => handleReviewChange(originalIndex, e.target.checked)}
+                      inputProps={{ 'aria-label': `${item.feature || '항목'} 검토 여부` }}
                     />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {item.checked ? (item.checkedBy?.name || item.checkedByName || '저장 시 로그인 계정') : '-'}
+                    {item.checked ? (item.checkedBy?.name || item.checkedByName || `저장 시 ${currentUser?.name || '로그인 사용자'}`) : '-'}
+                  </TableCell>
+                  <TableCell align="center">
+                    <Checkbox
+                      checked={item.verified}
+                      disabled={
+                        !item.checked
+                        || !(item.checkedBy?.name || item.checkedByName)
+                        || item.checkedBy?.id === currentUser?.id
+                      }
+                      onChange={(e) => handleConsiderationChange(originalIndex, 'verified', e.target.checked)}
+                      inputProps={{ 'aria-label': `${item.feature || '항목'} 검증 여부` }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {item.verified ? (item.verifiedBy?.name || item.verifiedByName || `저장 시 ${currentUser?.name || '로그인 사용자'}`) : '-'}
                   </TableCell>
                   <TableCell>
                     <TextField
@@ -343,8 +406,16 @@ const CustomerUpgradePlanEditPage = () => {
       </Paper>
 
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          공통 고려 사항
+        <Box display="flex" justifyContent="space-between" alignItems="center" gap={2} mb={1}>
+          <Typography variant="h6" fontWeight="bold">
+            공통 고려 사항
+          </Typography>
+          <Button variant="outlined" size="small" startIcon={<PlaylistAddCheck />} onClick={handleUseDefaultTemplate}>
+            기본 양식 사용하기
+          </Button>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          검토 저장 후 검토자와 다른 사용자가 검증할 수 있습니다.
         </Typography>
         <Divider sx={{ mb: 3 }} />
         <Stack spacing={2}>

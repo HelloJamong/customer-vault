@@ -18,6 +18,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Checkbox,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
 import { ArrowBack, Edit, ExpandMore } from '@mui/icons-material';
@@ -35,6 +36,9 @@ interface Consideration {
   note: string | null;
   checkedBy?: { id: number; name: string } | null;
   checkedByName?: string | null;
+  verified: boolean;
+  verifiedBy?: { id: number; name: string } | null;
+  verifiedByName?: string | null;
   displayOrder: number;
 }
 
@@ -105,13 +109,15 @@ const CustomerUpgradePlanPage = () => {
 
     return (
       <TableContainer sx={{ overflowX: 'auto' }}>
-        <Table size="small" sx={{ minWidth: 800 }}>
+        <Table size="small" sx={{ minWidth: 1040 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ minWidth: 160, whiteSpace: 'nowrap' }}>기능</TableCell>
               <TableCell sx={{ minWidth: 220 }}>설명</TableCell>
-              <TableCell sx={{ whiteSpace: 'nowrap' }}>확인여부</TableCell>
-              <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>확인자</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">검토</TableCell>
+              <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>검토자</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }} align="center">검증</TableCell>
+              <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>검증자</TableCell>
               <TableCell sx={{ minWidth: 180 }}>비고</TableCell>
             </TableRow>
           </TableHead>
@@ -120,9 +126,17 @@ const CustomerUpgradePlanPage = () => {
               <TableRow key={item.id}>
                 <TableCell>{item.feature}</TableCell>
                 <TableCell>{item.description || '-'}</TableCell>
-                <TableCell>{item.checked ? '확인 완료' : '미확인'}</TableCell>
+                <TableCell align="center">
+                  <Checkbox checked={item.checked} disabled size="small" inputProps={{ 'aria-label': `${item.feature} 검토 여부` }} />
+                </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
                   {item.checked ? (item.checkedBy?.name || item.checkedByName || '-') : '-'}
+                </TableCell>
+                <TableCell align="center">
+                  <Checkbox checked={item.verified} disabled size="small" inputProps={{ 'aria-label': `${item.feature} 검증 여부` }} />
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  {item.verified ? (item.verifiedBy?.name || item.verifiedByName || '-') : '-'}
                 </TableCell>
                 <TableCell>{item.note || '-'}</TableCell>
               </TableRow>

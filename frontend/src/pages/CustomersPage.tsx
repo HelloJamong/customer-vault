@@ -12,6 +12,7 @@ import ExcelJS from 'exceljs';
 import CustomerSummaryDialog, { type CustomerSummary } from '@/components/CustomerSummaryDialog';
 import { useCustomersPageStore } from '@/store/customersPageStore';
 import { useShallow } from 'zustand/react/shallow';
+import { downloadBlob } from '@/utils/download';
 
 type ExportRow = Array<string | number | boolean | null>;
 
@@ -598,13 +599,7 @@ const CustomersPage = () => {
 
     // 파일 다운로드
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // 로그 기록
     try {

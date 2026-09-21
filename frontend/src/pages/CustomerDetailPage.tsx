@@ -21,6 +21,18 @@ import apiClient from '@/api/axios';
 import type { Customer } from '@/types/customer.types';
 import ExcelJS from 'exceljs';
 import { logsApi } from '@/api/logs.api';
+import { downloadBlob } from '@/utils/download';
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const CustomerDetailPage = () => {
   const navigate = useNavigate();
@@ -218,13 +230,7 @@ const CustomerDetailPage = () => {
 
     // 다운로드
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // 로그 기록
     try {
@@ -250,9 +256,14 @@ const CustomerDetailPage = () => {
             목록으로
           </Button>
           <Box>
-            <Typography variant="h4" fontWeight="bold">
-              {customer.name}
-            </Typography>
+            <Box display="flex" alignItems="baseline" gap={2} flexWrap="wrap">
+              <Typography variant="h4" fontWeight="bold">
+                {customer.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                최종 수정: {formatDateTime(customer.updatedAt)}
+              </Typography>
+            </Box>
             <Typography variant="body2" color="text.secondary">
               고객사 유지보수 정보
             </Typography>

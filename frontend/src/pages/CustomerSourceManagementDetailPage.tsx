@@ -24,6 +24,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
 import ExcelJS from 'exceljs';
+import { downloadBlob } from '@/utils/download';
 
 interface ServerInfo {
   id?: number;
@@ -119,6 +120,8 @@ interface VirtualPcChecklistItem {
 interface VirtualPcImage {
   id?: number;
   name: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   osName: string;
   osEdition: string;
   osRelease: string;
@@ -133,6 +136,8 @@ interface VirtualPcImage {
 interface SourceManagement {
   id?: number;
   customerId: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   clientVersion: string;
   clientCustomInfo: string;
   virtualPcOsVersion: string;
@@ -157,6 +162,17 @@ const CHECKLIST_LABELS: Record<string, string> = {
   boot_cache_install: '캐시 설치 확인',
   boot_network: '가상PC 네트워크 연결 확인',
   boot_programs: '가상PC 내 설치 프로그램 정상 동작 확인',
+};
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 type ExportRow = Array<string | number | boolean | null>;
@@ -361,13 +377,7 @@ const CustomerSourceManagementDetailPage = () => {
 
     // 다운로드
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // 로그 기록
     try {
@@ -431,15 +441,13 @@ const CustomerSourceManagementDetailPage = () => {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const safeCustomerName = customerName
       .replaceAll('/', '-').replaceAll('\\', '-').replaceAll(':', '-').replaceAll('?', '-').replaceAll('*', '-').replaceAll('[', '-').replaceAll(']', '-');
-    link.download = `${safeCustomerName}-이미지정보.xlsx`;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    downloadBlob(
+      buffer,
+      `${safeCustomerName}-이미지정보.xlsx`,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
 
     try {
       await logsApi.logExcelExport({
@@ -484,9 +492,14 @@ const CustomerSourceManagementDetailPage = () => {
             목록으로
           </Button>
           <Box>
-            <Typography variant="h4" fontWeight="bold">
-              {customerName}
-            </Typography>
+            <Box display="flex" alignItems="baseline" gap={2} flexWrap="wrap">
+              <Typography variant="h4" fontWeight="bold">
+                {customerName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                최종 수정: {formatDateTime(sourceData?.updatedAt)}
+              </Typography>
+            </Box>
             <Typography variant="body2" color="text.secondary">
               구성 정보
             </Typography>
@@ -571,9 +584,14 @@ const CustomerSourceManagementDetailPage = () => {
               <Typography color="text.secondary">등록된 가상PC 이미지가 없습니다.</Typography>
             ) : virtualPcImages.map((image, imageIndex) => (
               <Paper key={image.id || imageIndex} variant="outlined" sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                  {image.name || `이미지 ${imageIndex + 1}`}
-                </Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="baseline" gap={2} flexWrap="wrap" mb={1}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {image.name || `이미지 ${imageIndex + 1}`}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    최초 작성: {formatDateTime(image.createdAt)} / 수정: {formatDateTime(image.updatedAt)}
+                  </Typography>
+                </Box>
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                   <Grid xs={12} sm={4}><ImageInfoItem label="OS" value={`${image.osName} / ${image.osEdition} / ${image.osRelease}`} /></Grid>
                   <Grid xs={12} sm={4}><ImageInfoItem label="C 드라이브" value={image.cDiskCapacity ? `${image.cDiskCapacity}GB` : '-'} /></Grid>

@@ -595,6 +595,8 @@ export class CustomersService {
       return {
         id: null,
         customerId,
+        createdAt: null,
+        updatedAt: null,
         clientVersion: null,
         clientCustomInfo: null,
         virtualPcOsVersion: null,
@@ -628,6 +630,8 @@ export class CustomersService {
     return {
       id: sourceManagement.id,
       customerId: sourceManagement.customerId,
+      createdAt: sourceManagement.createdAt,
+      updatedAt: sourceManagement.updatedAt,
       clientVersion: sourceManagement.clientVersion,
       clientCustomInfo: sourceManagement.clientCustomInfo,
       virtualPcOsVersion: sourceManagement.virtualPcOsVersion,
@@ -637,6 +641,8 @@ export class CustomersService {
       virtualPcImages: sourceManagement.virtualPcImages.map(image => ({
         id: image.id,
         name: image.name,
+        createdAt: image.createdAt,
+        updatedAt: image.updatedAt,
         osName: image.osName,
         osEdition: image.osEdition,
         osRelease: image.osRelease,
@@ -773,8 +779,10 @@ export class CustomersService {
     userId: number,
     userName: string | null,
     previousChecklistItems?: Map<string, { checked: boolean; checkedByUserId: number | null; checkedByName: string | null; checkedAt: Date | null }>,
+    previousCreatedAt?: Date,
   ) {
     return {
+      ...(previousCreatedAt ? { createdAt: previousCreatedAt } : {}),
       name: image.name,
       osName: image.osName,
       osEdition: image.osEdition,
@@ -998,6 +1006,9 @@ export class CustomersService {
         }])),
       );
     });
+    const previousCreatedAtByImageId = new Map(
+      existing.virtualPcImages.map((image) => [image.id, image.createdAt]),
+    );
 
     // 트랜잭션으로 서버 정보 및 접근 정보 업데이트
     // 각 목록은 dto에 해당 필드가 전달된 경우에만 삭제 후 재생성한다.
@@ -1069,6 +1080,7 @@ export class CustomersService {
                 userId,
                 checker?.name || null,
                 image.id ? previousChecklistByImageId.get(image.id) : undefined,
+                image.id ? previousCreatedAtByImageId.get(image.id) : undefined,
               )),
             },
           } : {}),
@@ -1146,19 +1158,55 @@ export class CustomersService {
     userId: number,
     userName: string | null,
     index: number,
-    previous?: Map<number, { checked: boolean; checkedByUserId: number | null; checkedByName: string | null; checkedAt: Date | null }>,
+    previous?: Map<number, {
+      category: string;
+      feature: string;
+      description: string | null;
+      checked: boolean;
+      checkedByUserId: number | null;
+      checkedByName: string | null;
+      checkedAt: Date | null;
+      verified: boolean;
+      verifiedByUserId: number | null;
+      verifiedByName: string | null;
+      verifiedAt: Date | null;
+    }>,
   ) {
     const prev = item.id ? previous?.get(item.id) : undefined;
-    const newlyChecked = !!item.checked && !prev?.checked;
+    const contentChanged = !!prev && (
+      prev.category !== item.category
+      || prev.feature !== item.feature
+      || (prev.description || null) !== (item.description || null)
+    );
+    const checked = contentChanged ? false : !!item.checked;
+    const verified = contentChanged ? false : !!item.verified;
+    const newlyChecked = checked && !prev?.checked;
+    const checkedByUserId = checked ? (newlyChecked ? userId : (prev?.checkedByUserId ?? userId)) : null;
+    const checkedByName = checked ? (newlyChecked ? userName : (prev?.checkedByName || userName)) : null;
+    const checkedAt = checked ? (newlyChecked ? new Date() : (prev?.checkedAt || new Date())) : null;
+
+    if (verified && !checked) {
+      throw new BadRequestException('검토가 완료된 항목만 검증할 수 있습니다');
+    }
+
+    const newlyVerified = verified && !prev?.verified;
+    if (newlyVerified && checkedByUserId === userId) {
+      throw new BadRequestException('검토자와 검증자는 서로 다른 사용자여야 합니다');
+    }
+
     return {
       category: item.category,
       feature: item.feature,
       description: item.description,
-      checked: !!item.checked,
+      checked,
       note: item.note,
-      checkedByUserId: item.checked ? (newlyChecked ? userId : (prev?.checkedByUserId ?? userId)) : null,
-      checkedByName: item.checked ? (newlyChecked ? userName : (prev?.checkedByName || userName)) : null,
-      checkedAt: item.checked ? (newlyChecked ? new Date() : (prev?.checkedAt || new Date())) : null,
+      checkedByUserId,
+      checkedByName,
+      checkedAt,
+      verified,
+      verifiedByUserId: verified ? (newlyVerified ? userId : (prev?.verifiedByUserId ?? userId)) : null,
+      verifiedByName: verified ? (newlyVerified ? userName : (prev?.verifiedByName || userName)) : null,
+      verifiedAt: verified ? (newlyVerified ? new Date() : (prev?.verifiedAt || new Date())) : null,
       displayOrder: item.displayOrder ?? index,
     };
   }
@@ -1169,7 +1217,10 @@ export class CustomersService {
       include: {
         considerations: {
           orderBy: { displayOrder: 'asc' },
-          include: { checkedBy: { select: { id: true, name: true } } },
+          include: {
+            checkedBy: { select: { id: true, name: true } },
+            verifiedBy: { select: { id: true, name: true } },
+          },
         },
       },
     });
@@ -1202,10 +1253,17 @@ export class CustomersService {
         note: item.note,
         checkedBy: item.checkedBy ? {
           id: item.checkedBy.id,
-          name: item.checkedByName || item.checkedBy.name,
+          name: item.checkedBy.name,
         } : null,
-        checkedByName: item.checkedByName,
+        checkedByName: item.checkedBy?.name || item.checkedByName,
         checkedAt: item.checkedAt,
+        verified: item.verified,
+        verifiedBy: item.verifiedBy ? {
+          id: item.verifiedBy.id,
+          name: item.verifiedBy.name,
+        } : null,
+        verifiedByName: item.verifiedBy?.name || item.verifiedByName,
+        verifiedAt: item.verifiedAt,
         displayOrder: item.displayOrder,
       })),
     };
@@ -1269,10 +1327,17 @@ export class CustomersService {
     const checker = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
     const previousByConsiderationId = new Map(
       existing.considerations.map((item) => [item.id, {
+        category: item.category,
+        feature: item.feature,
+        description: item.description,
         checked: item.checked,
         checkedByUserId: item.checkedByUserId,
         checkedByName: item.checkedByName,
         checkedAt: item.checkedAt,
+        verified: item.verified,
+        verifiedByUserId: item.verifiedByUserId,
+        verifiedByName: item.verifiedByName,
+        verifiedAt: item.verifiedAt,
       }]),
     );
 

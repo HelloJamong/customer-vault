@@ -61,6 +61,7 @@ model User {
   meetingMinutes        MeetingMinutes[] @relation("MeetingMinutesCreator")
   checkedVirtualPcChecklistItems VirtualPcChecklistItem[] @relation("VirtualPcChecklistCheckedBy")
   checkedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationCheckedBy")
+  verifiedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationVerifiedBy")
 
   @@index([isActive])
   @@map("users")
@@ -562,15 +563,21 @@ model UpgradeConsideration {
   checkedByUserId Int?      @map("checked_by_user_id")
   checkedByName   String?   @map("checked_by_name") @db.VarChar(100)
   checkedAt       DateTime? @map("checked_at")
+  verified        Boolean   @default(false) // 검증 여부
+  verifiedByUserId Int?     @map("verified_by_user_id")
+  verifiedByName  String?   @map("verified_by_name") @db.VarChar(100)
+  verifiedAt      DateTime? @map("verified_at")
   displayOrder    Int       @default(0) @map("display_order")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   upgradePlan     UpgradePlan @relation(fields: [upgradePlanId], references: [id], onDelete: Cascade)
   checkedBy       User?       @relation("UpgradeConsiderationCheckedBy", fields: [checkedByUserId], references: [id], onDelete: SetNull)
+  verifiedBy      User?       @relation("UpgradeConsiderationVerifiedBy", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
 
   @@index([upgradePlanId, category])
   @@index([checkedByUserId])
+  @@index([verifiedByUserId])
   @@map("upgrade_considerations")
 }
 

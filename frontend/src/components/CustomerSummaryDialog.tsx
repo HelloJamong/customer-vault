@@ -10,6 +10,7 @@ import {
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Close, Download } from '@mui/icons-material';
 import ExcelJS from 'exceljs';
+import { downloadBlob } from '@/utils/download';
 
 export interface CustomerSummary {
   id: number;
@@ -124,13 +125,7 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
 
     // 다운로드
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   };
 
   const columns: GridColDef<CustomerSummary>[] = [

@@ -22,10 +22,15 @@ export class UpgradeConsiderationDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ required: false, default: false, description: '확인 여부' })
+  @ApiProperty({ required: false, default: false, description: '검토 여부' })
   @IsOptional()
   @IsBoolean()
   checked?: boolean;
+
+  @ApiProperty({ required: false, default: false, description: '검증 여부' })
+  @IsOptional()
+  @IsBoolean()
+  verified?: boolean;
 
   @ApiProperty({ required: false, description: '비고' })
   @IsOptional()

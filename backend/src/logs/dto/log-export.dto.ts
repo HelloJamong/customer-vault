@@ -4,6 +4,7 @@ import { IsIn, IsString, MaxLength } from 'class-validator';
 // action은 화이트리스트로 고정해 임의 감사 로그 위조를 막는다.
 export const EXPORT_ACTIONS = [
   '구성 정보 엑셀 내보내기',
+  '가상PC 이미지 정보 엑셀 내보내기',
   '형상 관리 정보 엑셀 내보내기',
   '지원 목록 엑셀 내보내기',
   '고객사 유지보수 정보 엑셀 내보내기',
