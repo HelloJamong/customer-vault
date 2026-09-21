@@ -48,6 +48,11 @@ interface Consideration {
   displayOrder: number;
 }
 
+type ApiConsideration = Omit<Consideration, 'description' | 'note'> & {
+  description?: string | null;
+  note?: string | null;
+};
+
 interface UpgradePlanFormData {
   id: number | null;
   status: PlanStatus;
@@ -97,8 +102,10 @@ const CustomerUpgradePlanEditPage = () => {
             currentVersion: planResponse.data.currentVersion || '',
             targetVersion: planResponse.data.targetVersion || '',
             scheduleEstimate: planResponse.data.scheduleEstimate || '',
-            considerations: (planResponse.data.considerations || []).map((item: Consideration) => ({
+            considerations: (planResponse.data.considerations || []).map((item: ApiConsideration) => ({
               ...item,
+              description: item.description ?? '',
+              note: item.note ?? '',
               verified: !!item.verified,
             })),
           });
@@ -189,10 +196,10 @@ const CustomerUpgradePlanEditPage = () => {
             id: item.id,
             category: item.category,
             feature: item.feature.trim(),
-            description: item.description.trim() || undefined,
+            description: item.description?.trim() || undefined,
             checked: item.checked,
             verified: item.verified,
-            note: item.note.trim() || undefined,
+            note: item.note?.trim() || undefined,
             displayOrder,
           })),
       };
