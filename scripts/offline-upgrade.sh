@@ -474,19 +474,44 @@ fi
 
 PROXY_PORT=$(env_value PROXY_PORT || true)
 PROXY_PORT=${PROXY_PORT:-2082}
+PROXY_CONTAINER=$(compose_command ps -q proxy 2>/dev/null || true)
+[[ -n "$PROXY_CONTAINER" ]] || PROXY_CONTAINER=customer_proxy
+PROXY_HEALTHY=0
+log "Waiting for proxy container health"
+for _ in $(seq 1 300); do
+  proxy_state=$(docker inspect -f '{{.State.Status}}' "$PROXY_CONTAINER" 2>/dev/null || true)
+  proxy_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$PROXY_CONTAINER" 2>/dev/null || true)
+  if [[ "$proxy_state" == running && "$proxy_health" == healthy ]]; then
+    PROXY_HEALTHY=1
+    break
+  fi
+  if [[ "$proxy_state" == exited || "$proxy_state" == dead ]]; then
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$PROXY_HEALTHY" != 1 ]]; then
+  error "Proxy container did not become healthy"
+  compose_command ps || true
+  compose_command logs --tail=100 || true
+  rollback_application
+  exit 1
+fi
+
 if command -v curl >/dev/null 2>&1; then
-  log "Waiting for proxy health endpoint on port $PROXY_PORT"
-  PROXY_HEALTHY=0
-  for _ in $(seq 1 60); do
+  log "Checking published proxy health endpoint on port $PROXY_PORT"
+  HOST_PROXY_HEALTHY=0
+  for _ in $(seq 1 30); do
     if curl --fail --silent --max-time 5 "http://127.0.0.1:${PROXY_PORT}/api/health" >/dev/null 2>&1; then
-      PROXY_HEALTHY=1
+      HOST_PROXY_HEALTHY=1
       break
     fi
     sleep 2
   done
 
-  if [[ "$PROXY_HEALTHY" != 1 ]]; then
-    error "Proxy health endpoint failed"
+  if [[ "$HOST_PROXY_HEALTHY" != 1 ]]; then
+    error "Published proxy health endpoint failed"
     compose_command logs --tail=100 || true
     rollback_application
     exit 1

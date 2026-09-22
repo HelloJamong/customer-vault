@@ -206,6 +206,19 @@ test('nginx proxy reaches backend through the internal compose network', () => {
   assert.match(nginx, /upstream backend_api \{\n\s*server backend:5000;\n\s*\}/);
 });
 
+test('compose waits for frontend and proxy HTTP readiness on slow offline hosts', () => {
+  for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
+    const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    const frontend = serviceBlock(compose, 'frontend');
+    const proxy = serviceBlock(compose, 'proxy');
+
+    assert.match(frontend, /healthcheck:[\s\S]*http:\/\/localhost\//, `${file} frontend needs an HTTP healthcheck`);
+    assert.match(proxy, /frontend:\n {8}condition: service_healthy/, `${file} proxy must wait for frontend health`);
+    assert.match(proxy, /backend:\n {8}condition: service_healthy/, `${file} proxy must wait for backend health`);
+    assert.match(proxy, /healthcheck:[\s\S]*http:\/\/localhost\/api\/health/, `${file} proxy needs an API healthcheck`);
+  }
+});
+
 test('database passwords have no public fallback in compose files', () => {
   for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
     const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');
@@ -298,8 +311,10 @@ test('offline upgrade recovers the known existing-schema baseline migration fail
 test('offline upgrade retries transient proxy startup failures before rollback', () => {
   const upgradeScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'offline-upgrade.sh'), 'utf8');
 
+  assert.match(upgradeScript, /PROXY_CONTAINER=/);
   assert.match(upgradeScript, /PROXY_HEALTHY=0/);
-  assert.match(upgradeScript, /for _ in \$\(seq 1 60\)/);
+  assert.match(upgradeScript, /for _ in \$\(seq 1 300\)/);
+  assert.match(upgradeScript, /\.State\.Health/);
   assert.match(upgradeScript, /sleep 2/);
   assert.match(upgradeScript, /if \[\[ "\$PROXY_HEALTHY" != 1 \]\]/);
 });
