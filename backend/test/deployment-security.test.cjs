@@ -212,10 +212,12 @@ test('compose waits for frontend and proxy HTTP readiness on slow offline hosts'
     const frontend = serviceBlock(compose, 'frontend');
     const proxy = serviceBlock(compose, 'proxy');
 
-    assert.match(frontend, /healthcheck:[\s\S]*http:\/\/localhost\//, `${file} frontend needs an HTTP healthcheck`);
+    assert.match(frontend, /healthcheck:[\s\S]*http:\/\/127\.0\.0\.1\//, `${file} frontend healthcheck must use IPv4 loopback`);
+    assert.doesNotMatch(frontend, /healthcheck:[\s\S]*http:\/\/localhost\//, `${file} frontend healthcheck must not resolve localhost to IPv6`);
     assert.match(proxy, /frontend:\n {8}condition: service_healthy/, `${file} proxy must wait for frontend health`);
     assert.match(proxy, /backend:\n {8}condition: service_healthy/, `${file} proxy must wait for backend health`);
-    assert.match(proxy, /healthcheck:[\s\S]*http:\/\/localhost\/api\/health/, `${file} proxy needs an API healthcheck`);
+    assert.match(proxy, /healthcheck:[\s\S]*http:\/\/127\.0\.0\.1\/api\/health/, `${file} proxy healthcheck must use IPv4 loopback`);
+    assert.doesNotMatch(proxy, /healthcheck:[\s\S]*http:\/\/localhost\/api\/health/, `${file} proxy healthcheck must not resolve localhost to IPv6`);
   }
 });
 
