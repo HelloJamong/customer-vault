@@ -295,6 +295,15 @@ test('offline upgrade recovers the known existing-schema baseline migration fail
   assert.match(upgradeScript, /migrate deploy/);
 });
 
+test('offline upgrade retries transient proxy startup failures before rollback', () => {
+  const upgradeScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'offline-upgrade.sh'), 'utf8');
+
+  assert.match(upgradeScript, /PROXY_HEALTHY=0/);
+  assert.match(upgradeScript, /for _ in \$\(seq 1 60\)/);
+  assert.match(upgradeScript, /sleep 2/);
+  assert.match(upgradeScript, /if \[\[ "\$PROXY_HEALTHY" != 1 \]\]/);
+});
+
 test('entrypoint preserves successful migrate deploy exit status', () => {
   const result = runEntrypointScenario('success');
   assert.equal(result.status, 0, result.stderr || result.stdout);
