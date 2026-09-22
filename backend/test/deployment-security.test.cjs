@@ -118,6 +118,77 @@ function runEntrypointScenario(scenario, includeInitialMigration = true) {
   return { ...result, commands };
 }
 
+function runOfflineUpgradeDryRun(version) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-vault-offline-upgrade-'));
+  const appDir = path.join(tmp, 'app');
+  const packageDir = path.join(tmp, 'package');
+  const binDir = path.join(tmp, 'bin');
+  fs.mkdirSync(appDir);
+  fs.mkdirSync(packageDir);
+  fs.mkdirSync(binDir);
+
+  const envFile = path.join(appDir, '.env');
+  fs.writeFileSync(envFile, [
+    'VERSION=26.8.0',
+    `JWT_SECRET=${'j'.repeat(64)}`,
+    `ENCRYPTION_KEY=${'a'.repeat(64)}`,
+    `BACKUP_ENCRYPTION_KEY=${'b'.repeat(64)}`,
+    '',
+  ].join('\n'));
+  fs.writeFileSync(path.join(appDir, 'docker-compose.yml'), 'services: {}\n');
+  fs.writeFileSync(path.join(packageDir, 'docker-compose.yml'), `services:
+  backend:
+    image: igor0670/customer-storage-backend:\${VERSION:-latest}
+  frontend:
+    image: igor0670/customer-storage-frontend:\${VERSION:-latest}
+`);
+  fs.writeFileSync(path.join(packageDir, `customer-vault-images-${version}.tar.gz`), 'fixture');
+
+  const dockerLog = path.join(tmp, 'docker.log');
+  const mockDocker = path.join(binDir, 'docker');
+  fs.writeFileSync(mockDocker, `#!/bin/sh
+set -eu
+printf '%s|%s\\n' "\${VERSION:-}" "$*" >> "$MOCK_DOCKER_LOG"
+if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  exit 0
+fi
+case "$*" in
+  *"config --images")
+    printf '%s\\n' \\
+      "igor0670/customer-storage-backend:\${VERSION:-latest}" \\
+      "igor0670/customer-storage-frontend:\${VERSION:-latest}" \\
+      "mariadb:10.11" \\
+      "nginx:alpine" \\
+      "clamav/clamav:1.4.6"
+    exit 0
+    ;;
+esac
+echo "unexpected docker command: $*" >&2
+exit 99
+`);
+  fs.chmodSync(mockDocker, 0o755);
+
+  const result = spawnSync('bash', [
+    path.join(repoRoot, 'scripts', 'offline-upgrade.sh'),
+    '--app-dir', appDir,
+    '--package-dir', packageDir,
+    '--version', version,
+    '--dry-run',
+  ], {
+    env: {
+      ...process.env,
+      MOCK_DOCKER_LOG: dockerLog,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    },
+    encoding: 'utf8',
+  });
+
+  const dockerCommands = fs.readFileSync(dockerLog, 'utf8');
+  const persistedEnv = fs.readFileSync(envFile, 'utf8');
+  fs.rmSync(tmp, { recursive: true, force: true });
+  return { ...result, dockerCommands, persistedEnv };
+}
+
 test('backend service is not published to host in online and offline compose files', () => {
   for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
     const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');
@@ -202,6 +273,26 @@ test('production images require committed Prisma migrations', () => {
   const createMigrationScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'create-migration.sh'), 'utf8');
   assert.match(createMigrationScript, /-v .*backend\/prisma:\/app\/prisma/);
   assert.match(createMigrationScript, /--entrypoint npx/);
+});
+
+test('offline upgrade dry run resolves compose image variables with the target version', () => {
+  const result = runOfflineUpgradeDryRun('26.9.4');
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Resolved backend image: igor0670\/customer-storage-backend:26\.9\.4/);
+  assert.match(result.stdout, /Resolved frontend image: igor0670\/customer-storage-frontend:26\.9\.4/);
+  assert.match(result.stdout, /Dry run passed/);
+  assert.match(result.dockerCommands, /26\.9\.4\|compose .*config --images/);
+  assert.match(result.persistedEnv, /^VERSION=26\.8\.0$/m, 'dry run must not modify the existing environment');
+});
+
+test('offline upgrade recovers the known existing-schema baseline migration failure idempotently', () => {
+  const upgradeScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'offline-upgrade.sh'), 'utf8');
+
+  assert.match(upgradeScript, /P3018/);
+  assert.match(upgradeScript, /1050|already exists/i);
+  assert.match(upgradeScript, /migrate resolve --applied/);
+  assert.match(upgradeScript, /P3008/);
+  assert.match(upgradeScript, /migrate deploy/);
 });
 
 test('entrypoint preserves successful migrate deploy exit status', () => {

@@ -87,9 +87,18 @@ export class InspectionTargetsService {
     });
   }
 
-  async create(dto: CreateInspectionTargetDto) {
+  async create(dto: CreateInspectionTargetDto, audit?: { userId?: number; ipAddress?: string }) {
     const target = await this.prisma.inspectionTarget.create({
       data: dto,
+    });
+
+    await this.logsService.createServiceLog({
+      userId: audit?.userId,
+      logType: '정보',
+      action: '점검 대상 추가',
+      description: `고객사 ${dto.customerId}에 점검 대상 "${target.targetType}"을 추가했습니다.`,
+      afterValue: JSON.stringify(target),
+      ipAddress: audit?.ipAddress,
     });
 
     return {
@@ -98,17 +107,47 @@ export class InspectionTargetsService {
     };
   }
 
-  async update(id: number, dto: UpdateInspectionTargetDto) {
-    await this.prisma.inspectionTarget.update({
+  async update(id: number, dto: UpdateInspectionTargetDto, audit?: { userId?: number; ipAddress?: string }) {
+    const existing = await this.prisma.inspectionTarget.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('점검 항목을 찾을 수 없습니다.');
+    }
+
+    const updated = await this.prisma.inspectionTarget.update({
       where: { id },
       data: dto,
+    });
+
+    await this.logsService.createServiceLog({
+      userId: audit?.userId,
+      logType: '정보',
+      action: '점검 대상 수정',
+      description: `고객사 ${existing.customerId}의 점검 대상 "${existing.targetType}"을 수정했습니다.`,
+      beforeValue: JSON.stringify(existing),
+      afterValue: JSON.stringify(updated),
+      ipAddress: audit?.ipAddress,
     });
 
     return { message: '점검 대상이 수정되었습니다.' };
   }
 
-  async remove(id: number) {
+  async remove(id: number, audit?: { userId?: number; ipAddress?: string }) {
+    const existing = await this.prisma.inspectionTarget.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('점검 항목을 찾을 수 없습니다.');
+    }
+
     await this.prisma.inspectionTarget.delete({ where: { id } });
+
+    await this.logsService.createServiceLog({
+      userId: audit?.userId,
+      logType: '정보',
+      action: '점검 대상 삭제',
+      description: `고객사 ${existing.customerId}의 점검 대상 "${existing.targetType}"을 삭제했습니다.`,
+      beforeValue: JSON.stringify(existing),
+      ipAddress: audit?.ipAddress,
+    });
+
     return { message: '점검 대상이 삭제되었습니다.' };
   }
 

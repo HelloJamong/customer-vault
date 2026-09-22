@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { getClientIp } from '../common/utils/ip.util';
 
 @ApiTags('점검 대상')
 @Controller('inspection-targets')
@@ -39,22 +40,19 @@ export class InspectionTargetsController {
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   async create(@Body() dto: CreateInspectionTargetDto, @Req() req: any) {
-    await this.service.assertCanManageCustomer(dto.customerId, req.user);
-    return this.service.create(dto);
+    return this.service.create(dto, { userId: req.user.id, ipAddress: getClientIp(req) });
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateInspectionTargetDto, @Req() req: any) {
-    await this.service.assertCanManageTarget(id, req.user);
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, { userId: req.user.id, ipAddress: getClientIp(req) });
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-    await this.service.assertCanManageTarget(id, req.user);
-    return this.service.remove(id);
+    return this.service.remove(id, { userId: req.user.id, ipAddress: getClientIp(req) });
   }
 
   @Get(':id/template')

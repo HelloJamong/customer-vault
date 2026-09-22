@@ -5,7 +5,7 @@ import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto'
 import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto } from './dto/source-management.dto';
 import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeConsiderationDto } from './dto/upgrade-plan.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
-import { assertCustomerEditable, isAdminRole } from '../common/utils/customer-access.util';
+import { isAdminRole } from '../common/utils/customer-access.util';
 import { getInspectionPeriodStart } from '../common/utils/inspection-period.util';
 
 @Injectable()
@@ -749,7 +749,7 @@ export class CustomersService {
     };
   }
 
-  // 서버 접속 자격증명 등 민감정보를 실제 값으로 조회. 담당자·관리자만 호출 가능(컨트롤러에서 권한 확인) + 감사 기록.
+  // 서버 접속 자격증명 등 민감정보를 실제 값으로 조회. 사내 사용자 공통으로 허용하며 감사 기록을 남긴다.
   async getSourceManagementForEdit(customerId: number, userId: number, ipAddress: string) {
     const result = await this.getSourceManagement(customerId, { revealSecrets: true });
     await this.logsService.createServiceLog({
@@ -1427,8 +1427,4 @@ export class CustomersService {
     return this.getUpgradePlan(customerId);
   }
 
-  // 편집 권한: 관리자는 제한 없음, 일반 사용자는 담당(정/부 엔지니어, 영업) 고객사만.
-  async assertCustomerAssignment(customerId: number, userId: number, role: string) {
-    await assertCustomerEditable(this.prisma, customerId, { id: userId, role });
-  }
 }

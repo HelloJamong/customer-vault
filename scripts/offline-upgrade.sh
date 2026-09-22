@@ -167,10 +167,31 @@ BACKUP_ENCRYPTION_KEY_VALUE=$(env_value BACKUP_ENCRYPTION_KEY || true)
 [[ "$BACKUP_ENCRYPTION_KEY_VALUE" != 0000000000000000000000000000000000000000000000000000000000000000 ]] || die "Replace the placeholder BACKUP_ENCRYPTION_KEY in .env before upgrading"
 [[ "${BACKUP_ENCRYPTION_KEY_VALUE,,}" != "${ENCRYPTION_KEY_VALUE,,}" ]] || die "BACKUP_ENCRYPTION_KEY must differ from ENCRYPTION_KEY"
 
-BACKEND_IMAGE=$(awk '$1 == "image:" && $2 ~ /customer-storage-backend|customer_backend/ { print $2; exit }' "$COMPOSE_SOURCE")
-[[ -n "$BACKEND_IMAGE" ]] || die "Backend image could not be determined from the package compose file"
-FRONTEND_IMAGE=$(awk '$1 == "image:" && $2 ~ /customer-storage-frontend|customer_frontend/ { print $2; exit }' "$COMPOSE_SOURCE")
-[[ -n "$FRONTEND_IMAGE" ]] || die "Frontend image could not be determined from the package compose file"
+resolve_package_images() {
+  local package_images
+
+  if ! package_images=$(VERSION="$VERSION" docker compose \
+    --project-directory "$PACKAGE_DIR" \
+    --env-file "$ENV_FILE" \
+    -f "$COMPOSE_SOURCE" \
+    config --images); then
+    die "Package compose file could not be rendered with target version $VERSION"
+  fi
+
+  BACKEND_IMAGE=$(printf '%s\n' "$package_images" \
+    | awk '/customer-storage-backend|customer_backend/ { print; exit }')
+  FRONTEND_IMAGE=$(printf '%s\n' "$package_images" \
+    | awk '/customer-storage-frontend|customer_frontend/ { print; exit }')
+
+  [[ -n "$BACKEND_IMAGE" ]] || die "Backend image could not be determined from the rendered package compose file"
+  [[ -n "$FRONTEND_IMAGE" ]] || die "Frontend image could not be determined from the rendered package compose file"
+  [[ "$BACKEND_IMAGE" == *":$VERSION" ]] \
+    || die "Backend image does not use target version $VERSION: $BACKEND_IMAGE"
+  [[ "$FRONTEND_IMAGE" == *":$VERSION" ]] \
+    || die "Frontend image does not use target version $VERSION: $FRONTEND_IMAGE"
+}
+
+resolve_package_images
 
 compose_command() {
   docker compose \
@@ -206,6 +227,8 @@ log "Package directory: $PACKAGE_DIR"
 log "Target version: $VERSION"
 log "Compose package: $COMPOSE_SOURCE"
 log "Image archive: $IMAGES_SOURCE"
+log "Resolved backend image: $BACKEND_IMAGE"
+log "Resolved frontend image: $FRONTEND_IMAGE"
 
 if [[ "$DRY_RUN" == 1 ]]; then
   log "Dry run passed. No images were loaded and no services or files were changed."
@@ -243,7 +266,15 @@ fi
 
 log "Loading offline images"
 docker load -i "$IMAGES_SOURCE"
-docker image inspect "$BACKEND_IMAGE" >/dev/null 2>&1 || die "Expected backend image was not found after docker load: $BACKEND_IMAGE"
+
+for image in \
+  "$BACKEND_IMAGE" \
+  "$FRONTEND_IMAGE" \
+  "mariadb:10.11" \
+  "nginx:alpine" \
+  "clamav/clamav:1.4.6"; do
+  docker image inspect "$image" >/dev/null 2>&1 || die "Expected image was not found after docker load: $image"
+done
 
 BASELINE_MIGRATION=""
 if [[ -d "$PACKAGE_DIR/prisma/migrations" ]]; then
@@ -276,15 +307,6 @@ run_backup_crypto() {
     "$BACKEND_IMAGE" \
     /app/dist/backup/backup-crypto-cli.js "$@"
 }
-
-for image in \
-  "$BACKEND_IMAGE" \
-  "$FRONTEND_IMAGE" \
-  "mariadb:10.11" \
-  "nginx:alpine" \
-  "clamav/clamav:1.4.6"; do
-  docker image inspect "$image" >/dev/null 2>&1 || die "Expected image was not found after docker load: $image"
-done
 
 DB_BACKUP="$BACKUP_DIR/database.sql.gz"
 DB_BACKUP_PLAIN="$DB_BACKUP"
@@ -371,8 +393,11 @@ wait_for_database() {
 
 run_migration_preflight() {
   local migration_log="$BACKUP_DIR/migration-preflight.log"
+  local resolve_log="$BACKUP_DIR/migration-resolve.log"
   local status
   local initial_migration
+  local recovery_reason
+  local resolve_status
 
   log "Starting database for migration preflight"
   compose_command up -d db
@@ -389,14 +414,34 @@ run_migration_preflight() {
     return 0
   fi
 
-  if ! grep -q "P3005" "$migration_log"; then
+  initial_migration="$BASELINE_MIGRATION"
+  [[ -n "$initial_migration" ]] || die "Migration recovery requires an initial Prisma migration"
+
+  if grep -q "P3005" "$migration_log"; then
+    recovery_reason="existing database without Prisma migration history"
+  elif grep -q "P3018" "$migration_log" \
+    && grep -Fq "$initial_migration" "$migration_log" \
+    && grep -Eqi '(^|[^0-9])1050([^0-9]|$)|already exists' "$migration_log"; then
+    recovery_reason="existing schema collided with the packaged baseline migration"
+  else
     return "$status"
   fi
 
-  initial_migration="$BASELINE_MIGRATION"
-  [[ -n "$initial_migration" ]] || die "P3005 recovery requires an initial Prisma migration"
-  log "Existing database detected without migration history; marking only the baseline migration as applied: $initial_migration"
-  compose_command run --rm --no-deps --entrypoint npx backend prisma migrate resolve --applied "$initial_migration"
+  log "Recovering $recovery_reason; marking only the baseline migration as applied: $initial_migration"
+  set +e
+  compose_command run --rm --no-deps --entrypoint npx backend prisma migrate resolve --applied "$initial_migration" >"$resolve_log" 2>&1
+  resolve_status=$?
+  set -e
+  cat "$resolve_log"
+
+  if [[ "$resolve_status" != 0 ]]; then
+    if grep -q "P3008" "$resolve_log"; then
+      log "Baseline migration is already recorded as applied; continuing migration deployment"
+    else
+      return "$resolve_status"
+    fi
+  fi
+
   compose_command run --rm --no-deps --entrypoint npx backend prisma migrate deploy
 }
 

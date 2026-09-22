@@ -234,6 +234,7 @@ const CustomerSourceManagementEditPage = () => {
   const [customerName, setCustomerName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const [formData, setFormData] = useState<SourceManagement>({
     customerId: Number(customerId),
@@ -267,76 +268,72 @@ const CustomerSourceManagementEditPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
+      setLoadError('');
       try {
         // 고객사 이름 조회
         const customerResponse = await apiClient.get(`/customers/${customerId}`);
         setCustomerName(customerResponse.data.name);
 
         // 소스 관리 정보 조회
-        try {
-          const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management/edit`);
-          if (sourceResponse.data) {
-            const sourceData = sourceResponse.data as SourceManagement;
-            const virtualPcImages = sourceData.virtualPcImages?.length
-              ? sourceData.virtualPcImages.map((image) => ({
-                ...image,
-                dDiskCapacity: image.dDiskCapacity ?? '',
-                installedPrograms: image.installedPrograms || [],
-                checklistItems: image.checklistItems?.length
-                  ? image.checklistItems.map((item) => ({ ...item, verified: !!item.verified }))
-                  : createChecklistItems(),
-              }))
-              : [{
-                ...createVirtualPcImage(),
-                name: sourceData.virtualPcImageInfo ? '기존 이미지 정보' : '',
-                osName: sourceData.virtualPcOsVersion || '',
-                osRelease: sourceData.virtualPcBuildVersion || '',
-              }];
-            setFormData({
-              ...sourceData,
-              adminWebVersion: sourceData.adminWebVersion || '4.2',
-              adminWebVersionDetail: sourceData.adminWebVersionDetail || '',
-              virtualPcImages,
-              hrIntegration: {
-                ...sourceData.hrIntegration,
-                dbType: sourceData.hrIntegration?.dbType || '',
-                dbVersion: sourceData.hrIntegration?.dbVersion || '',
-                dbName: sourceData.hrIntegration?.dbName || '',
-                dbHost: sourceData.hrIntegration?.dbHost || '',
-                dbPort: sourceData.hrIntegration?.dbPort ?? '',
-                dbUsername: sourceData.hrIntegration?.dbUsername || '',
-                dbPassword: sourceData.hrIntegration?.dbPassword || '',
-                mappings: sourceData.hrIntegration?.mappings?.length
-                  ? sourceData.hrIntegration.mappings
-                  : createHrMappings(),
-                userSyncQuery: sourceData.hrIntegration?.userSyncQuery || '',
-                departmentSyncQuery: sourceData.hrIntegration?.departmentSyncQuery || '',
-              },
-              servers: sourceData.servers?.map((server) => ({
-                ...server,
-                // 편집 화면은 디스크 구성 1개만 다루지만, 기존에 여러 개가 등록된 서버의
-                // 추가 구성(index 1+)은 편집 대상이 아니므로 그대로 보존해 저장 시 유실되지 않게 한다.
-                diskGroups: server.diskGroups?.length ? [
-                  {
-                    ...server.diskGroups[0],
-                    raidType: server.diskGroups[0].raidType || '미확인',
-                    diskType: server.diskGroups[0].diskType || '',
-                    diskCapacityGb: server.diskGroups[0].diskCapacityGb ?? '',
-                    diskCapacityUnit: server.diskGroups[0].diskCapacityUnit === 'TB' ? 'TB' : 'GB',
-                  },
-                  ...server.diskGroups.slice(1),
-                ] : [],
-              })) || [],
-            });
-          }
-        } catch (error) {
-          // 404인 경우 새로 생성
-          if (!(error instanceof Error) || !('response' in error) || (error as { response?: { status?: number } }).response?.status !== 404) {
-            throw error;
-          }
+        const sourceResponse = await apiClient.get(`/customers/${customerId}/source-management/edit`);
+        if (sourceResponse.data) {
+          const sourceData = sourceResponse.data as SourceManagement;
+          const virtualPcImages = sourceData.virtualPcImages?.length
+            ? sourceData.virtualPcImages.map((image) => ({
+              ...image,
+              dDiskCapacity: image.dDiskCapacity ?? '',
+              installedPrograms: image.installedPrograms || [],
+              checklistItems: image.checklistItems?.length
+                ? image.checklistItems.map((item) => ({ ...item, verified: !!item.verified }))
+                : createChecklistItems(),
+            }))
+            : [{
+              ...createVirtualPcImage(),
+              name: sourceData.virtualPcImageInfo ? '기존 이미지 정보' : '',
+              osName: sourceData.virtualPcOsVersion || '',
+              osRelease: sourceData.virtualPcBuildVersion || '',
+            }];
+          setFormData({
+            ...sourceData,
+            adminWebVersion: sourceData.adminWebVersion || '4.2',
+            adminWebVersionDetail: sourceData.adminWebVersionDetail || '',
+            virtualPcImages,
+            hrIntegration: {
+              ...sourceData.hrIntegration,
+              dbType: sourceData.hrIntegration?.dbType || '',
+              dbVersion: sourceData.hrIntegration?.dbVersion || '',
+              dbName: sourceData.hrIntegration?.dbName || '',
+              dbHost: sourceData.hrIntegration?.dbHost || '',
+              dbPort: sourceData.hrIntegration?.dbPort ?? '',
+              dbUsername: sourceData.hrIntegration?.dbUsername || '',
+              dbPassword: sourceData.hrIntegration?.dbPassword || '',
+              mappings: sourceData.hrIntegration?.mappings?.length
+                ? sourceData.hrIntegration.mappings
+                : createHrMappings(),
+              userSyncQuery: sourceData.hrIntegration?.userSyncQuery || '',
+              departmentSyncQuery: sourceData.hrIntegration?.departmentSyncQuery || '',
+            },
+            servers: sourceData.servers?.map((server) => ({
+              ...server,
+              // 편집 화면은 디스크 구성 1개만 다루지만, 기존에 여러 개가 등록된 서버의
+              // 추가 구성(index 1+)은 편집 대상이 아니므로 그대로 보존해 저장 시 유실되지 않게 한다.
+              diskGroups: server.diskGroups?.length ? [
+                {
+                  ...server.diskGroups[0],
+                  raidType: server.diskGroups[0].raidType || '미확인',
+                  diskType: server.diskGroups[0].diskType || '',
+                  diskCapacityGb: server.diskGroups[0].diskCapacityGb ?? '',
+                  diskCapacityUnit: server.diskGroups[0].diskCapacityUnit === 'TB' ? 'TB' : 'GB',
+                },
+                ...server.diskGroups.slice(1),
+              ] : [],
+            })) || [],
+          });
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);
+        setLoadError(getApiErrorMessage(error, '구성 정보를 불러오지 못했습니다.'));
       } finally {
         setIsLoading(false);
       }
@@ -660,6 +657,21 @@ const CustomerSourceManagementEditPage = () => {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Box>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate(`/customers/${customerId}/source-management`)}
+          sx={{ mb: 2 }}
+        >
+          돌아가기
+        </Button>
+        <Alert severity="error">{loadError}</Alert>
       </Box>
     );
   }

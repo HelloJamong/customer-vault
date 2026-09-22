@@ -81,9 +81,8 @@ export class CustomersController {
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: '고객사 정보 수정' })
+  @ApiOperation({ summary: '고객사 유지보수 정보 수정 (사내 사용자 공통)' })
   async update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto, @Request() req: any) {
-    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.update(id, updateCustomerDto, req.user.id, ipAddress, req.user.role);
   }
@@ -115,9 +114,8 @@ export class CustomersController {
 
   @Get(':id/source-management/edit')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: '소스 관리 정보 조회 (자격증명 포함, 담당자·관리자 한정, 감사 기록됨)' })
+  @ApiOperation({ summary: '소스 관리 정보 조회 (자격증명 포함, 사내 사용자 공통, 감사 기록됨)' })
   async getSourceManagementForEdit(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.getSourceManagementForEdit(id, req.user.id, ipAddress);
   }
@@ -130,7 +128,6 @@ export class CustomersController {
     @Body() dto: CreateSourceManagementDto,
     @Request() req: any,
   ) {
-    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.createSourceManagement(id, dto, req.user.id, ipAddress);
   }
@@ -143,7 +140,6 @@ export class CustomersController {
     @Body() dto: UpdateSourceManagementDto,
     @Request() req: any,
   ) {
-    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.updateSourceManagement(id, dto, req.user.id, ipAddress);
   }
@@ -165,7 +161,6 @@ export class CustomersController {
     @Body() dto: CreateUpgradePlanDto,
     @Request() req: any,
   ) {
-    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.createUpgradePlan(id, dto, req.user.id, ipAddress);
   }
@@ -178,7 +173,6 @@ export class CustomersController {
     @Body() dto: UpdateUpgradePlanDto,
     @Request() req: any,
   ) {
-    await this.customersService.assertCustomerAssignment(id, req.user.id, req.user.role);
     const ipAddress = getClientIp(req);
     return this.customersService.updateUpgradePlan(id, dto, req.user.id, ipAddress);
   }

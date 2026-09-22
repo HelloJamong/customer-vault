@@ -47,29 +47,29 @@ export class SupportLogsController {
 
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: '지원 로그 생성' })
+  @ApiOperation({ summary: '지원 로그 생성 (사내 사용자 공통)' })
   create(@Body() createDto: CreateSupportLogDto, @Request() req: any) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.create(createDto, req.user.id, ipAddress, req.user);
+    return this.supportLogsService.create(createDto, req.user.id, ipAddress);
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: '지원 로그 수정' })
+  @ApiOperation({ summary: '지원 로그 수정 (사내 사용자 공통)' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateSupportLogDto,
     @Request() req: any,
   ) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.update(id, updateDto, req.user.id, ipAddress, req.user);
+    return this.supportLogsService.update(id, updateDto, req.user.id, ipAddress);
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: '지원 로그 삭제' })
+  @ApiOperation({ summary: '지원 로그 삭제 (사내 사용자 공통)' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.remove(id, req.user.id, ipAddress, req.user);
+    return this.supportLogsService.remove(id, req.user.id, ipAddress);
   }
 }
