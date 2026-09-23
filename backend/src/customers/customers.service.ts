@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto } from './dto/source-management.dto';
-import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeConsiderationDto } from './dto/upgrade-plan.dto';
+import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeConsiderationDto, UpgradeProgressLogDto } from './dto/upgrade-plan.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { isAdminRole } from '../common/utils/customer-access.util';
 import { getInspectionPeriodStart } from '../common/utils/inspection-period.util';
@@ -579,6 +579,7 @@ export class CustomersService {
         virtualPcImages: {
           orderBy: { id: 'asc' },
           include: {
+            verifier: { select: { id: true, name: true } },
             installedPrograms: { orderBy: { id: 'asc' } },
             checklistItems: {
               orderBy: { displayOrder: 'asc' },
@@ -654,6 +655,8 @@ export class CustomersService {
         licenseStatus: image.licenseStatus,
         licenseNote: image.licenseNote,
         hashValue: image.hashValue,
+        verifierUserId: image.verifierUserId,
+        verifierName: image.verifier?.name ?? null,
         installedPrograms: image.installedPrograms.map(program => ({
           id: program.id,
           name: program.name,
@@ -752,11 +755,12 @@ export class CustomersService {
   // 서버 접속 자격증명 등 민감정보를 실제 값으로 조회. 사내 사용자 공통으로 허용하며 감사 기록을 남긴다.
   async getSourceManagementForEdit(customerId: number, userId: number, ipAddress: string) {
     const result = await this.getSourceManagement(customerId, { revealSecrets: true });
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { name: true } });
     await this.logsService.createServiceLog({
       userId,
       logType: '보안',
       action: '소스 관리 민감정보 열람',
-      description: `고객사 ${customerId}의 서버 접속·인사연동 DB 자격증명을 열람했습니다`,
+      description: `고객사 ${customer?.name ?? `ID ${customerId}`}의 서버 접속·인사연동 DB 자격증명을 열람했습니다`,
       ipAddress,
     });
     return result;
@@ -811,6 +815,7 @@ export class CustomersService {
       licenseStatus: image.licenseStatus,
       licenseNote: image.licenseNote,
       hashValue: image.hashValue,
+      verifierUserId: image.verifierUserId ?? null,
       installedPrograms: image.installedPrograms?.length ? {
         create: image.installedPrograms.map(program => ({
           name: program.name,
@@ -855,6 +860,18 @@ export class CustomersService {
     };
   }
 
+  // 검증 담당자는 활성 기술팀 사용자만 지정할 수 있다. 이미 지정돼 있던 담당자는 소속이 바뀌어도 그대로 저장을 허용한다.
+  private async assertVerifierCandidates(ids: Array<number | null | undefined>, keep: Array<number | null> = []) {
+    const newIds = [...new Set(ids.filter((id): id is number => typeof id === 'number' && !keep.includes(id)))];
+    if (newIds.length === 0) return;
+    const count = await this.prisma.user.count({
+      where: { id: { in: newIds }, isActive: true, role: 'user', department: '기술팀' },
+    });
+    if (count !== newIds.length) {
+      throw new BadRequestException('검증 담당자는 기술팀 사용자만 지정할 수 있습니다');
+    }
+  }
+
   private validateVirtualPcImages(images?: VirtualPcImageDto[]) {
     if (!images) return;
     if (images.length === 0) {
@@ -890,6 +907,8 @@ export class CustomersService {
     }
 
     this.validateVirtualPcImages(dto.virtualPcImages);
+
+    await this.assertVerifierCandidates((dto.virtualPcImages || []).map((image) => image.verifierUserId));
 
     const checker = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1024,6 +1043,10 @@ export class CustomersService {
     }
 
     this.validateVirtualPcImages(dto.virtualPcImages);
+    await this.assertVerifierCandidates(
+      (dto.virtualPcImages || []).map((image) => image.verifierUserId),
+      existing.virtualPcImages.map((image) => image.verifierUserId),
+    );
 
     const checker = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1270,6 +1293,10 @@ export class CustomersService {
             verifiedBy: { select: { id: true, name: true } },
           },
         },
+        progressLogs: {
+          orderBy: [{ logDate: 'desc' }, { id: 'desc' }],
+        },
+        verifier: { select: { id: true, name: true } },
       },
     });
 
@@ -1281,9 +1308,12 @@ export class CustomersService {
         currentVersion: null,
         targetVersion: null,
         scheduleEstimate: null,
+        verifierUserId: null,
+        verifierName: null,
         createdAt: null,
         updatedAt: null,
         considerations: [],
+        progressLogs: [],
       };
     }
 
@@ -1294,6 +1324,8 @@ export class CustomersService {
       currentVersion: upgradePlan.currentVersion,
       targetVersion: upgradePlan.targetVersion,
       scheduleEstimate: upgradePlan.scheduleEstimate,
+      verifierUserId: upgradePlan.verifierUserId,
+      verifierName: upgradePlan.verifier?.name ?? null,
       createdAt: upgradePlan.createdAt,
       updatedAt: upgradePlan.updatedAt,
       considerations: upgradePlan.considerations.map((item) => ({
@@ -1318,6 +1350,15 @@ export class CustomersService {
         verifiedAt: item.verifiedAt,
         displayOrder: item.displayOrder,
       })),
+      progressLogs: upgradePlan.progressLogs.map((log) => ({
+        id: log.id,
+        logDate: log.logDate.toISOString().slice(0, 10),
+        authorName: log.authorName,
+        content: log.content,
+        createdByUserId: log.createdByUserId,
+        createdAt: log.createdAt,
+        updatedAt: log.updatedAt,
+      })),
     };
   }
 
@@ -1332,6 +1373,7 @@ export class CustomersService {
       throw new ConflictException('이미 업그레이드 계획이 존재합니다');
     }
 
+    await this.assertVerifierCandidates([dto.verifierUserId]);
     const checker = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
 
     const upgradePlan = await this.prisma.upgradePlan.create({
@@ -1341,6 +1383,7 @@ export class CustomersService {
         currentVersion: dto.currentVersion,
         targetVersion: dto.targetVersion,
         scheduleEstimate: dto.scheduleEstimate,
+        verifierUserId: dto.verifierUserId ?? null,
         considerations: dto.considerations?.length ? {
           create: dto.considerations.map((item, index) =>
             this.buildConsiderationCreateData(item, userId, checker?.name || null, index),
@@ -1376,6 +1419,7 @@ export class CustomersService {
       throw new NotFoundException('업그레이드 계획이 없습니다');
     }
 
+    await this.assertVerifierCandidates([dto.verifierUserId], [existing.verifierUserId]);
     const checker = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
     const previousByConsiderationId = new Map(
       existing.considerations.map((item) => [item.id, {
@@ -1405,6 +1449,7 @@ export class CustomersService {
           currentVersion: dto.currentVersion,
           targetVersion: dto.targetVersion,
           scheduleEstimate: dto.scheduleEstimate,
+          verifierUserId: dto.verifierUserId,
           considerations: dto.considerations?.length ? {
             create: dto.considerations.map((item, index) =>
               this.buildConsiderationCreateData(item, userId, checker?.name || null, index, previousByConsiderationId),
@@ -1427,4 +1472,96 @@ export class CustomersService {
     return this.getUpgradePlan(customerId);
   }
 
+  private buildProgressLogData(dto: UpgradeProgressLogDto, fallbackAuthorName: string) {
+    const content = dto.content.trim();
+    if (!content) {
+      throw new BadRequestException('내용을 입력해주세요');
+    }
+    return {
+      logDate: new Date(dto.logDate.slice(0, 10)),
+      authorName: dto.authorName?.trim() || fallbackAuthorName,
+      content,
+    };
+  }
+
+  private async findEditableProgressLog(customerId: number, logId: number, user: { id: number; role: string }) {
+    const log = await this.prisma.upgradeProgressLog.findFirst({
+      where: { id: logId, upgradePlan: { customerId } },
+      include: { upgradePlan: { select: { customer: { select: { name: true } } } } },
+    });
+    if (!log) {
+      throw new NotFoundException('진척 현황 기록을 찾을 수 없습니다');
+    }
+    if (!isAdminRole(user.role) && log.createdByUserId !== user.id) {
+      throw new ForbiddenException('본인이 작성한 기록만 수정/삭제할 수 있습니다');
+    }
+    return log;
+  }
+
+  async createUpgradeProgressLog(customerId: number, dto: UpgradeProgressLogDto, user: { id: number; role: string; name?: string }, ipAddress: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다');
+    }
+
+    const data = this.buildProgressLogData(dto, user.name || '');
+    // 계획이 없으면 기본값(미정)으로 생성한 뒤 기록한다
+    const upgradePlan = await this.prisma.upgradePlan.upsert({
+      where: { customerId },
+      create: { customerId },
+      update: {},
+    });
+    const log = await this.prisma.upgradeProgressLog.create({
+      data: { ...data, upgradePlanId: upgradePlan.id, createdByUserId: user.id },
+    });
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정보',
+      action: '업그레이드 진척 현황 추가',
+      description: `고객사 ${customer.name}의 업그레이드 진척 현황을 추가했습니다`,
+      beforeValue: null,
+      afterValue: JSON.stringify(log),
+      ipAddress,
+    });
+
+    return this.getUpgradePlan(customerId);
+  }
+
+  async updateUpgradeProgressLog(customerId: number, logId: number, dto: UpgradeProgressLogDto, user: { id: number; role: string; name?: string }, ipAddress: string) {
+    const { upgradePlan, ...existing } = await this.findEditableProgressLog(customerId, logId, user);
+    const log = await this.prisma.upgradeProgressLog.update({
+      where: { id: logId },
+      data: this.buildProgressLogData(dto, existing.authorName),
+    });
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정보',
+      action: '업그레이드 진척 현황 수정',
+      description: `고객사 ${upgradePlan.customer.name}의 업그레이드 진척 현황을 수정했습니다`,
+      beforeValue: JSON.stringify(existing),
+      afterValue: JSON.stringify(log),
+      ipAddress,
+    });
+
+    return this.getUpgradePlan(customerId);
+  }
+
+  async deleteUpgradeProgressLog(customerId: number, logId: number, user: { id: number; role: string }, ipAddress: string) {
+    const { upgradePlan, ...existing } = await this.findEditableProgressLog(customerId, logId, user);
+    await this.prisma.upgradeProgressLog.delete({ where: { id: logId } });
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정보',
+      action: '업그레이드 진척 현황 삭제',
+      description: `고객사 ${upgradePlan.customer.name}의 업그레이드 진척 현황을 삭제했습니다`,
+      beforeValue: JSON.stringify(existing),
+      afterValue: null,
+      ipAddress,
+    });
+
+    return this.getUpgradePlan(customerId);
+  }
 }

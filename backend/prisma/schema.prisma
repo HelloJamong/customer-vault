@@ -63,6 +63,9 @@ model User {
   verifiedVirtualPcChecklistItems VirtualPcChecklistItem[] @relation("VirtualPcChecklistVerifiedBy")
   checkedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationCheckedBy")
   verifiedUpgradeConsiderations UpgradeConsideration[] @relation("UpgradeConsiderationVerifiedBy")
+  upgradeProgressLogs   UpgradeProgressLog[] @relation("UpgradeProgressLogCreator")
+  assignedVirtualPcImageVerifications VirtualPcImage[] @relation("VirtualPcImageVerifier")
+  assignedUpgradePlanVerifications    UpgradePlan[]    @relation("UpgradePlanVerifier")
 
   @@index([isActive])
   @@map("users")
@@ -484,14 +487,17 @@ model VirtualPcImage {
   licenseStatus      String   @default("미진행") @map("license_status") @db.VarChar(20)
   licenseNote        String?  @map("license_note") @db.Text
   hashValue          String?  @map("hash_value") @db.VarChar(255)
+  verifierUserId     Int?     @map("verifier_user_id") // 체크리스트 검증 담당자 (기술팀)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   sourceManagement  SourceManagement            @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+  verifier          User?                       @relation("VirtualPcImageVerifier", fields: [verifierUserId], references: [id], onDelete: SetNull)
   installedPrograms VirtualPcInstalledProgram[]
   checklistItems    VirtualPcChecklistItem[]
 
   @@index([sourceManagementId])
+  @@index([verifierUserId])
   @@map("virtual_pc_images")
 }
 
@@ -549,13 +555,37 @@ model UpgradePlan {
   currentVersion   String?  @map("current_version") @db.VarChar(50)
   targetVersion    String?  @map("target_version") @db.VarChar(50)
   scheduleEstimate String?  @map("schedule_estimate") @db.VarChar(50) // 예: "26/09", "3/4분기"
+  verifierUserId   Int?     @map("verifier_user_id") // 고려 사항 검증 담당자 (기술팀)
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   customer         Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  verifier         User?                  @relation("UpgradePlanVerifier", fields: [verifierUserId], references: [id], onDelete: SetNull)
   considerations   UpgradeConsideration[]
+  progressLogs     UpgradeProgressLog[]
+
+  @@index([verifierUserId])
 
   @@map("upgrade_plans")
+}
+
+// 업그레이드 진척 현황 (날짜, 작성자, 내용)
+model UpgradeProgressLog {
+  id              Int      @id @default(autoincrement())
+  upgradePlanId   Int      @map("upgrade_plan_id")
+  logDate         DateTime @map("log_date") @db.Date
+  authorName      String   @map("author_name") @db.VarChar(100) // 표시용 작성자 (기본값: 로그인 사용자, 수정 가능)
+  content         String   @db.Text
+  createdByUserId Int?     @map("created_by_user_id") // 수정/삭제 권한 판단용 실제 작성자
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  upgradePlan     UpgradePlan @relation(fields: [upgradePlanId], references: [id], onDelete: Cascade)
+  createdBy       User?       @relation("UpgradeProgressLogCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([upgradePlanId, logDate])
+  @@index([createdByUserId])
+  @@map("upgrade_progress_logs")
 }
 
 // 업그레이드 고려 사항 (공통: 클라이언트/관리서버, 고객사별: 커스텀)

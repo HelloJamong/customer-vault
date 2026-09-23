@@ -81,7 +81,7 @@ export class InspectionStatusService {
     missingTargets: MissingInspectionTarget[];
     lastInspectionDate: string | null;
   } {
-    const { inspectionTargets, documents, inspectionCycleType, inspectionCycleMonth } = customer;
+    const { inspectionTargets, documents, inspectionCycleType, inspectionCycleMonth, contractStartDate, contractEndDate } = customer;
 
     if (!inspectionTargets || inspectionTargets.length === 0) {
       return { missingTargets: [], lastInspectionDate: null };
@@ -125,6 +125,8 @@ export class InspectionStatusService {
         inspectionDates,
         expectedMonths,
         targetYear,
+        contractStartDate,
+        contractEndDate,
       );
 
       // 누락된 월이 있으면 추가
@@ -403,7 +405,13 @@ export class InspectionStatusService {
     inspectionDates: Date[],
     expectedMonths: number[],
     targetYear: number,
+    contractStartDate?: Date | null,
+    contractEndDate?: Date | null,
   ): number[] {
+    // 계약 기간(시작월~종료월) 밖의 월은 점검 대상이 아니다. 계약일은 날짜 전용(@db.Date) 컬럼이라 UTC 기준으로 연·월을 비교한다.
+    const toMonthKey = (date: Date) => date.getUTCFullYear() * 12 + date.getUTCMonth();
+    const contractStartKey = contractStartDate ? toMonthKey(new Date(contractStartDate)) : null;
+    const contractEndKey = contractEndDate ? toMonthKey(new Date(contractEndDate)) : null;
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
@@ -418,6 +426,11 @@ export class InspectionStatusService {
     for (const expectedMonth of expectedMonths) {
       // 해당 월에 점검 이력이 있는지 확인
       const hasInspection = inspectedMonthsInYear.includes(expectedMonth);
+
+      const monthKey = targetYear * 12 + (expectedMonth - 1);
+      if ((contractStartKey !== null && monthKey < contractStartKey) || (contractEndKey !== null && monthKey > contractEndKey)) {
+        continue;
+      }
 
       if (!hasInspection) {
         // 현재 월과 미래 월은 제외 (아직 점검할 시기가 아님)

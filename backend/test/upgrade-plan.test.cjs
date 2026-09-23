@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-const { BadRequestException } = require('@nestjs/common');
+const { BadRequestException, ForbiddenException } = require('@nestjs/common');
 const { CustomersService } = require('../src/customers/customers.service');
 
 const createService = (prisma = {}) => new CustomersService(prisma, {}, {});
@@ -38,6 +38,15 @@ test('upgrade plan response exposes reviewer and verifier display names instead 
           verifiedAt: new Date(),
           displayOrder: 0,
         }],
+        progressLogs: [{
+          id: 9,
+          logDate: new Date('2026-09-23T00:00:00Z'),
+          authorName: '김작성',
+          content: '진행 중',
+          createdByUserId: 1,
+          createdAt: updatedAt,
+          updatedAt,
+        }],
       }),
     },
   };
@@ -50,6 +59,8 @@ test('upgrade plan response exposes reviewer and verifier display names instead 
   assert.equal(item.verifiedBy.name, '이검증');
   assert.equal(item.verifiedByName, '이검증');
   assert.equal(result.updatedAt, updatedAt);
+  assert.equal(result.progressLogs[0].logDate, '2026-09-23');
+  assert.equal(result.progressLogs[0].authorName, '김작성');
 });
 
 test('upgrade consideration verification records a different user and preserves the reviewer', () => {
@@ -168,4 +179,51 @@ test('upgrade plan default template contains the requested client and management
     Array.from(items.filter((item) => item.category === '관리서버'), (item) => item.feature),
     ['패스워드 복잡성', 'IP 할당 정책', '계정연동', '로그인 인증 방식', '화면 캡처 방지 정책', '원격 예외처리', '관리웹 접근 IP 제어', '라이선스', '계정연동 라이선스 할당 여부'],
   );
+});
+
+const progressLogPrisma = (log, calls = []) => ({
+  customer: { findUnique: async () => ({ id: 10, name: '고객사' }) },
+  upgradePlan: {
+    upsert: async (args) => { calls.push(['upsert', args]); return { id: 3 }; },
+    findUnique: async () => null,
+  },
+  upgradeProgressLog: {
+    findFirst: async () => log,
+    create: async (args) => { calls.push(['create', args]); return { id: 1, ...args.data }; },
+    update: async (args) => { calls.push(['update', args]); return { id: log.id, ...args.data }; },
+    delete: async (args) => { calls.push(['delete', args]); },
+  },
+});
+const serviceLogs = [];
+const logsService = { createServiceLog: async (entry) => { serviceLogs.push(entry); } };
+
+test('progress log defaults author to the logged-in user and auto-creates the plan', async () => {
+  const calls = [];
+  const service = new CustomersService(progressLogPrisma(null, calls), logsService, {});
+
+  await service.createUpgradeProgressLog(10, { logDate: '2026-09-23', content: ' 1차 점검 완료 ' }, { id: 5, role: 'user', name: '김작성' }, '::1');
+  await service.createUpgradeProgressLog(10, { logDate: '2026-09-23', authorName: '박대리', content: '고객 협의' }, { id: 5, role: 'user', name: '김작성' }, '::1');
+
+  const creates = calls.filter(([op]) => op === 'create').map(([, args]) => args.data);
+  assert.equal(calls[0][0], 'upsert');
+  assert.equal(creates[0].authorName, '김작성');
+  assert.equal(creates[0].content, '1차 점검 완료');
+  assert.equal(creates[0].createdByUserId, 5);
+  assert.equal(creates[1].authorName, '박대리');
+  assert.equal(creates[1].logDate.toISOString().slice(0, 10), '2026-09-23');
+});
+
+test('progress log can be edited or deleted only by its creator or an admin', async () => {
+  const log = { id: 7, createdByUserId: 5, authorName: '김작성', upgradePlan: { customer: { name: '가나다은행' } } };
+  const dto = { logDate: '2026-09-24', content: '수정' };
+  const service = new CustomersService(progressLogPrisma(log), logsService, {});
+
+  await assert.rejects(service.updateUpgradeProgressLog(10, 7, dto, { id: 6, role: 'user' }, '::1'), ForbiddenException);
+  await assert.rejects(service.deleteUpgradeProgressLog(10, 7, { id: 6, role: 'user' }, '::1'), ForbiddenException);
+  await service.updateUpgradeProgressLog(10, 7, dto, { id: 5, role: 'user' }, '::1');
+  await service.deleteUpgradeProgressLog(10, 7, { id: 6, role: 'admin' }, '::1');
+  assert.match(serviceLogs.at(-1).description, /고객사 가나다은행의/);
+  assert.match(serviceLogs.at(-2).description, /고객사 가나다은행의/);
+  assert.doesNotMatch(serviceLogs.at(-1).beforeValue, /upgradePlan/);
+  await assert.rejects(service.createUpgradeProgressLog(10, { logDate: '2026-09-24', content: '   ' }, { id: 5, role: 'user', name: '김' }, '::1'), BadRequestException);
 });

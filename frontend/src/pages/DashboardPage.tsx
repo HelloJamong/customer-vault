@@ -9,6 +9,7 @@ import {
   Memory,
   Storage,
   Computer,
+  FactCheck,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
@@ -16,6 +17,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useDashboard } from '@/hooks/useDashboard';
 import { customersAPI } from '@/api/customers.api';
 import IncompleteInspectionsDialog from '@/components/dashboard/IncompleteInspectionsDialog';
+import PendingVerificationsDialog from '@/components/dashboard/PendingVerificationsDialog';
+import { dashboardApi } from '@/api/dashboard.api';
 
 const DashboardPage = () => {
   const user = useAuthStore((state) => state.user);
@@ -703,6 +706,13 @@ const AdminDashboard = () => <DashboardContent hideUserCounts hideSystemResource
 const UserDashboard = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
+  const { data: pendingVerifications = [] } = useQuery({
+    queryKey: ['dashboard', 'pending-verifications'],
+    queryFn: dashboardApi.getPendingVerifications,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
 
   const {
     data: myCustomers,
@@ -766,6 +776,14 @@ const UserDashboard = () => {
       bgColor: alpha('#ef4444', 0.15),
       iconColor: '#ef4444',
     },
+    {
+      title: '검증 대기',
+      value: pendingVerifications.length.toLocaleString(), // 체크리스트 문서(카테고리) 단위
+      icon: <FactCheck />,
+      bgColor: alpha('#f59e0b', 0.15),
+      iconColor: '#f59e0b',
+      onClick: () => setPendingDialogOpen(true),
+    },
   ];
 
   const handleGoDetail = (customerId: number) => {
@@ -803,18 +821,28 @@ const UserDashboard = () => {
 
   return (
     <Box>
-      {/* Stat Cards - 3 column grid */}
+      <PendingVerificationsDialog
+        open={pendingDialogOpen}
+        onClose={() => setPendingDialogOpen(false)}
+        pendingVerifications={pendingVerifications}
+      />
+      {/* Stat Cards - 4 column grid */}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 3,
         }}
       >
         {inspectionStats.map((stat) => (
           <Box
             key={stat.title}
+            onClick={stat.onClick}
+            role={stat.onClick ? 'button' : undefined}
+            tabIndex={stat.onClick ? 0 : undefined}
+            onKeyDown={stat.onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') stat.onClick?.(); } : undefined}
             sx={{
+              ...(stat.onClick && { cursor: 'pointer', '&:hover': { borderColor: 'warning.main' } }),
               bgcolor: 'background.paper',
               p: 3,
               borderRadius: 3,

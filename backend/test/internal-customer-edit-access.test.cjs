@@ -122,11 +122,12 @@ test('unassigned internal users can manage maintenance inspection targets', asyn
 test('maintenance inspection target changes retain actor and before/after audit history', async () => {
   const savedLogs = [];
   const existing = { id: 3, customerId: 7, targetType: '정기점검', productName: '기존 제품' };
+  const customer = { name: '테스트 고객사' };
   const service = new InspectionTargetsService(
     {
       inspectionTarget: {
-        create: async ({ data }) => ({ id: 3, ...data }),
-        findUnique: async () => existing,
+        create: async ({ data }) => ({ id: 3, ...data, customer }),
+        findUnique: async () => ({ ...existing, customer }),
         update: async ({ data }) => ({ ...existing, ...data }),
         delete: async () => existing,
       },

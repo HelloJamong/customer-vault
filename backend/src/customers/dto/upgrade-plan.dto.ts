@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, IsBoolean, Min, ValidateNested, IsIn, MaxLength } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsBoolean, Min, ValidateNested, IsIn, MaxLength, IsDateString, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -74,6 +74,29 @@ export class CreateUpgradePlanDto {
   @ValidateNested({ each: true })
   @Type(() => UpgradeConsiderationDto)
   considerations?: UpgradeConsiderationDto[];
+
+  @ApiProperty({ required: false, nullable: true, description: '고려 사항 검증 담당자 ID (기술팀)' })
+  @IsOptional()
+  @IsInt()
+  verifierUserId?: number | null;
 }
 
 export class UpdateUpgradePlanDto extends CreateUpgradePlanDto {}
+
+export class UpgradeProgressLogDto {
+  @ApiProperty({ required: true, description: '날짜 (YYYY-MM-DD)' })
+  @IsDateString({ strict: true })
+  logDate: string;
+
+  @ApiProperty({ required: false, description: '작성자 (미입력 시 로그인 사용자)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  authorName?: string;
+
+  @ApiProperty({ required: true, description: '내용' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  content: string;
+}

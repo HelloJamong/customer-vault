@@ -26,6 +26,7 @@ import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
 import ExcelJS from 'exceljs';
 import { downloadBlob } from '@/utils/download';
+import { VIRTUAL_PC_CHECKLIST_LABELS } from '@/utils/virtual-pc-checklist';
 
 interface ServerInfo {
   id?: number;
@@ -136,6 +137,7 @@ interface VirtualPcImage {
   licenseNote?: string | null;
   installedPrograms: VirtualPcInstalledProgram[];
   checklistItems: VirtualPcChecklistItem[];
+  verifierName?: string | null;
 }
 
 interface SourceManagement {
@@ -159,15 +161,7 @@ interface SourceManagement {
   hrIntegration: HRIntegration;
 }
 
-const CHECKLIST_LABELS: Record<string, string> = {
-  vmft_d_drive_type: 'D 드라이브 Type 확인',
-  vmft_3d_acceleration: '3D 가속 비활성화 확인',
-  vmft_nested_vt: 'Nested VT 비활성화 확인',
-  boot_server_install: '서버 설치 확인',
-  boot_cache_install: '캐시 설치 확인',
-  boot_network: '가상PC 네트워크 연결 확인',
-  boot_programs: '가상PC 내 설치 프로그램 정상 동작 확인',
-};
+const CHECKLIST_LABELS = VIRTUAL_PC_CHECKLIST_LABELS;
 
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) return '-';
@@ -651,6 +645,7 @@ const CustomerSourceManagementDetailPage = () => {
                   <AccordionSummary expandIcon={<ExpandMore />}>
                     <Typography variant="subtitle2" fontWeight="bold">
                       체크리스트 ({image.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value').length})
+                      {' · '}검증 담당자: {image.verifierName || '미지정'}
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>

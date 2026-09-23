@@ -39,9 +39,24 @@ export interface IncompleteInspection {
   subEngineer: string;
 }
 
+export interface PendingVerification {
+  type: 'virtualPcChecklist' | 'upgradePlan';
+  customerId: number;
+  customerName: string;
+  documentName: string | null;
+  items: { key: string; checkedByName: string | null }[];
+}
+
 export const dashboardApi = {
   getStats: async (): Promise<DashboardStats> => {
     const response = await apiClient.get<DashboardStats>('/dashboard/stats', {
+      headers: { 'X-Session-Activity': 'false' },
+    });
+    return response.data;
+  },
+
+  getPendingVerifications: async (): Promise<PendingVerification[]> => {
+    const response = await apiClient.get<PendingVerification[]>('/dashboard/pending-verifications', {
       headers: { 'X-Session-Activity': 'false' },
     });
     return response.data;

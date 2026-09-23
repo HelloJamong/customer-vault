@@ -309,6 +309,11 @@ export class VirtualPcImageDto {
   @ValidateNested({ each: true })
   @Type(() => VirtualPcChecklistItemDto)
   checklistItems?: VirtualPcChecklistItemDto[];
+
+  @ApiProperty({ required: false, nullable: true, description: '체크리스트 검증 담당자 ID (기술팀)' })
+  @IsOptional()
+  @IsInt()
+  verifierUserId?: number | null;
 }
 
 export class CreateSourceManagementDto {

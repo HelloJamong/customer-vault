@@ -19,11 +19,14 @@ import {
   TableHead,
   TableRow,
   Checkbox,
+  TextField,
+  IconButton,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Edit, ExpandMore } from '@mui/icons-material';
+import { ArrowBack, Edit, ExpandMore, Delete, Save, Close } from '@mui/icons-material';
 import apiClient from '@/api/axios';
 import type { Customer } from '@/types/customer.types';
+import { useAuthStore } from '@/store/authStore';
 
 type ConsiderationCategory = '클라이언트' | '관리서버' | '커스텀';
 
@@ -42,6 +45,20 @@ interface Consideration {
   displayOrder: number;
 }
 
+interface ProgressLog {
+  id: number;
+  logDate: string;
+  authorName: string;
+  content: string;
+  createdByUserId: number | null;
+}
+
+interface ProgressLogForm {
+  logDate: string;
+  authorName: string;
+  content: string;
+}
+
 interface UpgradePlan {
   id: number | null;
   createdAt: string | null;
@@ -50,8 +67,15 @@ interface UpgradePlan {
   currentVersion: string | null;
   targetVersion: string | null;
   scheduleEstimate: string | null;
+  verifierName: string | null;
   considerations: Consideration[];
+  progressLogs: ProgressLog[];
 }
+
+const today = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD (로컬 기준)
+
+const apiErrorMessage = (error: unknown, fallback: string) =>
+  (error as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
 
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) return '-';
@@ -79,6 +103,12 @@ const CustomerUpgradePlanPage = () => {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [upgradePlan, setUpgradePlan] = useState<UpgradePlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role?.toLowerCase() || '');
+  const [newLog, setNewLog] = useState<ProgressLogForm>({ logDate: today(), authorName: user?.name || '', content: '' });
+  const [editingLogId, setEditingLogId] = useState<number | null>(null);
+  const [editLog, setEditLog] = useState<ProgressLogForm>({ logDate: '', authorName: '', content: '' });
+  const [isSavingLog, setIsSavingLog] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -160,6 +190,48 @@ const CustomerUpgradePlanPage = () => {
     );
   };
 
+  const progressLogsUrl = `/customers/${customerId}/upgrade-plan/progress-logs`;
+
+  const handleAddLog = async () => {
+    if (!newLog.content.trim()) { alert('내용을 입력해주세요.'); return; }
+    setIsSavingLog(true);
+    try {
+      const response = await apiClient.post(progressLogsUrl, newLog);
+      setUpgradePlan(response.data);
+      setNewLog({ logDate: today(), authorName: user?.name || '', content: '' });
+    } catch (error) {
+      alert(apiErrorMessage(error, '진척 현황 추가에 실패했습니다.'));
+    } finally {
+      setIsSavingLog(false);
+    }
+  };
+
+  const handleUpdateLog = async (logId: number) => {
+    if (!editLog.content.trim()) { alert('내용을 입력해주세요.'); return; }
+    setIsSavingLog(true);
+    try {
+      const response = await apiClient.put(`${progressLogsUrl}/${logId}`, editLog);
+      setUpgradePlan(response.data);
+      setEditingLogId(null);
+    } catch (error) {
+      alert(apiErrorMessage(error, '진척 현황 수정에 실패했습니다.'));
+    } finally {
+      setIsSavingLog(false);
+    }
+  };
+
+  const handleDeleteLog = async (logId: number) => {
+    if (!window.confirm('이 진척 현황 기록을 삭제하시겠습니까?')) return;
+    try {
+      const response = await apiClient.delete(`${progressLogsUrl}/${logId}`);
+      setUpgradePlan(response.data);
+    } catch (error) {
+      alert(apiErrorMessage(error, '진척 현황 삭제에 실패했습니다.'));
+    }
+  };
+
+  const canModifyLog = (log: ProgressLog) => isAdmin || log.createdByUserId === user?.id;
+
   const considerationCount = (category: ConsiderationCategory) =>
     (upgradePlan?.considerations || []).filter((item) => item.category === category).length;
 
@@ -217,6 +289,7 @@ const CustomerUpgradePlanPage = () => {
           <InfoItem label="현재 버전" value={upgradePlan?.currentVersion} />
           <InfoItem label="업그레이드 버전" value={upgradePlan?.targetVersion} />
           <InfoItem label="예상 일정" value={upgradePlan?.scheduleEstimate} />
+          <InfoItem label="검증 담당자" value={upgradePlan?.verifierName || '미지정'} />
         </Grid>
       </Paper>
 
@@ -251,6 +324,128 @@ const CustomerUpgradePlanPage = () => {
         </Typography>
         <Divider sx={{ mb: 3 }} />
         {renderConsiderationTable('커스텀', '커스텀 항목')}
+      </Paper>
+
+      <Paper sx={{ p: 3, mt: 3 }}>
+        <Typography variant="h6" fontWeight="bold" gutterBottom>
+          진척 현황
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="flex-start">
+          <TextField
+            label="날짜"
+            type="date"
+            size="small"
+            value={newLog.logDate}
+            onChange={(e) => setNewLog({ ...newLog, logDate: e.target.value })}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="작성자"
+            size="small"
+            value={newLog.authorName}
+            onChange={(e) => setNewLog({ ...newLog, authorName: e.target.value })}
+            inputProps={{ maxLength: 100 }}
+          />
+          <TextField
+            label="내용"
+            size="small"
+            multiline
+            minRows={1}
+            sx={{ flex: 1, minWidth: 240 }}
+            value={newLog.content}
+            onChange={(e) => setNewLog({ ...newLog, content: e.target.value })}
+            inputProps={{ maxLength: 5000 }}
+          />
+          <Button variant="contained" onClick={handleAddLog} disabled={isSavingLog || !newLog.logDate}>
+            추가
+          </Button>
+        </Box>
+        {(upgradePlan?.progressLogs || []).length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            등록된 진척 현황이 없습니다.
+          </Typography>
+        ) : (
+          <TableContainer sx={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 720 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 150, whiteSpace: 'nowrap' }}>날짜</TableCell>
+                  <TableCell sx={{ width: 140, whiteSpace: 'nowrap' }}>작성자</TableCell>
+                  <TableCell>내용</TableCell>
+                  <TableCell sx={{ width: 100 }} align="center" />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(upgradePlan?.progressLogs || []).map((log) =>
+                  editingLogId === log.id ? (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <TextField
+                          type="date"
+                          size="small"
+                          value={editLog.logDate}
+                          onChange={(e) => setEditLog({ ...editLog, logDate: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          value={editLog.authorName}
+                          onChange={(e) => setEditLog({ ...editLog, authorName: e.target.value })}
+                          inputProps={{ maxLength: 100 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          multiline
+                          fullWidth
+                          value={editLog.content}
+                          onChange={(e) => setEditLog({ ...editLog, content: e.target.value })}
+                          inputProps={{ maxLength: 5000 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <IconButton size="small" aria-label="저장" onClick={() => handleUpdateLog(log.id)} disabled={isSavingLog || !editLog.logDate}>
+                          <Save fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" aria-label="취소" onClick={() => setEditingLogId(null)}>
+                          <Close fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <TableRow key={log.id}>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{log.logDate}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{log.authorName}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'pre-wrap' }}>{log.content}</TableCell>
+                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        {canModifyLog(log) && (
+                          <>
+                            <IconButton
+                              size="small"
+                              aria-label="수정"
+                              onClick={() => {
+                                setEditingLogId(log.id);
+                                setEditLog({ logDate: log.logDate, authorName: log.authorName, content: log.content });
+                              }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" aria-label="삭제" onClick={() => handleDeleteLog(log.id)}>
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
     </Box>
   );

@@ -198,11 +198,14 @@ export class DocumentsService {
     } catch (error) {
       const securityFailure = getFileSecurityFailureReason(error);
       if (securityFailure) {
+        const customer = await this.prisma.customer
+          .findUnique({ where: { id: data.customerId }, select: { name: true } })
+          .catch(() => null);
         await this.logsService.createServiceLog({
           userId: data.uploadedBy,
           logType: '보안',
           action: '파일 보안 검사 차단',
-          description: `점검서 업로드가 파일 보안 검사에서 차단되었습니다. (고객사 ID: ${data.customerId}, 사유: ${securityFailure})`,
+          description: `점검서 업로드가 파일 보안 검사에서 차단되었습니다. (고객사: ${customer?.name ?? `ID ${data.customerId}`}, 사유: ${securityFailure})`,
         }).catch(() => {});
       }
 

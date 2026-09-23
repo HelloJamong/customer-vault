@@ -64,6 +64,7 @@ export class MeetingMinutesService {
       },
       include: {
         creator: { select: { id: true, name: true, username: true } },
+        customer: { select: { name: true } },
       },
     });
 
@@ -71,7 +72,7 @@ export class MeetingMinutesService {
       userId,
       logType: '정보',
       action: '회의록 작성',
-      description: `"${minutes.subject}" 회의록 작성 (고객사 ID: ${customerId})`,
+      description: `"${minutes.subject}" 회의록 작성 (고객사: ${minutes.customer.name})`,
       afterValue: JSON.stringify({ id: minutes.id, subject: minutes.subject }),
       ipAddress,
     });

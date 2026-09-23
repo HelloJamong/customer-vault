@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import Grid from '@/mui-grid2';
 import { ArrowBack, Save, Add, Delete, ExpandMore, PlaylistAddCheck } from '@mui/icons-material';
+import VerifierSelect from '@/components/checklist/VerifierSelect';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useAuthStore } from '@/store/authStore';
@@ -59,6 +60,8 @@ interface UpgradePlanFormData {
   currentVersion: string;
   targetVersion: string;
   scheduleEstimate: string;
+  verifierUserId: number | null;
+  verifierName: string | null;
   considerations: Consideration[];
 }
 
@@ -85,6 +88,8 @@ const CustomerUpgradePlanEditPage = () => {
     currentVersion: '',
     targetVersion: '',
     scheduleEstimate: '',
+    verifierUserId: null,
+    verifierName: null,
     considerations: [],
   });
 
@@ -102,6 +107,8 @@ const CustomerUpgradePlanEditPage = () => {
             currentVersion: planResponse.data.currentVersion || '',
             targetVersion: planResponse.data.targetVersion || '',
             scheduleEstimate: planResponse.data.scheduleEstimate || '',
+            verifierUserId: planResponse.data.verifierUserId ?? null,
+            verifierName: planResponse.data.verifierName ?? null,
             considerations: (planResponse.data.considerations || []).map((item: ApiConsideration) => ({
               ...item,
               description: item.description ?? '',
@@ -190,6 +197,7 @@ const CustomerUpgradePlanEditPage = () => {
         currentVersion: formData.currentVersion.trim(),
         targetVersion: formData.targetVersion.trim(),
         scheduleEstimate: formData.scheduleEstimate.trim(),
+        verifierUserId: formData.verifierUserId,
         considerations: formData.considerations
           .filter((item) => item.feature.trim())
           .map((item, displayOrder) => ({
@@ -414,8 +422,15 @@ const CustomerUpgradePlanEditPage = () => {
           </Button>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          검토 저장 후 검토자와 다른 사용자가 검증할 수 있습니다.
+          검토 저장 후 검토자와 다른 사용자가 검증할 수 있습니다. 검증 담당자를 지정하면 담당자의 대시보드에 검증 대기로 표시됩니다.
         </Typography>
+        <Box sx={{ mb: 2 }}>
+          <VerifierSelect
+            value={formData.verifierUserId}
+            currentName={formData.verifierName}
+            onChange={(verifierUserId) => setFormData({ ...formData, verifierUserId })}
+          />
+        </Box>
         <Divider sx={{ mb: 3 }} />
         <Stack spacing={2}>
           <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}>

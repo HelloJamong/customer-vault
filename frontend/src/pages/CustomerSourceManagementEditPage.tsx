@@ -29,6 +29,7 @@ import {
 import Grid from '@/mui-grid2';
 import { ArrowBack, Save, Add, Delete, ExpandMore } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import VerifierSelect from '@/components/checklist/VerifierSelect';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useAuthStore } from '@/store/authStore';
@@ -139,6 +140,8 @@ interface VirtualPcImage {
   licenseNote?: string;
   installedPrograms: VirtualPcInstalledProgram[];
   checklistItems: VirtualPcChecklistItem[];
+  verifierUserId?: number | null;
+  verifierName?: string | null;
 }
 
 interface SourceManagement {
@@ -394,6 +397,7 @@ const CustomerSourceManagementEditPage = () => {
               note: item.note?.trim() || undefined,
               displayOrder: item.displayOrder,
             })),
+          verifierUserId: image.verifierUserId ?? null,
         })),
         servers: formData.servers?.map((server) => ({
           ...server,
@@ -930,6 +934,13 @@ const CustomerSourceManagementEditPage = () => {
                   </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
+                  <Box sx={{ mb: 2 }}>
+                    <VerifierSelect
+                      value={image.verifierUserId}
+                      currentName={image.verifierName}
+                      onChange={(verifierUserId) => handleVirtualPcImageChange(imageIndex, 'verifierUserId', verifierUserId)}
+                    />
+                  </Box>
                   {image.dDiskCapacity !== '' && image.dDiskCapacity !== undefined && (
                     <Alert severity="info" sx={{ mb: 1 }}>
                       D 드라이브가 입력되어 D 드라이브 Type 확인 항목이 활성화되었습니다.

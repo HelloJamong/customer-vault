@@ -417,4 +417,55 @@ export class DashboardService {
       subEngineer: customer.engineerSub?.name || '-',      // 부 엔지니어
     }));
   }
+
+  // 로그인 사용자가 검증 담당자로 지정된 체크리스트 중 검토 완료·검증 전 항목
+  async getPendingVerifications(userId: number) {
+    const pending = { checked: true, verified: false };
+    // vmft_hash_value는 화면에서 숨기는 레거시 항목이라 제외
+    const pendingChecklist = { ...pending, itemKey: { not: 'vmft_hash_value' } };
+    const [images, plans] = await Promise.all([
+      this.prisma.virtualPcImage.findMany({
+        where: { verifierUserId: userId, checklistItems: { some: pendingChecklist } },
+        orderBy: { id: 'asc' },
+        select: {
+          name: true,
+          sourceManagement: { select: { customer: { select: { id: true, name: true } } } },
+          checklistItems: {
+            where: pendingChecklist,
+            orderBy: { displayOrder: 'asc' },
+            select: { itemKey: true, checkedByName: true },
+          },
+        },
+      }),
+      this.prisma.upgradePlan.findMany({
+        where: { verifierUserId: userId, considerations: { some: pending } },
+        orderBy: { id: 'asc' },
+        select: {
+          customer: { select: { id: true, name: true } },
+          considerations: {
+            where: pending,
+            orderBy: { displayOrder: 'asc' },
+            select: { category: true, feature: true, checkedByName: true },
+          },
+        },
+      }),
+    ]);
+
+    return [
+      ...images.map((image) => ({
+        type: 'virtualPcChecklist' as const,
+        customerId: image.sourceManagement.customer.id,
+        customerName: image.sourceManagement.customer.name,
+        documentName: image.name,
+        items: image.checklistItems.map((item) => ({ key: item.itemKey, checkedByName: item.checkedByName })),
+      })),
+      ...plans.map((plan) => ({
+        type: 'upgradePlan' as const,
+        customerId: plan.customer.id,
+        customerName: plan.customer.name,
+        documentName: null,
+        items: plan.considerations.map((item) => ({ key: `${item.category} - ${item.feature}`, checkedByName: item.checkedByName })),
+      })),
+    ];
+  }
 }

@@ -16,7 +16,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
 import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
-import { CreateUpgradePlanDto, UpdateUpgradePlanDto } from './dto/upgrade-plan.dto';
+import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeProgressLogDto } from './dto/upgrade-plan.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -175,5 +175,40 @@ export class CustomersController {
   ) {
     const ipAddress = getClientIp(req);
     return this.customersService.updateUpgradePlan(id, dto, req.user.id, ipAddress);
+  }
+
+  // 업그레이드 진척 현황
+  @Post(':id/upgrade-plan/progress-logs')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '업그레이드 진척 현황 추가' })
+  createUpgradeProgressLog(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpgradeProgressLogDto,
+    @Request() req: any,
+  ) {
+    return this.customersService.createUpgradeProgressLog(id, dto, req.user, getClientIp(req));
+  }
+
+  @Put(':id/upgrade-plan/progress-logs/:logId')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '업그레이드 진척 현황 수정 (본인 기록 또는 관리자)' })
+  updateUpgradeProgressLog(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('logId', ParseIntPipe) logId: number,
+    @Body() dto: UpgradeProgressLogDto,
+    @Request() req: any,
+  ) {
+    return this.customersService.updateUpgradeProgressLog(id, logId, dto, req.user, getClientIp(req));
+  }
+
+  @Delete(':id/upgrade-plan/progress-logs/:logId')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '업그레이드 진척 현황 삭제 (본인 기록 또는 관리자)' })
+  deleteUpgradeProgressLog(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('logId', ParseIntPipe) logId: number,
+    @Request() req: any,
+  ) {
+    return this.customersService.deleteUpgradeProgressLog(id, logId, req.user, getClientIp(req));
   }
 }

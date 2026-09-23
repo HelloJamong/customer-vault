@@ -25,4 +25,10 @@ export class DashboardController {
   getIncompleteInspections() {
     return this.service.getIncompleteInspections();
   }
+
+  @Get('pending-verifications')
+  @ApiOperation({ summary: '내가 검증 담당자로 지정된 검증 대기 항목 조회' })
+  getPendingVerifications(@Request() req) {
+    return this.service.getPendingVerifications(req.user.id);
+  }
 }
