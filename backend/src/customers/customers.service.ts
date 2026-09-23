@@ -264,7 +264,7 @@ export class CustomersService {
     };
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto, userId: number, ipAddress?: string, role?: string) {
+  async update(id: number, updateCustomerDto: UpdateCustomerDto, userId: number, ipAddress?: string) {
     // 변경 전 데이터 조회
     const beforeCustomer = await this.prisma.customer.findUnique({
       where: { id },
@@ -325,13 +325,17 @@ export class CustomersService {
       updateData.salesId = null;
     }
 
-    // 일반 사용자(user)는 담당자 지정(정/부 엔지니어, 영업)을 변경할 수 없다.
-    // (담당자를 자기 자신으로 바꿔 권한을 얻는 것을 방지) — 위의 null 변환 이후에 제거
-    if (role !== undefined && !isAdminRole(role)) {
-      delete updateData.engineerId;
-      delete updateData.engineerSubId;
-      delete updateData.salesId;
-    }
+    // 담당자 지정(정/부 엔지니어, 영업)은 모든 사내 사용자가 변경할 수 있다. 변경 내역은 아래 서비스 로그에 이름으로 남긴다.
+    const assignmentFields = [
+      { key: 'engineerId', label: '담당 엔지니어', before: beforeCustomer.engineer?.name },
+      { key: 'engineerSubId', label: '부담당 엔지니어', before: beforeCustomer.engineerSub?.name },
+      { key: 'salesId', label: '담당 영업', before: beforeCustomer.sales?.name },
+    ] as const;
+    const changedAssignments = assignmentFields.filter(({ key }) => updateData[key] !== beforeCustomer[key]);
+    const assigneeIds = changedAssignments.map(({ key }) => updateData[key]).filter((userId): userId is number => userId != null);
+    const assignees = assigneeIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: assigneeIds } }, select: { id: true, name: true } })
+      : [];
 
     const customer = await this.prisma.customer.update({
       where: { id },
@@ -350,9 +354,9 @@ export class CustomersService {
     if (normalizedAfterContractType !== normalizedBeforeContractType) {
       changes.push(`계약상태: ${normalizedBeforeContractType || '없음'} → ${normalizedAfterContractType}`);
     }
-    if (updateCustomerDto.engineerId !== undefined && updateCustomerDto.engineerId !== beforeCustomer.engineerId) {
-      const beforeName = beforeCustomer.engineer?.name || '없음';
-      changes.push(`담당엔지니어 변경 (이전: ${beforeName})`);
+    for (const { key, label, before } of changedAssignments) {
+      const after = assignees.find((user) => user.id === updateData[key])?.name;
+      changes.push(`${label}: ${before || '없음'} → ${after || '없음'}`);
     }
 
     // 로그 기록 (변경 사항이 있을 경우에만)

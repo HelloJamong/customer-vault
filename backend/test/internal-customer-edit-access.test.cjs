@@ -26,7 +26,7 @@ test('unassigned internal users can update customer maintenance information', as
   const result = await controller.update(7, { notes: 'updated' }, request);
 
   assert.equal(result.message, 'updated');
-  assert.deepEqual(updateArgs, [7, { notes: 'updated' }, 99, '127.0.0.1', 'user']);
+  assert.deepEqual(updateArgs, [7, { notes: 'updated' }, 99, '127.0.0.1']);
 });
 
 test('unassigned internal users can read and save source-management edits', async () => {

@@ -84,7 +84,7 @@ export class CustomersController {
   @ApiOperation({ summary: '고객사 유지보수 정보 수정 (사내 사용자 공통)' })
   async update(@Param('id', ParseIntPipe) id: number, @Body() updateCustomerDto: UpdateCustomerDto, @Request() req: any) {
     const ipAddress = getClientIp(req);
-    return this.customersService.update(id, updateCustomerDto, req.user.id, ipAddress, req.user.role);
+    return this.customersService.update(id, updateCustomerDto, req.user.id, ipAddress);
   }
 
   @Delete(':id')
