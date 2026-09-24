@@ -120,6 +120,31 @@ export class UpdateSettingsDto {
   @IsBoolean()
   otpEnabled?: boolean;
 
+  @ApiProperty({ description: '관리자 계정 OTP 적용 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  otpApplyToAdministrators?: boolean;
+
+  @ApiProperty({ description: '기술팀 OTP 적용 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  otpApplyToTechDepartment?: boolean;
+
+  @ApiProperty({ description: '영업팀 OTP 적용 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  otpApplyToSalesDepartment?: boolean;
+
+  @ApiProperty({ description: '개발팀 OTP 적용 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  otpApplyToDevDepartment?: boolean;
+
+  @ApiProperty({ description: '시스템 전역 IP 접근 제한 여부', required: false })
+  @IsOptional()
+  @IsBoolean()
+  ipRestrictionEnabled?: boolean;
+
   @ApiProperty({
     description: '로그인 실패 횟수 제한 활성화 여부',
     example: false,

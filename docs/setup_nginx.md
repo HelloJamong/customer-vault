@@ -8,6 +8,7 @@
   - `/api/` → `backend:5000`
   - `/` (정적 포함) → `frontend:80`
 - 필수 헤더: `Host`, `X-Forwarded-For`, `X-Forwarded-Proto`, `Upgrade/Connection`(WebSocket/SSE)
+- 백엔드의 클라이언트 IP 판별을 위해 `.env`의 `TRUST_PROXY_ADDRESSES`에 **해당 배포 환경에서 실제 요청을 전달하는 프록시 주소/CIDR만** 지정합니다. 개발/운영의 프록시 주소를 서로 복사하지 마세요. 여러 홉을 쓸 때는 숫자 홉 신뢰보다 명시적 주소 목록이 안전합니다. 목록 미설정 시 기존 기본값인 `TRUST_PROXY_HOPS=1`을 사용합니다.
 - 업로드/타임아웃: `client_max_body_size 20m`, `proxy_*_timeout 60s`
 - **오프라인 환경 지원**: CSP 및 보안 헤더를 통해 외부 리소스(CDN, 폰트 등) 차단
 

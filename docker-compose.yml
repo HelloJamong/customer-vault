@@ -68,6 +68,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5000
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      TRUST_PROXY_ADDRESSES: ${TRUST_PROXY_ADDRESSES:-}
       TZ: ${TZ:-Asia/Seoul}
       DATABASE_URL: mysql://${DB_USER:-customer_user}:${DB_PASSWORD:?DB_PASSWORD must be set}@db:3306/${DB_NAME:-customer_db}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}

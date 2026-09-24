@@ -50,6 +50,11 @@ const SettingsPage = () => {
         sessionTimeoutMinutes: settings.sessionTimeoutMinutes ?? 30,
         sessionTimeoutWarningEnabled: settings.sessionTimeoutWarningEnabled ?? true,
         otpEnabled: settings.otpEnabled ?? false,
+        otpApplyToAdministrators: settings.otpApplyToAdministrators ?? true,
+        otpApplyToTechDepartment: settings.otpApplyToTechDepartment ?? true,
+        otpApplyToSalesDepartment: settings.otpApplyToSalesDepartment ?? true,
+        otpApplyToDevDepartment: settings.otpApplyToDevDepartment ?? true,
+        ipRestrictionEnabled: settings.ipRestrictionEnabled ?? false,
         loginFailureLimitEnabled: settings.loginFailureLimitEnabled,
         loginFailureLimit: settings.loginFailureLimit,
         accountLockMinutes: settings.accountLockMinutes,
@@ -76,8 +81,14 @@ const SettingsPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
+      const wasRequiredForCurrentAdmin = Boolean(
+        settings?.otpEnabled && settings.otpApplyToAdministrators,
+      );
+      const willBeRequiredForCurrentAdmin = Boolean(
+        formData.otpEnabled && formData.otpApplyToAdministrators,
+      );
       const enablingOtpForUnregisteredUser =
-        settings?.otpEnabled === false && formData.otpEnabled === true && !user?.mfaEnabled;
+        !wasRequiredForCurrentAdmin && willBeRequiredForCurrentAdmin && !user?.mfaEnabled;
       await updateSettings(formData);
       setSnackbar({
         open: true,
@@ -346,7 +357,7 @@ const SettingsPage = () => {
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
             폐쇄망에서도 사용할 수 있는 Authenticator 앱 기반 TOTP 인증을 적용합니다.
-            활성화하면 OTP를 등록하지 않은 사용자는 다음 로그인 시 등록 절차를 진행해야 합니다.
+            활성화 후 관리자 또는 부서별 적용 대상을 선택할 수 있습니다.
           </Typography>
           <FormControlLabel
             control={
@@ -357,8 +368,76 @@ const SettingsPage = () => {
             }
             label="OTP 2차 인증 활성화"
           />
+          {formData.otpEnabled && (
+            <Box sx={{ mt: 2, pl: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                적용 대상
+              </Typography>
+              <FormGroup row>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.otpApplyToAdministrators ?? true}
+                      onChange={(e) => setFormData({ ...formData, otpApplyToAdministrators: e.target.checked })}
+                    />
+                  }
+                  label="관리자 (슈퍼/일반)"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.otpApplyToTechDepartment ?? true}
+                      onChange={(e) => setFormData({ ...formData, otpApplyToTechDepartment: e.target.checked })}
+                    />
+                  }
+                  label="기술팀"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.otpApplyToSalesDepartment ?? true}
+                      onChange={(e) => setFormData({ ...formData, otpApplyToSalesDepartment: e.target.checked })}
+                    />
+                  }
+                  label="영업팀"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.otpApplyToDevDepartment ?? true}
+                      onChange={(e) => setFormData({ ...formData, otpApplyToDevDepartment: e.target.checked })}
+                    />
+                  }
+                  label="개발팀"
+                />
+              </FormGroup>
+            </Box>
+          )}
           <Alert severity="info" sx={{ mt: 2 }}>
-            Google Authenticator 또는 Microsoft Authenticator에서 QR 코드를 등록합니다. OTP를 분실한 경우 사용자 관리 화면에서 관리자만 등록을 초기화할 수 있습니다.
+            적용 대상 사용자는 다음 로그인 후 OTP를 등록해야 합니다. OTP를 분실한 경우 사용자 관리 화면에서 관리자만 등록을 초기화할 수 있습니다.
+          </Alert>
+        </Paper>
+
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            IP 접근 제한
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            활성화하면 모든 계정은 등록된 IP에서만 로그인할 수 있고, 세션도 로그인한 IP에 고정됩니다.
+            기존 계정은 최근 성공 로그인 IP를 허용 목록에 자동 등록합니다.
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={formData.ipRestrictionEnabled ?? false}
+                onChange={(e) => setFormData({ ...formData, ipRestrictionEnabled: e.target.checked })}
+              />
+            }
+            label="시스템 전역 IP 접근 제한 활성화"
+          />
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            최근 성공 로그인 IP가 없는 활성 계정이 있으면 제한 활성화가 거부됩니다. 먼저 계정 관리에서 해당 계정의 허용 IP를 등록하세요.
+            새 계정을 만들 때는 시스템 제한이 켜져 있으면 IP 입력이 필수입니다. 관리자 계정은 최대 2개, 일반 사용자는 1개까지 등록할 수 있습니다.
           </Alert>
         </Paper>
 

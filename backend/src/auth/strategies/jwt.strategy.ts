@@ -4,6 +4,9 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getSessionTimeoutMs, getSessionTimeoutMinutes, isPasswordExpired } from '../session-policy';
+import { getClientIp } from '../../common/utils/ip.util';
+import { isIpAllowedForUser, isSessionIpMatch } from '../ip-policy';
+import { isMfaRequiredForUser } from '../mfa-policy';
 
 export interface JwtPayload {
   sub: number;
@@ -15,6 +18,9 @@ export interface JwtPayload {
 
 interface RequestLike {
   headers?: Record<string, string | string[] | undefined>;
+  ip?: string;
+  socket?: { remoteAddress?: string };
+  connection?: { remoteAddress?: string };
 }
 
 @Injectable()
@@ -45,6 +51,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      include: { allowedIps: { select: { ipAddress: true } } },
     });
 
     if (!user || !user.isActive) {
@@ -67,6 +74,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('세션이 만료되었습니다.');
     }
 
+    if (request) {
+      const requestIp = getClientIp(request);
+      if (
+        settings?.ipRestrictionEnabled &&
+        (!isSessionIpMatch(session.ipAddress, requestIp) ||
+          !isIpAllowedForUser(user, requestIp, true))
+      ) {
+        await this.prisma.userSession.deleteMany({ where: { id: session.id } });
+        throw new UnauthorizedException('세션의 접속 IP가 변경되었습니다.');
+      }
+    }
+
     // 백그라운드 polling은 유휴 세션을 연장하지 않는다. 사용자 요청만 활동으로 기록한다.
     if (!isPassiveRequest) {
       await this.prisma.userSession.updateMany({
@@ -85,7 +104,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       isFirstLogin: user.isFirstLogin,
       passwordExpired: isPasswordExpired(user.passwordChangedAt, settings),
       mfaEnabled: user.mfaEnabled,
-      mfaSetupRequired: Boolean(settings?.otpEnabled && !user.mfaEnabled),
+      mfaSetupRequired: Boolean(isMfaRequiredForUser(settings, user) && !user.mfaEnabled),
       sessionId: payload.sessionId, // JWT에서 sessionId 전달
       sessionTimeoutMinutes: timeoutMinutes,
       sessionTimeoutWarningEnabled: settings?.sessionTimeoutWarningEnabled ?? true,

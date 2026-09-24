@@ -66,6 +66,7 @@ model User {
   upgradeProgressLogs   UpgradeProgressLog[] @relation("UpgradeProgressLogCreator")
   assignedVirtualPcImageVerifications VirtualPcImage[] @relation("VirtualPcImageVerifier")
   assignedUpgradePlanVerifications    UpgradePlan[]    @relation("UpgradePlanVerifier")
+  allowedIps            UserAllowedIp[]
 
   @@index([isActive])
   @@map("users")
@@ -235,6 +236,13 @@ model SystemSettings {
 
   // OTP 정책
   otpEnabled                 Boolean   @default(false) @map("otp_enabled")
+  otpApplyToAdministrators   Boolean   @default(true) @map("otp_apply_to_administrators")
+  otpApplyToTechDepartment   Boolean   @default(true) @map("otp_apply_to_tech_department")
+  otpApplyToSalesDepartment  Boolean   @default(true) @map("otp_apply_to_sales_department")
+  otpApplyToDevDepartment    Boolean   @default(true) @map("otp_apply_to_dev_department")
+
+  // 접속 IP 제한
+  ipRestrictionEnabled       Boolean   @default(false) @map("ip_restriction_enabled")
 
   // 로그인 실패 횟수
   loginFailureLimitEnabled    Boolean   @default(false) @map("login_failure_limit_enabled")
@@ -297,6 +305,20 @@ model UserSession {
 
   @@index([userId, lastActivity])
   @@map("user_sessions")
+}
+
+// 관리자 사전 등록 사용자별 접속 IP
+model UserAllowedIp {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  ipAddress String   @map("ip_address") @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ipAddress])
+  @@index([userId])
+  @@map("user_allowed_ips")
 }
 
 // 서비스 로그

@@ -84,7 +84,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: '수정 성공' })
   update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto, @Request() req) {
     const ipAddress = getClientIp(req);
-    return this.usersService.update(id, updateUserDto, req.user.id, ipAddress);
+    return this.usersService.update(id, updateUserDto, req.user.id, req.user.role, ipAddress);
   }
 
   @Patch(':id/description')

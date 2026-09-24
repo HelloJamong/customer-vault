@@ -22,6 +22,10 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
+# IPv6 listen 자동 설정 스크립트는 apk로 패키지 저장소 조회를 시도해 폐쇄망에서 기동이 약 2분 지연된다.
+# default.conf를 커스텀 설정으로 교체하므로 이 스크립트는 항상 변경 없이 종료된다 → 제거해도 동작 차이 없음.
+RUN rm -f /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+
 # 빌드 결과물 복사
 COPY --from=builder /app/dist /usr/share/nginx/html
 

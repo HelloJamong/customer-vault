@@ -28,6 +28,8 @@ import { Add, MoreVert } from '@mui/icons-material';
 import apiClient from '@/api/axios';
 import { useAuthStore } from '@/store/authStore';
 import { getApiErrorMessage } from '@/utils/api-error';
+import { AllowedIpFields } from '@/components/users/AllowedIpFields';
+import { formatAllowedIpAddresses, parseAllowedIpAddresses } from '@/utils/allowed-ip';
 
 interface User {
   id: number;
@@ -41,6 +43,7 @@ interface User {
   status: string;
   createdAt: string;
   lastLogin?: string;
+  allowedIpAddresses: string[];
 }
 
 const UsersPage = () => {
@@ -57,6 +60,7 @@ const UsersPage = () => {
     email: '',
     department: '',
     description: '',
+    allowedIpAddresses: '',
   });
 
   useEffect(() => {
@@ -86,14 +90,14 @@ const UsersPage = () => {
 
   const handleOpenDialog = () => {
     setSelectedUser(null); // 생성 모드를 위해 선택된 사용자 초기화
-    setFormData({ username: '', name: '', email: '', department: '', description: '' });
+    setFormData({ username: '', name: '', email: '', department: '', description: '', allowedIpAddresses: '' });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedUser(null);
-    setFormData({ username: '', name: '', email: '', department: '', description: '' });
+    setFormData({ username: '', name: '', email: '', department: '', description: '', allowedIpAddresses: '' });
   };
 
   const handleEdit = () => {
@@ -104,6 +108,7 @@ const UsersPage = () => {
         email: selectedUser.email || '',
         department: selectedUser.department || '',
         description: selectedUser.description || '',
+        allowedIpAddresses: formatAllowedIpAddresses(selectedUser.allowedIpAddresses),
       });
       setOpenDialog(true);
     }
@@ -121,6 +126,11 @@ const UsersPage = () => {
       alert('올바른 이메일 형식이 아닙니다.');
       return;
     }
+    const allowedIpAddresses = parseAllowedIpAddresses(formData.allowedIpAddresses);
+    if (allowedIpAddresses.length > 1) {
+      alert('일반 사용자 계정은 IP를 1개까지 등록할 수 있습니다.');
+      return;
+    }
 
     try {
       const response = await apiClient.post('/users', {
@@ -130,6 +140,7 @@ const UsersPage = () => {
         department: formData.department,
         description: formData.description,
         role: 'user',
+        allowedIpAddresses,
       });
 
       alert(response.data.message);
@@ -158,6 +169,11 @@ const UsersPage = () => {
       alert('올바른 이메일 형식이 아닙니다.');
       return;
     }
+    const allowedIpAddresses = parseAllowedIpAddresses(formData.allowedIpAddresses);
+    if (allowedIpAddresses.length > 1) {
+      alert('일반 사용자 계정은 IP를 1개까지 등록할 수 있습니다.');
+      return;
+    }
 
     try {
       await apiClient.patch(`/users/${selectedUser.id}`, {
@@ -165,6 +181,7 @@ const UsersPage = () => {
         email: formData.email || undefined,
         department: formData.department,
         description: formData.description,
+        allowedIpAddresses,
       });
 
       alert('사용자 정보가 수정되었습니다.');
@@ -295,6 +312,7 @@ const UsersPage = () => {
               <TableCell>이메일</TableCell>
               <TableCell>소속</TableCell>
               <TableCell>설명</TableCell>
+              <TableCell>허용 IP</TableCell>
               <TableCell>상태</TableCell>
               <TableCell>생성일</TableCell>
               <TableCell>마지막 로그인</TableCell>
@@ -309,6 +327,9 @@ const UsersPage = () => {
                 <TableCell>{user.email || '-'}</TableCell>
                 <TableCell>{user.department || '-'}</TableCell>
                 <TableCell>{user.description || '-'}</TableCell>
+                <TableCell sx={{ minWidth: 140, maxWidth: 220, overflowWrap: 'anywhere' }}>
+                  {user.allowedIpAddresses?.length ? user.allowedIpAddresses.join(', ') : '미등록'}
+                </TableCell>
                 <TableCell>
                   <Chip label={user.status} color={getStatusColor(user.status)} size="small" />
                 </TableCell>
@@ -415,6 +436,11 @@ const UsersPage = () => {
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             multiline
             rows={2}
+          />
+          <AllowedIpFields
+            value={formData.allowedIpAddresses}
+            onValueChange={(allowedIpAddresses) => setFormData({ ...formData, allowedIpAddresses })}
+            maxIps={1}
           />
         </DialogContent>
         <DialogActions>

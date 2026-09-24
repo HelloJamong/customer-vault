@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsEmail, IsOptional, IsArray, IsInt, IsEnum } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsIP,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { Role } from '../../common/enums/role.enum';
 
 export class CreateUserDto {
@@ -35,6 +44,13 @@ export class CreateUserDto {
   @IsInt({ each: true })
   @IsOptional()
   customerIds?: number[];
+
+  @ApiProperty({ example: ['192.168.10.25'], description: '허용 IP 목록 (일반 사용자 최대 1개)', required: false })
+  @IsArray()
+  @ArrayMaxSize(2)
+  @IsIP(undefined, { each: true })
+  @IsOptional()
+  allowedIpAddresses?: string[];
 }
 
 export class UpdateUserDto {
@@ -63,4 +79,11 @@ export class UpdateUserDto {
   @IsInt({ each: true })
   @IsOptional()
   customerIds?: number[];
+
+  @ApiProperty({ example: ['192.168.10.25'], description: '허용 IP 목록 (일반 사용자 최대 1개)', required: false })
+  @IsArray()
+  @ArrayMaxSize(2)
+  @IsIP(undefined, { each: true })
+  @IsOptional()
+  allowedIpAddresses?: string[];
 }

@@ -89,8 +89,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '토큰 갱신' })
   @ApiResponse({ status: 200, description: '토큰 갱신 성공' })
-  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshToken(refreshTokenDto.refreshToken);
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto, @Request() req) {
+    return this.authService.refreshToken(refreshTokenDto.refreshToken, getClientIp(req));
   }
 
   @Post('mfa/verify')

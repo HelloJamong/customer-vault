@@ -65,7 +65,7 @@ export const authAPI = {
     return data;
   },
 
-  getMfaStatus: async (): Promise<{ otpEnabled: boolean; mfaEnabled: boolean; setupRequired: boolean }> => {
+  getMfaStatus: async (): Promise<{ otpEnabled: boolean; requiredByPolicy: boolean; mfaEnabled: boolean; setupRequired: boolean }> => {
     const { data } = await apiClient.get('/auth/mfa/status');
     return data;
   },

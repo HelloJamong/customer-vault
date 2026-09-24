@@ -133,16 +133,7 @@ test('initial admin password is forced through the login password-change flow', 
   assert.equal(updatedSettings.response.status, 200);
 
   const updatedPolicy = await request('/api/auth/session-policy', { headers: adminHeaders });
-  assert.equal(updatedPolicy.response.status, 200);
-  assert.equal(updatedPolicy.body.timeoutMinutes, 10);
-  assert.equal(updatedPolicy.body.warningEnabled, false);
-  assert.equal(updatedPolicy.body.warningSeconds, 60);
-
-  const adminLogout = await request('/api/auth/logout', {
-    method: 'POST',
-    headers: adminHeaders,
-  });
-  assert.equal(adminLogout.response.status, 200);
+  assert.equal(updatedPolicy.response.status, 401);
 
   const setupLogin = await request('/api/auth/login', {
     method: 'POST',

@@ -121,3 +121,52 @@ test('privileged password reset does not return the default password', async () 
   assert.deepEqual(result, { message: '비밀번호가 초기화되었습니다.' });
   assert.equal(Object.hasOwn(result, 'defaultPassword'), false);
 });
+
+test('new accounts require an IP when global IP restriction is enabled', async () => {
+  let created = false;
+  const service = new UsersService(
+    {
+      systemSettings: { findFirst: async () => ({ ipRestrictionEnabled: true }) },
+      user: {
+        create: async () => {
+          created = true;
+        },
+      },
+    },
+    {},
+  );
+
+  await assert.rejects(
+    service.create({ role: 'user', department: '기술팀' }, 1, 'admin'),
+    /허용 IP를 1개 이상/,
+  );
+  assert.equal(created, false);
+});
+
+test('admin accounts are limited to two allowed IP addresses', async () => {
+  let created = false;
+  const service = new UsersService(
+    {
+      systemSettings: { findFirst: async () => ({ ipRestrictionEnabled: false }) },
+      user: {
+        create: async () => {
+          created = true;
+        },
+      },
+    },
+    {},
+  );
+
+  await assert.rejects(
+    service.create(
+      {
+        role: 'super_admin',
+        allowedIpAddresses: ['192.168.10.1', '192.168.10.2', '192.168.10.3'],
+      },
+      1,
+      'super_admin',
+    ),
+    /최대 2개/,
+  );
+  assert.equal(created, false);
+});

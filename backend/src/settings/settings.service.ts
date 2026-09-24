@@ -4,6 +4,7 @@ import { LogsService } from '../logs/logs.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { getInitialAdminPassword } from '../common/config/initial-password';
+import { isMfaRequiredForUser } from '../auth/mfa-policy';
 
 @Injectable()
 export class SettingsService {
@@ -26,9 +27,8 @@ export class SettingsService {
   }
 
   async updateSettings(data: UpdateSettingsDto, userId: number, ipAddress?: string) {
-    this.validateSettings(data);
-
     const settings = await this.getSettings();
+    this.validateSettings(data, settings);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { username: true },
@@ -120,6 +120,28 @@ export class SettingsService {
       afterValues.push(data.otpEnabled ? '활성화' : '비활성화');
     }
 
+    if (data.ipRestrictionEnabled !== undefined && data.ipRestrictionEnabled !== settings.ipRestrictionEnabled) {
+      changes.push('시스템 전역 IP 접근 제한');
+      beforeValues.push(settings.ipRestrictionEnabled ? '활성화' : '비활성화');
+      afterValues.push(data.ipRestrictionEnabled ? '활성화' : '비활성화');
+    }
+
+    const otpTargets: Array<[keyof UpdateSettingsDto, string]> = [
+      ['otpApplyToAdministrators', '관리자 OTP 적용'],
+      ['otpApplyToTechDepartment', '기술팀 OTP 적용'],
+      ['otpApplyToSalesDepartment', '영업팀 OTP 적용'],
+      ['otpApplyToDevDepartment', '개발팀 OTP 적용'],
+    ];
+    for (const [key, label] of otpTargets) {
+      const nextValue = data[key];
+      const previousValue = settings[key as keyof typeof settings];
+      if (typeof nextValue === 'boolean' && nextValue !== previousValue) {
+        changes.push(label);
+        beforeValues.push(previousValue ? '적용' : '미적용');
+        afterValues.push(nextValue ? '적용' : '미적용');
+      }
+    }
+
     if (data.loginFailureLimitEnabled !== undefined && data.loginFailureLimitEnabled !== settings.loginFailureLimitEnabled) {
       changes.push('로그인 실패 횟수 제한 활성화');
       beforeValues.push(settings.loginFailureLimitEnabled ? '활성화' : '비활성화');
@@ -163,6 +185,10 @@ export class SettingsService {
     }
 
     // SFTP 패스워드는 평문으로 입력받아 암호화 저장
+    if (data.ipRestrictionEnabled === true && !settings.ipRestrictionEnabled) {
+      await this.seedUsersAllowedIpsFromLoginHistory();
+    }
+
     let updateData: any = { ...data, updatedBy: userId };
     if (data.sftpPassword !== undefined && data.sftpPassword !== '') {
       updateData.sftpPassword = this.cryptoService.encrypt(data.sftpPassword);
@@ -186,6 +212,31 @@ export class SettingsService {
       data: updateData,
     });
 
+    const otpPolicyChanged = [
+      'otpEnabled',
+      'otpApplyToAdministrators',
+      'otpApplyToTechDepartment',
+      'otpApplyToSalesDepartment',
+      'otpApplyToDevDepartment',
+    ].some((key) => data[key as keyof UpdateSettingsDto] !== undefined);
+    if (otpPolicyChanged) {
+      const users = await this.prisma.user.findMany({
+        select: { id: true, role: true, department: true },
+      });
+      const newlyTargetedUserIds = users
+        .filter(
+          (targetUser) =>
+            !isMfaRequiredForUser(settings, targetUser) &&
+            isMfaRequiredForUser(updated, targetUser),
+        )
+        .map((targetUser) => targetUser.id);
+      if (newlyTargetedUserIds.length > 0) {
+        await this.prisma.userSession.deleteMany({
+          where: { userId: { in: newlyTargetedUserIds } },
+        });
+      }
+    }
+
     // 변경 사항이 있을 경우에만 로그 기록
     if (changes.length > 0) {
       await this.logsService.createServiceLog({
@@ -207,7 +258,43 @@ export class SettingsService {
     };
   }
 
-  private validateSettings(data: UpdateSettingsDto) {
+  private async seedUsersAllowedIpsFromLoginHistory() {
+    const users = await this.prisma.user.findMany({
+      select: { id: true, username: true, isActive: true, allowedIps: { select: { id: true } } },
+    });
+    if (users.length === 0) return;
+
+    const latestAttempts = await this.prisma.loginAttempt.findMany({
+      where: {
+        userId: { in: users.map(({ id }) => id) },
+        success: true,
+        ipAddress: { not: null },
+        NOT: { ipAddress: 'unknown' },
+      },
+      orderBy: { attemptTime: 'desc' },
+      distinct: ['userId'],
+      select: { userId: true, ipAddress: true },
+    });
+    const latestIpByUser = new Map(latestAttempts.map(({ userId, ipAddress }) => [userId, ipAddress]));
+    const missingHistory = users.filter((user) =>
+      user.isActive && user.allowedIps.length === 0 && !latestIpByUser.get(user.id),
+    );
+    if (missingHistory.length > 0) {
+      const usernames = missingHistory.map(({ username }) => username).join(', ');
+      throw new BadRequestException(
+        `최근 로그인 IP가 없는 활성 계정이 있어 IP 제한을 켤 수 없습니다. 먼저 허용 IP를 등록하세요: ${usernames}`,
+      );
+    }
+
+    const data = users
+      .filter((user) => user.allowedIps.length === 0 && latestIpByUser.has(user.id))
+      .map((user) => ({ userId: user.id, ipAddress: latestIpByUser.get(user.id)! }));
+    if (data.length > 0) {
+      await this.prisma.userAllowedIp.createMany({ data, skipDuplicates: true });
+    }
+  }
+
+  private validateSettings(data: UpdateSettingsDto, currentSettings: any) {
     if (data.passwordExpiryDays !== undefined) {
       const validDays = [7, 30, 60, 90];
       if (!validDays.includes(data.passwordExpiryDays)) {
@@ -228,6 +315,17 @@ export class SettingsService {
     if (data.sessionTimeoutMinutes !== undefined &&
         (data.sessionTimeoutMinutes < 10 || data.sessionTimeoutMinutes > 60)) {
       throw new BadRequestException('세션 타임아웃은 10분 이상 60분 이하로 설정해야 합니다.');
+    }
+
+    const otpEnabled = data.otpEnabled ?? currentSettings.otpEnabled;
+    const hasOtpTarget = [
+      data.otpApplyToAdministrators ?? currentSettings.otpApplyToAdministrators ?? true,
+      data.otpApplyToTechDepartment ?? currentSettings.otpApplyToTechDepartment ?? true,
+      data.otpApplyToSalesDepartment ?? currentSettings.otpApplyToSalesDepartment ?? true,
+      data.otpApplyToDevDepartment ?? currentSettings.otpApplyToDevDepartment ?? true,
+    ].some(Boolean);
+    if (otpEnabled && !hasOtpTarget) {
+      throw new BadRequestException('OTP 기능을 사용하려면 적용 대상을 1개 이상 선택해야 합니다.');
     }
   }
 }

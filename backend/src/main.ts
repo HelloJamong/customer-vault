@@ -7,6 +7,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import * as express from 'express';
 import * as cors from 'cors';
 import { SessionActivityInterceptor } from './auth/interceptors/session-activity.interceptor';
+import { getTrustProxySetting } from './common/utils/trust-proxy.util';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -14,11 +15,13 @@ async function bootstrap() {
     bodyParser: true, // NestJS 기본 body parser 사용 (쿠키 처리 개선)
   });
 
-  // Trust proxy to get real client IP from X-Forwarded-For header.
-  // 신뢰 홉 수를 고정한다(nginx 리버스 프록시 1대). true로 두면 클라이언트가
-  // X-Forwarded-For를 위조해 req.ip를 조작하고 레이트리밋을 우회할 수 있다.
+  // Trust only explicitly configured proxy addresses when available. This avoids
+  // trusting client-supplied X-Forwarded-For values on shorter/direct paths.
   const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
+  expressApp.set(
+    'trust proxy',
+    getTrustProxySetting(process.env.TRUST_PROXY_ADDRESSES, process.env.TRUST_PROXY_HOPS),
+  );
 
   // ConfigModule이 .env를 로드한 후 필수 환경 변수 검증
   // 리포지토리/문서에 공개된 기본값은 형식 검증을 통과하더라도 거부한다.

@@ -19,6 +19,8 @@ import { LoginDto, ChangePasswordDto, MfaVerifyDto } from './dto/login.dto';
 import { getInitialAdminPassword } from '../common/config/initial-password';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { TotpService } from './totp.service';
+import { isIpAllowedForUser, isSessionIpMatch, normalizeIpAddress } from './ip-policy';
+import { isMfaRequiredForUser } from './mfa-policy';
 
 import {
   getSessionTimeoutMs,
@@ -49,6 +51,7 @@ export class AuthService {
     // 사용자 조회
     const user = await this.prisma.user.findUnique({
       where: { username },
+      include: { allowedIps: { select: { ipAddress: true } } },
     });
 
     if (!user) {
@@ -73,8 +76,13 @@ export class AuthService {
       throw new UnauthorizedException('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
 
-    // 비밀번호 만료 확인 (만료되어도 로그인 허용 - 프론트엔드에서 강제 변경 처리)
     const settings = await this.getSystemSettings();
+    if (!isIpAllowedForUser(user, ipAddress, settings.ipRestrictionEnabled)) {
+      await this.recordRestrictedIpLogin(user.id, ipAddress);
+      throw new UnauthorizedException('등록되지 않은 IP에서는 로그인할 수 없습니다.');
+    }
+
+    // 비밀번호 만료 확인 (만료되어도 로그인 허용 - 프론트엔드에서 강제 변경 처리)
     const passwordExpired = await this.isPasswordExpired(user.id, settings);
 
     // 중복 로그인 방지가 활성화된 경우 기존 세션 확인
@@ -90,7 +98,7 @@ export class AuthService {
       }
     }
 
-    if (settings.otpEnabled && user.mfaEnabled) {
+    if (isMfaRequiredForUser(settings, user) && user.mfaEnabled) {
       return {
         mfaRequired: true,
         mfaChallengeToken: this.generateMfaChallengeToken(user, forceLogin),
@@ -120,14 +128,21 @@ export class AuthService {
       throw new UnauthorizedException('OTP 인증 요청이 유효하지 않습니다.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { allowedIps: { select: { ipAddress: true } } },
+    });
     if (!user || !user.isActive || !user.mfaEnabled || !user.mfaSecretEncrypted) {
       throw new UnauthorizedException('OTP 인증을 사용할 수 없는 계정입니다.');
     }
 
     const settings = await this.getSystemSettings();
-    if (!settings.otpEnabled) {
-      throw new UnauthorizedException('OTP 기능이 비활성화되었습니다.');
+    if (!isMfaRequiredForUser(settings, user)) {
+      throw new UnauthorizedException('이 계정에는 OTP 인증이 적용되지 않습니다.');
+    }
+    if (!isIpAllowedForUser(user, ipAddress, settings.ipRestrictionEnabled)) {
+      await this.recordRestrictedIpLogin(user.id, ipAddress);
+      throw new UnauthorizedException('등록되지 않은 IP에서는 로그인할 수 없습니다.');
     }
 
     let secret: string;
@@ -166,9 +181,12 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { username: true, mfaEnabled: true },
+      select: { username: true, role: true, department: true, mfaEnabled: true },
     });
     if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    if (!isMfaRequiredForUser(settings, user)) {
+      throw new ForbiddenException('현재 계정은 OTP 적용 대상이 아닙니다.');
+    }
     if (user.mfaEnabled) throw new BadRequestException('이미 OTP가 등록되어 있습니다.');
 
     const secret = this.totpService.generateSecret();
@@ -202,8 +220,17 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { username: true, mfaEnabled: true, mfaSecretEncrypted: true },
+      select: {
+        username: true,
+        role: true,
+        department: true,
+        mfaEnabled: true,
+        mfaSecretEncrypted: true,
+      },
     });
+    if (user && !isMfaRequiredForUser(settings, user)) {
+      throw new ForbiddenException('현재 계정은 OTP 적용 대상이 아닙니다.');
+    }
     if (!user || !user.mfaSecretEncrypted) {
       throw new BadRequestException('먼저 OTP QR 코드를 발급받아야 합니다.');
     }
@@ -247,13 +274,15 @@ export class AuthService {
     const settings = await this.getSystemSettings();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { mfaEnabled: true },
+      select: { role: true, department: true, mfaEnabled: true },
     });
     if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    const requiredByPolicy = isMfaRequiredForUser(settings, user);
     return {
       otpEnabled: settings.otpEnabled,
+      requiredByPolicy,
       mfaEnabled: user.mfaEnabled,
-      setupRequired: settings.otpEnabled && !user.mfaEnabled,
+      setupRequired: requiredByPolicy && !user.mfaEnabled,
     };
   }
 
@@ -371,7 +400,7 @@ export class AuthService {
     return { message: '비밀번호가 변경되었습니다.' };
   }
 
-  async refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string, ipAddress?: string) {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('JWT_SECRET'),
@@ -386,6 +415,7 @@ export class AuthService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
+        include: { allowedIps: { select: { ipAddress: true } } },
       });
 
       if (!user || !user.isActive) {
@@ -405,6 +435,16 @@ export class AuthService {
       });
       if (!session) {
         throw new UnauthorizedException('세션이 만료되었습니다.');
+      }
+
+      if (
+        settings.ipRestrictionEnabled &&
+        ipAddress &&
+        (!isSessionIpMatch(session.ipAddress, ipAddress) ||
+          !isIpAllowedForUser(user, ipAddress, true))
+      ) {
+        await this.prisma.userSession.deleteMany({ where: { id: session.id } });
+        throw new UnauthorizedException('세션의 접속 IP가 변경되었습니다.');
       }
 
       await this.prisma.userSession.update({
@@ -571,7 +611,7 @@ export class AuthService {
         isFirstLogin: user.isFirstLogin,
         passwordExpired,
         mfaEnabled: user.mfaEnabled,
-        mfaSetupRequired: Boolean(settings.otpEnabled && !user.mfaEnabled),
+        mfaSetupRequired: Boolean(isMfaRequiredForUser(settings, user) && !user.mfaEnabled),
       },
     };
   }
@@ -763,7 +803,7 @@ export class AuthService {
       data: {
         userId,
         sessionId,
-        ipAddress,
+        ipAddress: normalizeIpAddress(ipAddress),
       },
     });
 
@@ -788,6 +828,25 @@ export class AuthService {
     if (settings.passwordRequireNumber && !/[0-9]/.test(password)) {
       throw new BadRequestException('비밀번호에는 숫자가 포함되어야 합니다.');
     }
+  }
+
+  private async recordRestrictedIpLogin(userId: number, ipAddress: string) {
+    const cleanedIp = normalizeIpAddress(ipAddress);
+    await this.prisma.loginAttempt.create({
+      data: {
+        userId,
+        success: false,
+        failureReason: 'IP_RESTRICTED',
+        ipAddress: cleanedIp,
+      },
+    });
+    await this.logsService.createServiceLog({
+      userId,
+      logType: '경고',
+      action: '미등록 IP 로그인 차단',
+      description: '사전 등록되지 않은 IP의 로그인 시도를 차단했습니다.',
+      ipAddress: cleanedIp,
+    });
   }
 
   // 5분마다 실행: lastActivity 기준으로 만료된 세션 자동 삭제

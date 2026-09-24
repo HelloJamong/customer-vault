@@ -221,6 +221,13 @@ test('compose waits for frontend and proxy HTTP readiness on slow offline hosts'
   }
 });
 
+test('frontend image skips the nginx IPv6 entrypoint script that stalls on apk repository lookup offline', () => {
+  const dockerfile = fs.readFileSync(path.join(repoRoot, 'frontend/Dockerfile'), 'utf8');
+  const productionStage = dockerfile.slice(dockerfile.lastIndexOf('FROM nginx'));
+
+  assert.match(productionStage, /RUN rm -f \/docker-entrypoint\.d\/10-listen-on-ipv6-by-default\.sh/);
+});
+
 test('database passwords have no public fallback in compose files', () => {
   for (const file of ['docker-compose.yml', 'docker-compose.offline.yml']) {
     const compose = fs.readFileSync(path.join(repoRoot, file), 'utf8');

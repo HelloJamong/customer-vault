@@ -25,6 +25,8 @@ import { Add, MoreVert } from '@mui/icons-material';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useAuthStore } from '@/store/authStore';
+import { AllowedIpFields } from '@/components/users/AllowedIpFields';
+import { formatAllowedIpAddresses, parseAllowedIpAddresses } from '@/utils/allowed-ip';
 
 interface User {
   id: number;
@@ -38,10 +40,12 @@ interface User {
   status: string;
   createdAt: string;
   lastLogin?: string;
+  allowedIpAddresses: string[];
 }
 
 const AdminsPage = () => {
   const currentUser = useAuthStore((state) => state.user);
+  const clearAuth = useAuthStore((state) => state.logout);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -53,6 +57,7 @@ const AdminsPage = () => {
     name: '',
     email: '',
     description: '',
+    allowedIpAddresses: '',
   });
 
   // 현재 사용자가 슈퍼 관리자인지 확인
@@ -85,14 +90,14 @@ const AdminsPage = () => {
 
   const handleOpenDialog = () => {
     setSelectedUser(null);
-    setFormData({ username: '', name: '', email: '', description: '' });
+    setFormData({ username: '', name: '', email: '', description: '', allowedIpAddresses: '' });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedUser(null);
-    setFormData({ username: '', name: '', email: '', description: '' });
+    setFormData({ username: '', name: '', email: '', description: '', allowedIpAddresses: '' });
   };
 
   const handleEdit = () => {
@@ -102,6 +107,7 @@ const AdminsPage = () => {
         name: selectedUser.name,
         email: selectedUser.email || '',
         description: selectedUser.description || '',
+        allowedIpAddresses: formatAllowedIpAddresses(selectedUser.allowedIpAddresses),
       });
       setOpenDialog(true);
     }
@@ -119,6 +125,11 @@ const AdminsPage = () => {
       alert('올바른 이메일 형식이 아닙니다.');
       return;
     }
+    const allowedIpAddresses = parseAllowedIpAddresses(formData.allowedIpAddresses);
+    if (isSuperAdmin && allowedIpAddresses.length > 2) {
+      alert('관리자 계정은 IP를 2개까지 등록할 수 있습니다.');
+      return;
+    }
 
     try {
       const response = await apiClient.post('/users', {
@@ -127,6 +138,7 @@ const AdminsPage = () => {
         email: formData.email || undefined,
         description: formData.description,
         role: 'admin',
+        ...(isSuperAdmin && { allowedIpAddresses }),
       });
 
       alert(response.data.message);
@@ -155,14 +167,26 @@ const AdminsPage = () => {
       alert('올바른 이메일 형식이 아닙니다.');
       return;
     }
+    const allowedIpAddresses = parseAllowedIpAddresses(formData.allowedIpAddresses);
+    if (isSuperAdmin && allowedIpAddresses.length > 2) {
+      alert('관리자 계정은 IP를 2개까지 등록할 수 있습니다.');
+      return;
+    }
 
     try {
-      await apiClient.patch(`/users/${selectedUser.id}`, {
+      const response = await apiClient.patch(`/users/${selectedUser.id}`, {
         name: formData.name,
         email: formData.email || undefined,
         description: formData.description,
+        ...(isSuperAdmin && { allowedIpAddresses }),
       });
 
+      if (response.data.sessionInvalidated) {
+        alert('접속 IP 정책이 변경되어 다시 로그인해야 합니다.');
+        clearAuth();
+        window.location.href = '/login';
+        return;
+      }
       alert('사용자 정보가 수정되었습니다.');
       handleCloseDialog();
       fetchUsers();
@@ -318,6 +342,7 @@ const AdminsPage = () => {
               <TableCell>이름</TableCell>
               <TableCell>이메일</TableCell>
               <TableCell>설명</TableCell>
+              <TableCell>허용 IP</TableCell>
               <TableCell>상태</TableCell>
               <TableCell>생성일</TableCell>
               <TableCell>마지막 로그인</TableCell>
@@ -336,6 +361,9 @@ const AdminsPage = () => {
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email || '-'}</TableCell>
                 <TableCell>{user.description || '-'}</TableCell>
+                <TableCell sx={{ minWidth: 140, maxWidth: 220, overflowWrap: 'anywhere' }}>
+                  {user.allowedIpAddresses?.length ? user.allowedIpAddresses.join(', ') : '미등록'}
+                </TableCell>
                 <TableCell>
                   <Chip label={user.status} color={getStatusColor(user.status)} size="small" />
                 </TableCell>
@@ -431,6 +459,13 @@ const AdminsPage = () => {
             multiline
             rows={2}
           />
+          {isSuperAdmin && (
+            <AllowedIpFields
+              value={formData.allowedIpAddresses}
+              onValueChange={(allowedIpAddresses) => setFormData({ ...formData, allowedIpAddresses })}
+              maxIps={2}
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>취소</Button>

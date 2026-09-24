@@ -11,6 +11,11 @@ export interface SystemSettings {
   sessionTimeoutMinutes: number;
   sessionTimeoutWarningEnabled: boolean;
   otpEnabled: boolean;
+  otpApplyToAdministrators: boolean;
+  otpApplyToTechDepartment: boolean;
+  otpApplyToSalesDepartment: boolean;
+  otpApplyToDevDepartment: boolean;
+  ipRestrictionEnabled: boolean;
   loginFailureLimitEnabled: boolean;
   loginFailureLimit: number;
   accountLockMinutes: number;
@@ -47,6 +52,11 @@ export interface UpdateSettingsRequest {
   sessionTimeoutMinutes?: number;
   sessionTimeoutWarningEnabled?: boolean;
   otpEnabled?: boolean;
+  otpApplyToAdministrators?: boolean;
+  otpApplyToTechDepartment?: boolean;
+  otpApplyToSalesDepartment?: boolean;
+  otpApplyToDevDepartment?: boolean;
+  ipRestrictionEnabled?: boolean;
   loginFailureLimitEnabled?: boolean;
   loginFailureLimit?: number;
   accountLockMinutes?: number;

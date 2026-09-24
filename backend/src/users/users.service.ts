@@ -5,6 +5,7 @@ import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../common/enums/role.enum';
 import { getInitialAdminPassword } from '../common/config/initial-password';
+import { normalizeIpAddress } from '../auth/ip-policy';
 
 @Injectable()
 export class UsersService {
@@ -35,13 +36,18 @@ export class UsersService {
         lockedUntil: true,
         createdAt: true,
         lastLogin: true,
+        allowedIps: {
+          select: { ipAddress: true },
+          orderBy: { id: 'asc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     // 사용자 상태 계산
-    return users.map((user) => ({
+    return users.map(({ allowedIps, ...user }) => ({
       ...user,
+      allowedIpAddresses: allowedIps.map(({ ipAddress }) => ipAddress),
       status: this.getUserStatus(user),
     }));
   }
@@ -101,6 +107,10 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
+        allowedIps: {
+          select: { ipAddress: true },
+          orderBy: { id: 'asc' },
+        },
         assignedCustomers: {
           include: {
             customer: {
@@ -118,8 +128,11 @@ export class UsersService {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
-    const { passwordHash, ...result } = user;
-    return result;
+    const { passwordHash, allowedIps, ...result } = user;
+    return {
+      ...result,
+      allowedIpAddresses: allowedIps.map(({ ipAddress }) => ipAddress),
+    };
   }
 
   async create(
@@ -128,7 +141,8 @@ export class UsersService {
     currentUserRole: string,
     ipAddress?: string,
   ) {
-    const { customerIds, ...userData } = createUserDto;
+    const { customerIds, allowedIpAddresses, ...userData } = createUserDto;
+    const normalizedAllowedIps = this.normalizeAllowedIps(allowedIpAddresses);
     const actorRole = String(currentUserRole ?? '').trim().toLowerCase();
 
     if (actorRole !== Role.ADMIN && actorRole !== Role.SUPER_ADMIN) {
@@ -139,6 +153,12 @@ export class UsersService {
     if (actorRole === Role.ADMIN && userData.role !== Role.USER) {
       throw new ForbiddenException('일반 관리자는 일반 사용자 계정만 생성할 수 있습니다.');
     }
+
+    const settings = await this.getSystemSettings();
+    if (settings.ipRestrictionEnabled && normalizedAllowedIps.length === 0) {
+      throw new BadRequestException('IP 제한을 사용하려면 허용 IP를 1개 이상 등록해야 합니다.');
+    }
+    this.validateAllowedIpLimit(userData.role, normalizedAllowedIps);
 
     // 슈퍼 관리자 생성 시 최대 3명 제한 확인
     if (userData.role === 'super_admin') {
@@ -181,7 +201,6 @@ export class UsersService {
     };
 
     // 기본 비밀번호 가져오기
-    const settings = await this.getSystemSettings();
     const passwordHash = await bcrypt.hash(settings.defaultPassword, 12);
 
     const user = await this.prisma.user.create({
@@ -189,6 +208,9 @@ export class UsersService {
         ...userDataToCreate,
         passwordHash,
         isFirstLogin: true,
+        allowedIps: normalizedAllowedIps.length > 0
+          ? { create: normalizedAllowedIps.map((allowedIp) => ({ ipAddress: allowedIp })) }
+          : undefined,
       },
     });
 
@@ -220,18 +242,57 @@ export class UsersService {
     };
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto, currentUserId: number, ipAddress?: string) {
+  async update(
+    id: number,
+    updateUserDto: UpdateUserDto,
+    currentUserId: number,
+    currentUserRole: string,
+    ipAddress?: string,
+  ) {
     // 변경 전 데이터 조회
     const beforeUser = await this.prisma.user.findUnique({
       where: { id },
-      select: { username: true, name: true, role: true, department: true, email: true },
+      select: {
+        username: true,
+        name: true,
+        role: true,
+        department: true,
+        email: true,
+        allowedIps: { select: { ipAddress: true } },
+      },
     });
 
     if (!beforeUser) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
-    const { customerIds, ...userData } = updateUserDto;
+    const actorRole = String(currentUserRole ?? '').trim().toLowerCase();
+    const { customerIds, allowedIpAddresses, ...userData } = updateUserDto;
+    const currentAllowedIps = beforeUser.allowedIps
+      .map(({ ipAddress: allowedIp }) => normalizeIpAddress(allowedIp))
+      .sort();
+    const normalizedAllowedIps = allowedIpAddresses === undefined
+      ? currentAllowedIps
+      : this.normalizeAllowedIps(allowedIpAddresses);
+    const allowedIpsChanged =
+      allowedIpAddresses !== undefined &&
+      normalizedAllowedIps.slice().sort().join(',') !== currentAllowedIps.join(',');
+    const ipPolicyChanged = allowedIpsChanged;
+
+    if (
+      ipPolicyChanged &&
+      actorRole !== Role.SUPER_ADMIN &&
+      (beforeUser.role === Role.ADMIN || beforeUser.role === Role.SUPER_ADMIN)
+    ) {
+      throw new ForbiddenException('관리자 계정의 접속 IP는 슈퍼 관리자만 변경할 수 있습니다.');
+    }
+
+    const settings = await this.getSystemSettings();
+
+    if (settings.ipRestrictionEnabled && normalizedAllowedIps.length === 0) {
+      throw new BadRequestException('IP 제한을 사용하려면 허용 IP를 1개 이상 등록해야 합니다.');
+    }
+    this.validateAllowedIpLimit(beforeUser.role, normalizedAllowedIps);
 
     // undefined 값을 제거하여 실제로 업데이트할 필드만 전달
     const updateData: any = {};
@@ -241,11 +302,21 @@ export class UsersService {
         updateData[key] = value;
       }
     });
+    if (allowedIpsChanged) {
+      updateData.allowedIps = {
+        deleteMany: {},
+        create: normalizedAllowedIps.map((allowedIp) => ({ ipAddress: allowedIp })),
+      };
+    }
 
     const user = await this.prisma.user.update({
       where: { id },
       data: updateData,
     });
+
+    if (ipPolicyChanged) {
+      await this.prisma.userSession.deleteMany({ where: { userId: id } });
+    }
 
     // 담당 고객사 업데이트
     if (customerIds !== undefined) {
@@ -276,6 +347,9 @@ export class UsersService {
     if (updateUserDto.department !== undefined && updateUserDto.department !== beforeUser.department) {
       changes.push(`소속: ${beforeUser.department || '없음'} → ${updateUserDto.department || '없음'}`);
     }
+    if (allowedIpsChanged) {
+      changes.push(`허용 IP: ${normalizedAllowedIps.length}개 등록`);
+    }
 
     // 로그 기록 (변경 사항이 있을 경우에만)
     if (changes.length > 0 || customerIds !== undefined) {
@@ -292,6 +366,7 @@ export class UsersService {
       id: user.id,
       username: user.username,
       name: user.name,
+      sessionInvalidated: ipPolicyChanged && id === currentUserId,
       message: '사용자 정보가 수정되었습니다.',
     };
   }
@@ -299,11 +374,27 @@ export class UsersService {
   async toggleActive(id: number, currentUserId: number, currentUserRole: string, ipAddress?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, username: true, name: true, isActive: true, role: true },
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        isActive: true,
+        role: true,
+        allowedIps: { select: { ipAddress: true } },
+      },
     });
 
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (!user.isActive) {
+      const settings = await this.getSystemSettings();
+      const allowedIps = user.allowedIps.map(({ ipAddress: allowedIp }) => allowedIp);
+      if (settings.ipRestrictionEnabled && allowedIps.length === 0) {
+        throw new BadRequestException('IP 제한이 활성화되어 있습니다. 먼저 허용 IP를 등록해야 계정을 활성화할 수 있습니다.');
+      }
+      this.validateAllowedIpLimit(user.role, allowedIps);
     }
 
     // 본인 계정 비활성화 방지
@@ -555,5 +646,20 @@ export class UsersService {
     }
 
     return settings;
+  }
+
+  private normalizeAllowedIps(ipAddresses?: string[]): string[] {
+    return [...new Set((ipAddresses || []).map(normalizeIpAddress).filter((ip) => ip !== 'unknown'))];
+  }
+
+  private validateAllowedIpLimit(role: string, allowedIps: string[]) {
+    const maxAllowed = role === Role.ADMIN || role === Role.SUPER_ADMIN ? 2 : 1;
+    if (allowedIps.length > maxAllowed) {
+      throw new BadRequestException(
+        role === Role.ADMIN || role === Role.SUPER_ADMIN
+          ? '관리자 계정은 IP를 최대 2개까지 등록할 수 있습니다.'
+          : '일반 사용자 계정은 IP를 1개까지 등록할 수 있습니다.',
+      );
+    }
   }
 }
