@@ -72,12 +72,12 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
 
     worksheet.columns = [
       { width: 25 },
-      { width: 10 },
+      { width: 20 },
+      { width: 20 },
       { width: 15 },
       { width: 12 },
       { width: 25 },
       { width: 14 },
-      { width: 20 },
       { width: 12 },
       { width: 12 },
       { width: 12 },
@@ -86,12 +86,12 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
     const sheetData: ExportRow[] = [
       [
         '고객사명',
-        '버전',
+        '관리서버 버전',
+        '클라이언트 버전',
         '점검주기',
         '계약 상태',
         '계약 기간',
         '하드웨어 포함',
-        '클라이언트 버전',
         '정 담당자',
         '부 담당자',
         '영업 담당자',
@@ -101,12 +101,12 @@ const CustomerSummaryDialog = ({ open, onClose, customers }: CustomerSummaryDial
     customers.forEach((customer) => {
       sheetData.push([
         customer.name,
-        customer.versionInfo || '-',
+        customer.version || '-',
+        customer.clientVersion || '-',
         getInspectionCycleText(customer),
         customer.contractType || '-',
         getContractPeriodText(customer),
         customer.hardwareIncluded ? '포함' : '미포함',
-        customer.clientVersion || '-',
         customer.engineer?.name || '-',
         customer.engineerSub?.name || '-',
         customer.sales?.name || '-',

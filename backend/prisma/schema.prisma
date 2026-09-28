@@ -192,9 +192,11 @@ model Document {
   inspectionTargetId  Int?      @map("inspection_target_id")
   title               String    @db.VarChar(200)
   description         String?   @db.Text
-  filename            String    @db.VarChar(255)
-  filepath            String    @db.VarChar(500)
+  filename            String?   @db.VarChar(255)
+  filepath            String?   @db.VarChar(500)
   fileSize            Int?      @map("file_size")
+  isReportStored       Boolean   @default(true) @map("is_report_stored")
+  reportNotStoredReason String?  @map("report_not_stored_reason") @db.Text
   uploadedBy          Int       @map("uploaded_by")
   uploadedAt          DateTime  @default(now()) @map("uploaded_at")
   inspectionDate      DateTime? @map("inspection_date") @db.Date

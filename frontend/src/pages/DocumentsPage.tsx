@@ -10,6 +10,9 @@ import {
   Select,
   Alert,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
+  TextField,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -21,7 +24,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersAPI } from '@/api/customers.api';
 import { documentsAPI } from '@/api/documents.api';
 import type { Customer } from '@/types/customer.types';
-import type { InspectionTarget, UploadInspectionDocumentDto } from '@/api/documents.api';
+import type {
+  InspectionTarget,
+  RegisterUnstoredInspectionDto,
+  UploadInspectionDocumentDto,
+} from '@/api/documents.api';
 import { useAuthStore } from '@/store/authStore';
 import { getApiErrorMessage } from '@/utils/api-error';
 
@@ -38,6 +45,8 @@ const DocumentsPage = () => {
   });
   const [inspectionDate, setInspectionDate] = useState<Dayjs>(dayjs());
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isReportNotStored, setIsReportNotStored] = useState(false);
+  const [notStoredReason, setNotStoredReason] = useState('');
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
 
@@ -56,7 +65,12 @@ const DocumentsPage = () => {
 
   // 업로드 mutation
   const uploadMutation = useMutation({
-    mutationFn: (dto: UploadInspectionDocumentDto) => documentsAPI.uploadInspectionDocument(dto),
+    mutationFn: (submission:
+      | { mode: 'upload'; dto: UploadInspectionDocumentDto }
+      | { mode: 'notStored'; dto: RegisterUnstoredInspectionDto }) =>
+      submission.mode === 'upload'
+        ? documentsAPI.uploadInspectionDocument(submission.dto)
+        : documentsAPI.registerUnstoredInspection(submission.dto),
     onSuccess: (data) => {
       setSuccess(data.message || '점검서가 업로드되었습니다.');
       setError('');
@@ -72,6 +86,8 @@ const DocumentsPage = () => {
       });
       setInspectionDate(dayjs());
       setSelectedFile(null);
+      setIsReportNotStored(false);
+      setNotStoredReason('');
       // 파일 입력 초기화
       const fileInput = document.getElementById('file-upload') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
@@ -118,18 +134,33 @@ const DocumentsPage = () => {
       setError('점검 방식을 선택해주세요.');
       return;
     }
-    if (!selectedFile) {
+    if (isReportNotStored && !notStoredReason.trim()) {
+      setError('점검서 미보관 사유를 입력해주세요.');
+      return;
+    }
+    if (!isReportNotStored && !selectedFile) {
       setError('파일을 선택해주세요.');
       return;
     }
 
-    uploadMutation.mutate({
+    const sharedData = {
       customerId: parseInt(formData.customerId),
       inspectionTargetId: parseInt(formData.inspectionTargetId),
       inspectionDate: inspectionDate.format('YYYY-MM-DD'),
       inspectionType: formData.inspectionType,
-      file: selectedFile,
-    });
+    };
+
+    if (isReportNotStored) {
+      uploadMutation.mutate({
+        mode: 'notStored',
+        dto: { ...sharedData, reason: notStoredReason.trim() },
+      });
+    } else if (selectedFile) {
+      uploadMutation.mutate({
+        mode: 'upload',
+        dto: { ...sharedData, file: selectedFile },
+      });
+    }
   };
 
   return (
@@ -231,36 +262,63 @@ const DocumentsPage = () => {
                 textField: {
                   fullWidth: true,
                   required: true,
-                  helperText: '누락된 점검서를 업로드할 경우 실제 점검일을 선택해주세요',
+                  helperText: '실제 점검일을 선택해주세요',
                 },
               }}
             />
           </Box>
 
-          {/* 파일 선택 (PDF만) */}
-          <Box mt={2}>
-            <Button variant="outlined" component="label" fullWidth>
-              PDF 파일 선택
-              <input
-                id="file-upload"
-                type="file"
-                hidden
-                onChange={handleFileChange}
-                accept=".pdf"
+          <FormControlLabel
+            sx={{ mt: 2 }}
+            control={
+              <Checkbox
+                checked={isReportNotStored}
+                onChange={(event) => {
+                  setIsReportNotStored(event.target.checked);
+                  if (event.target.checked) setSelectedFile(null);
+                }}
               />
-            </Button>
-            {selectedFile && (
-              <Typography variant="body2" color="text.secondary" mt={1}>
-                선택된 파일: {selectedFile.name}
+            }
+            label="점검서 미보관"
+          />
+
+          {isReportNotStored ? (
+            <TextField
+              fullWidth
+              required
+              multiline
+              minRows={2}
+              margin="normal"
+              label="점검서 미보관 사유"
+              value={notStoredReason}
+              onChange={(event) => setNotStoredReason(event.target.value)}
+              placeholder="예: 고객사 정책상 점검서를 별도 보관하지 않음"
+            />
+          ) : (
+            <Box mt={2}>
+              <Button variant="outlined" component="label" fullWidth>
+                PDF 파일 선택
+                <input
+                  id="file-upload"
+                  type="file"
+                  hidden
+                  onChange={handleFileChange}
+                  accept=".pdf"
+                />
+              </Button>
+              {selectedFile && (
+                <Typography variant="body2" color="text.secondary" mt={1}>
+                  선택된 파일: {selectedFile.name}
+                </Typography>
+              )}
+              <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                * PDF 파일만 업로드 가능합니다
               </Typography>
-            )}
-            <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-              * PDF 파일만 업로드 가능합니다
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block">
-              * 파일명은 자동으로 "고객사명_제품명_N월_정기점검보고서.pdf" 형식으로 저장됩니다
-            </Typography>
-          </Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                * 파일명은 자동으로 "고객사명_제품명_N월_정기점검보고서.pdf" 형식으로 저장됩니다
+              </Typography>
+            </Box>
+          )}
 
           {/* 제출 버튼 */}
           <Button
@@ -272,7 +330,9 @@ const DocumentsPage = () => {
             startIcon={uploadMutation.isPending ? <CircularProgress size={20} /> : <UploadIcon />}
             disabled={uploadMutation.isPending}
           >
-            {uploadMutation.isPending ? '업로드 중...' : '업로드'}
+            {uploadMutation.isPending
+              ? isReportNotStored ? '등록 중...' : '업로드 중...'
+              : isReportNotStored ? '점검 완료 등록' : '업로드'}
           </Button>
           </Box>
         </LocalizationProvider>

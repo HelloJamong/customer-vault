@@ -23,6 +23,14 @@ export interface UploadInspectionDocumentResponse {
   message?: string;
 }
 
+export interface RegisterUnstoredInspectionDto {
+  customerId: number;
+  inspectionTargetId: number;
+  inspectionDate: string;
+  inspectionType: string;
+  reason: string;
+}
+
 export const documentsAPI = {
   // 고객사별 점검 대상 조회
   getInspectionTargets: async (customerId: number): Promise<InspectionTarget[]> => {
@@ -44,6 +52,14 @@ export const documentsAPI = {
     const { data } = await apiClient.post('/documents/my/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return data;
+  },
+
+  // 점검서는 보관하지 않지만 점검 완료로 기록
+  registerUnstoredInspection: async (
+    dto: RegisterUnstoredInspectionDto,
+  ): Promise<UploadInspectionDocumentResponse> => {
+    const { data } = await apiClient.post('/documents/my/not-stored', dto);
     return data;
   },
 

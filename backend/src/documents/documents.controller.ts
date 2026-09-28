@@ -13,6 +13,8 @@ import {
   Res,
   Request,
   ForbiddenException,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -114,6 +116,32 @@ export class DocumentsController {
     });
   }
 
+  @Post('my/not-stored')
+  @Roles(Role.USER)
+  async registerNotStoredByUser(
+    @Body() body: any,
+    @Request() req,
+  ) {
+    const customerId = parseInt(body.customerId, 10);
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      throw new BadRequestException('고객사를 선택해주세요.');
+    }
+    const isAssigned = await this.service.isUserAssignedToCustomer(req.user.id, customerId);
+
+    if (!isAssigned) {
+      throw new ForbiddenException('담당하지 않는 고객사에는 점검 완료를 등록할 수 없습니다.');
+    }
+
+    return this.service.createNotStored({
+      customerId,
+      inspectionTargetId: parseInt(body.inspectionTargetId, 10),
+      uploadedBy: req.user.id,
+      inspectionDate: body.inspectionDate,
+      inspectionType: body.inspectionType,
+      reason: typeof body.reason === 'string' ? body.reason : '',
+    });
+  }
+
   @Get('customer/:customerId')
   findByCustomer(
     @Param('customerId', ParseIntPipe) customerId: number,
@@ -146,6 +174,9 @@ export class DocumentsController {
     }
 
     const filepath = this.service.getFilePath(document);
+    if (!filepath) {
+      throw new NotFoundException('점검서 파일이 보관되지 않은 기록입니다.');
+    }
     const fileAccessible = await fsp.access(filepath).then(() => true).catch(() => false);
 
     if (!fileAccessible) {
@@ -164,6 +195,9 @@ export class DocumentsController {
     }
 
     const filepath = this.service.getFilePath(document);
+    if (!filepath) {
+      throw new NotFoundException('점검서 파일이 보관되지 않은 기록입니다.');
+    }
     const fileAccessible = await fsp.access(filepath).then(() => true).catch(() => false);
 
     if (!fileAccessible) {

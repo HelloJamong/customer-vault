@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { assertCustomerEditable } from '../common/utils/customer-access.util';
@@ -220,6 +220,91 @@ export class DocumentsService {
     }
   }
 
+  async createNotStored(data: {
+    customerId: number;
+    inspectionTargetId: number;
+    uploadedBy: number;
+    inspectionDate: string;
+    inspectionType: string;
+    reason: string;
+  }) {
+    const reason = data.reason.trim();
+    const inspectionDate = new Date(data.inspectionDate);
+
+    if (!Number.isInteger(data.customerId) || data.customerId <= 0) {
+      throw new BadRequestException('고객사를 선택해주세요.');
+    }
+    if (!Number.isInteger(data.inspectionTargetId) || data.inspectionTargetId <= 0) {
+      throw new BadRequestException('점검 대상을 선택해주세요.');
+    }
+    if (isNaN(inspectionDate.getTime())) {
+      throw new BadRequestException('유효한 점검일을 입력해주세요.');
+    }
+    if (!data.inspectionType) {
+      throw new BadRequestException('점검 방식을 선택해주세요.');
+    }
+    if (!reason) {
+      throw new BadRequestException('점검서 미보관 사유를 입력해주세요.');
+    }
+
+    const [customer, inspectionTarget] = await Promise.all([
+      this.prisma.customer.findUnique({
+        where: { id: data.customerId },
+        select: { id: true, name: true, lastInspectionDate: true },
+      }),
+      this.prisma.inspectionTarget.findFirst({
+        where: { id: data.inspectionTargetId, customerId: data.customerId },
+        select: { id: true, productName: true, customName: true, targetType: true },
+      }),
+    ]);
+
+    if (!customer) {
+      throw new NotFoundException('고객사를 찾을 수 없습니다.');
+    }
+    if (!inspectionTarget) {
+      throw new NotFoundException('선택한 고객사의 점검 대상을 찾을 수 없습니다.');
+    }
+
+    const document = await this.prisma.document.create({
+      data: {
+        customerId: data.customerId,
+        inspectionTargetId: data.inspectionTargetId,
+        title: '점검서 미보관',
+        filename: null,
+        filepath: null,
+        fileSize: null,
+        isReportStored: false,
+        reportNotStoredReason: reason,
+        uploadedBy: data.uploadedBy,
+        inspectionDate,
+        inspectionType: data.inspectionType,
+      },
+    });
+
+    if (!customer.lastInspectionDate || inspectionDate > customer.lastInspectionDate) {
+      await this.prisma.customer.update({
+        where: { id: data.customerId },
+        data: { lastInspectionDate: inspectionDate },
+      });
+    }
+
+    await this.updateInspectionStatus(data.customerId);
+    await this.logsService.createServiceLog({
+      userId: data.uploadedBy,
+      logType: '정보',
+      action: '점검서 미보관 완료 등록',
+      description: `${customer.name}의 ${inspectionTarget.productName || inspectionTarget.customName || inspectionTarget.targetType} 점검을 완료로 등록했습니다. (점검서 미보관 사유: ${reason})`,
+    });
+
+    return {
+      id: document.id,
+      title: document.title,
+      isReportStored: document.isReportStored,
+      reportNotStoredReason: document.reportNotStoredReason,
+      message: '점검서 미보관으로 점검 완료가 등록되었습니다.',
+    };
+  }
+
   async remove(id: number, userId?: number) {
     const document = await this.prisma.document.findUnique({
       where: { id },
@@ -233,10 +318,10 @@ export class DocumentsService {
       const customerId = document.customerId;
       const customerName = document.customer.name;
       const productName = document.inspectionTarget?.productName || '알 수 없음';
-      const filename = document.filename;
+      const filename = document.filename || '점검서 미보관';
 
       // 파일 삭제
-      if (await fileExists(document.filepath)) {
+      if (document.filepath && await fileExists(document.filepath)) {
         await fsp.unlink(document.filepath);
       }
 
@@ -258,7 +343,7 @@ export class DocumentsService {
     return { message: '문서가 삭제되었습니다.' };
   }
 
-  getFilePath(document: any): string {
+  getFilePath(document: any): string | null {
     return document.filepath;
   }
 

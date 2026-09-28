@@ -46,7 +46,9 @@ import { documentsAPI, type InspectionTarget } from '@/api/documents.api';
 interface Document {
   id: number;
   title: string;
-  filename: string;
+  filename: string | null;
+  isReportStored: boolean;
+  reportNotStoredReason: string | null;
   inspectionDate: string;
   inspectionType: string;
   inspectionTarget?: {
@@ -449,7 +451,7 @@ const CustomerDocumentsPage = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>파일명</TableCell>
+                  <TableCell>점검서 파일명 / 미보관 사유</TableCell>
                   <TableCell>점검달</TableCell>
                   <TableCell>점검자</TableCell>
                   <TableCell>점검제품</TableCell>
@@ -460,7 +462,9 @@ const CustomerDocumentsPage = () => {
               <TableBody>
                 {documents.map((doc) => (
                   <TableRow key={doc.id} hover>
-                    <TableCell>{doc.filename}</TableCell>
+                    <TableCell>
+                      {doc.isReportStored ? doc.filename : doc.reportNotStoredReason}
+                    </TableCell>
                     <TableCell>
                       {new Date(doc.inspectionDate).toLocaleDateString('ko-KR', {
                         year: 'numeric',
@@ -478,14 +482,18 @@ const CustomerDocumentsPage = () => {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<Visibility />}
-                        onClick={() => navigate(`/documents/${doc.id}/view`)}
-                      >
-                        보기
-                      </Button>
+                      {doc.isReportStored ? (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<Visibility />}
+                          onClick={() => navigate(`/documents/${doc.id}/view`)}
+                        >
+                          보기
+                        </Button>
+                      ) : (
+                        <Chip label="파일 미보관" size="small" variant="outlined" />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
