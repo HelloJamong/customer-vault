@@ -37,6 +37,10 @@ import { useAuthStore } from '@/store/authStore';
 type RaidType = '미확인' | 'RAID 미사용' | 'RAID0' | 'RAID1' | 'RAID5' | 'RAID6' | 'RAID10' | '기타';
 type DiskCapacityUnit = 'GB' | 'TB';
 
+let clientKeySequence = 0;
+
+const createClientKey = () => `client-${++clientKeySequence}`;
+
 interface ServerDiskGroup {
   id?: number;
   raidType: RaidType;
@@ -450,7 +454,7 @@ const CustomerSourceManagementEditPage = () => {
 
   const handleAddServer = () => {
     const newServer: ServerInfo = {
-      _clientKey: crypto.randomUUID(),
+      _clientKey: createClientKey(),
       serverType: '관리서버',
       manufacturer: '',
       modelName: '',
@@ -543,7 +547,7 @@ const CustomerSourceManagementEditPage = () => {
 
   const handleAddAccessInfo = () => {
     const newAccessInfo: ServerAccessInfo = {
-      _clientKey: crypto.randomUUID(),
+      _clientKey: createClientKey(),
       accessType: '관리웹',
       webUrl: '',
       webAccount: '',
