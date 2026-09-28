@@ -74,6 +74,7 @@ services:
       BACKUP_DIR: /app/backups
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env (openssl rand -hex 32)}
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY must be set in .env (openssl rand -hex 32)}
+      AI_INTEGRATION_API_KEY: ${AI_INTEGRATION_API_KEY:-}
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs

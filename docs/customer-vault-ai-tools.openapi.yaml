@@ -1,0 +1,330 @@
+openapi: 3.0.3
+info:
+  title: Customer Vault AI Tool API
+  version: 1.0.0
+  license:
+    name: ISC
+    url: https://opensource.org/license/isc-license-txt
+  description: |
+    Open WebUI 또는 사내 LLM Tool 실행 환경에서 Customer Vault 정보를 제한적으로 조회하기 위한 읽기 전용 API입니다.
+    이 API는 기존 앱 JWT가 아니라 배포 환경 변수로 주입되는 AI 연동 전용 Bearer machine token을 사용합니다.
+    토큰은 단일 공유 연동 신원이며, Open WebUI 사용자별 권한 위임은 수행하지 않습니다.
+    구조화된 조회 필드에는 민감한 연락처/접속 자격증명을 포함하지 않습니다. 지원 로그 자유 서술 필드는 이메일, 전화번호, IPv4, 일부 라벨형 비밀정보, Bearer/JWT 패턴을 최선 노력으로 마스킹하지만 완전한 DLP를 보장하지 않으므로 내부 AI 데이터 처리 정책을 적용해야 합니다.
+servers:
+  - url: https://customer-vault.example.internal
+    description: 운영 또는 사내 Reverse Proxy 주소로 변경
+security:
+  - AiIntegrationBearer: []
+tags:
+  - name: Customers
+    description: 고객사 검색 Tool
+  - name: SupportLogs
+    description: 미조치 지원 이슈 조회 Tool
+paths:
+  /api/ai-tools/customers/search:
+    get:
+      tags:
+        - Customers
+      operationId: searchCustomersForAi
+      summary: 고객사 담당자와 내부 담당자 조회
+      description: |
+        고객사명 일부로 최대 10건을 검색합니다.
+        응답에는 고객사 담당자의 이름, 직위, 부서와 내부 담당 엔지니어/영업명만 포함합니다.
+        전화번호, 이메일, 접속정보, 계정/비밀번호, 인증서, 토큰과 같은 별도 필드는 반환하지 않습니다.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: 검색할 고객사명 일부 또는 전체 이름
+          schema:
+            type: string
+            minLength: 1
+          example: 고객사A
+      responses:
+        '200':
+          description: 고객사 검색 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerSearchResponse'
+              example:
+                items:
+                  - customerId: 12
+                    customerName: 고객사A
+                    customerContacts:
+                      - name: 홍길동
+                        position: 팀장
+                        department: IT운영팀
+                    accountManagers:
+                      engineer: 김엔지니어
+                      engineerSub: 이엔지니어
+                      sales: 박영업
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/ai-tools/support-logs/unresolved:
+    get:
+      tags:
+        - SupportLogs
+      operationId: getUnresolvedSupportLogsForAi
+      summary: 현재 미조치 지원 이슈 조회
+      description: |
+        현재 조치 상태가 `진행 중`, `진행 불가`, `보류`인 지원 이슈를 조회합니다.
+        `supportDateTo`는 과거 상태를 재구성하지 않고, 현재 미조치 상태인 항목 중 `supportDate <= supportDateTo` 조건만 적용합니다.
+        `inquiryContent`와 `actionContent`는 자유 서술 데이터입니다. 이메일, 전화번호, IPv4, 일부 라벨형 비밀정보, Bearer/JWT 패턴은 최선 노력으로 마스킹하지만 모든 민감정보를 탐지하거나 제거한다고 보장하지 않습니다. 데이터 입력 정책과 AI 처리 정책을 함께 적용해야 합니다.
+      parameters:
+        - name: customerName
+          in: query
+          required: false
+          description: 고객사명 일부 또는 전체 이름
+          schema:
+            type: string
+            minLength: 1
+          example: 고객사A
+        - name: supportDateTo
+          in: query
+          required: false
+          description: 이 날짜 이하의 지원일만 조회합니다. 과거 상태 재구성 기준이 아닙니다.
+          schema:
+            type: string
+            format: date
+          example: '2026-09-28'
+        - name: limit
+          in: query
+          required: false
+          description: 반환 건수 제한. 최대 100입니다.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          example: 50
+      responses:
+        '200':
+          description: 현재 미조치 지원 이슈 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnresolvedSupportLogResponse'
+              example:
+                items:
+                  - id: 101
+                    customerName: 고객사A
+                    supportDate: '2026-09-20'
+                    category: 장애
+                    title: 접속 지연 문의
+                    actionStatus: 진행 중
+                    inquiryContent: 관리 콘솔 접속이 지연됨
+                    actionContent: 원인 확인 중
+                    jiraTicket: JIRA-1234
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    AiIntegrationBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: AI_INTEGRATION_API_KEY
+      description: Customer Vault 서버의 AI_INTEGRATION_API_KEY 값입니다.
+  schemas:
+    CustomerSearchResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/CustomerSearchItem'
+    CustomerSearchItem:
+      type: object
+      required:
+        - customerId
+        - customerName
+        - customerContacts
+        - accountManagers
+      properties:
+        customerId:
+          type: integer
+          example: 12
+        customerName:
+          type: string
+          example: 고객사A
+        customerContacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerContact'
+        accountManagers:
+          $ref: '#/components/schemas/AccountManagers'
+    CustomerContact:
+      type: object
+      required:
+        - name
+        - position
+        - department
+      properties:
+        name:
+          type: string
+          nullable: true
+          example: 홍길동
+        position:
+          type: string
+          nullable: true
+          example: 팀장
+        department:
+          type: string
+          nullable: true
+          example: IT운영팀
+    AccountManagers:
+      type: object
+      required:
+        - engineer
+        - engineerSub
+        - sales
+      properties:
+        engineer:
+          type: string
+          nullable: true
+          example: 김엔지니어
+        engineerSub:
+          type: string
+          nullable: true
+          example: 이엔지니어
+        sales:
+          type: string
+          nullable: true
+          example: 박영업
+    UnresolvedSupportLogResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnresolvedSupportLog'
+    UnresolvedSupportLog:
+      type: object
+      required:
+        - id
+        - customerName
+        - supportDate
+        - category
+        - title
+        - actionStatus
+        - inquiryContent
+        - actionContent
+        - jiraTicket
+      properties:
+        id:
+          type: integer
+          example: 101
+        customerName:
+          type: string
+          example: 고객사A
+        supportDate:
+          type: string
+          format: date
+          example: '2026-09-20'
+        category:
+          type: string
+          nullable: true
+          example: 장애
+        title:
+          type: string
+          nullable: true
+          example: 접속 지연 문의
+        actionStatus:
+          type: string
+          enum:
+            - 진행 중
+            - 진행 불가
+            - 보류
+          example: 진행 중
+        inquiryContent:
+          type: string
+          nullable: true
+          example: 관리 콘솔 접속이 지연됨
+        actionContent:
+          type: string
+          nullable: true
+          example: 원인 확인 중
+        jiraTicket:
+          type: string
+          nullable: true
+          example: JIRA-1234
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - timestamp
+        - path
+      properties:
+        statusCode:
+          type: integer
+          example: 401
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          example: 유효한 연동 토큰이 필요합니다.
+        code:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-28T00:00:00.000Z'
+        path:
+          type: string
+          example: /api/ai-tools/customers/search?name=고객사A
+        error:
+          type: string
+          description: 개발 환경에서만 포함됩니다.
+        stack:
+          type: string
+          description: 개발 환경에서만 포함됩니다.
+  responses:
+    BadRequest:
+      description: 잘못된 요청 파라미터
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 400
+            message: name은 필수입니다.
+            timestamp: '2026-09-28T00:00:00.000Z'
+            path: /api/ai-tools/customers/search
+    Unauthorized:
+      description: AI 연동 토큰이 없거나 올바르지 않음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 401
+            message: 유효한 연동 토큰이 필요합니다.
+            timestamp: '2026-09-28T00:00:00.000Z'
+            path: /api/ai-tools/customers/search
+    InternalServerError:
+      description: 서버 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 500
+            message: 서버 오류가 발생했습니다.
+            timestamp: '2026-09-28T00:00:00.000Z'
+            path: /api/ai-tools/customers/search

@@ -18,6 +18,7 @@ import { InspectionStatusModule } from './inspection-status/inspection-status.mo
 import { NoticesModule } from './notices/notices.module';
 import { BackupModule } from './backup/backup.module';
 import { MeetingMinutesModule } from './meeting-minutes/meeting-minutes.module';
+import { AiToolsModule } from './ai-tools/ai-tools.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MeetingMinutesModule } from './meeting-minutes/meeting-minutes.module';
     NoticesModule,
     BackupModule,
     MeetingMinutesModule,
+    AiToolsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
