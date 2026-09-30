@@ -55,6 +55,7 @@ model User {
   customersAsSales      Customer[] @relation("Sales")
   updatedSettings       SystemSettings[]
   createdSupportLogs    SupportLog[] @relation("SupportLogCreator")
+  supportLogEntries     SupportLogEntry[] @relation("SupportLogEntryCreator")
   createdNotices        Notice[] @relation("NoticeCreator")
   noticeViews           UserNoticeView[] @relation("UserNoticeViews")
   backupLogs            BackupLog[]
@@ -384,6 +385,7 @@ model SourceManagement {
   servers               ServerInfo[]
   accessInfo            ServerAccessInfo[]
   virtualPcImages       VirtualPcImage[]
+  virtualPcImageRevisions VirtualPcImageRevision[]
   hrMappings            HrIntegrationMapping[]
 
   @@map("source_management")
@@ -512,6 +514,7 @@ model VirtualPcImage {
   licenseNote        String?  @map("license_note") @db.Text
   hashValue          String?  @map("hash_value") @db.VarChar(255)
   verifierUserId     Int?     @map("verifier_user_id") // 체크리스트 검증 담당자 (기술팀)
+  revision           Int      @default(1) // 재제작 판 번호
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -523,6 +526,28 @@ model VirtualPcImage {
   @@index([sourceManagementId])
   @@index([verifierUserId])
   @@map("virtual_pc_images")
+}
+
+// 가상PC 이미지 재제작 이력 (재제작 직전 판의 스냅샷)
+// 이미지 행은 저장 시 삭제 후 재생성되므로 이미지 FK 대신 소스 관리에 연결하고,
+// 이미지가 목록에서 제거되면 서비스에서 해당 이력을 함께 삭제한다.
+model VirtualPcImageRevision {
+  id                 Int      @id @default(autoincrement())
+  sourceManagementId Int      @map("source_management_id")
+  virtualPcImageId   Int      @map("virtual_pc_image_id")
+  revision           Int      // 스냅샷의 판 번호
+  reason             String   @db.Text // 재제작 사유
+  rebuiltOn          DateTime @map("rebuilt_on") @db.Date // 재제작일
+  snapshot           Json     // 이미지 사양·설치 프로그램·체크리스트 결과
+  createdByUserId    Int?     @map("created_by_user_id")
+  createdByName      String   @map("created_by_name") @db.VarChar(100)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  sourceManagement SourceManagement @relation(fields: [sourceManagementId], references: [id], onDelete: Cascade)
+
+  @@unique([virtualPcImageId, revision])
+  @@index([sourceManagementId])
+  @@map("virtual_pc_image_revisions")
 }
 
 // 가상PC 설치 프로그램
@@ -664,8 +689,28 @@ model SupportLog {
 
   customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   creator         User?     @relation("SupportLogCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  entries         SupportLogEntry[]
 
   @@map("support_logs")
+}
+
+// 지원 내역 (지원 로그별 날짜/지원자/내용)
+model SupportLogEntry {
+  id              Int      @id @default(autoincrement())
+  supportLogId    Int      @map("support_log_id")
+  entryDate       DateTime @map("entry_date") @db.Date
+  authorName      String   @map("author_name") @db.VarChar(100) // 작성 시점 로그인 사용자 이름 (계정 삭제 후에도 유지)
+  content         String   @db.Text
+  createdByUserId Int?     @map("created_by_user_id") // 수정/삭제 권한 판단용 실제 작성자
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  supportLog      SupportLog @relation(fields: [supportLogId], references: [id], onDelete: Cascade)
+  createdBy       User?      @relation("SupportLogEntryCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([supportLogId, entryDate])
+  @@index([createdByUserId])
+  @@map("support_log_entries")
 }
 
 // 공지사항

@@ -19,6 +19,12 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -26,15 +32,17 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
-import { ArrowBack, Add, ExpandMore, Search, Refresh, Download } from '@mui/icons-material';
+import { ArrowBack, Add, ExpandMore, Search, Refresh, Download, Edit, Delete, Save, Close } from '@mui/icons-material';
 import { supportLogsAPI } from '@/api/support-logs.api';
 import { customersAPI } from '@/api/customers.api';
 import { logsApi } from '@/api/logs.api';
 import { settingsApi } from '@/api/settings.api';
-import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/types/support-log.types';
+import type { SupportLog, SupportLogEntry, CreateSupportLogDto, UpdateSupportLogDto, SupportLogEntryDto } from '@/types/support-log.types';
 import type { Customer } from '@/types/customer.types';
 import ExcelJS from 'exceljs';
 import { downloadBlob } from '@/utils/download';
+import { useAuthStore } from '@/store/authStore';
+import { getEngineers, formatProgress } from '@/utils/support-log';
 
 dayjs.locale('ko');
 
@@ -42,6 +50,8 @@ const CustomerSupportLogsPage = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role?.toLowerCase() || '');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [supportLogs, setSupportLogs] = useState<SupportLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,7 +74,7 @@ const CustomerSupportLogsPage = () => {
     userInfo: '',
     actionStatus: '',
     inquiryContent: '',
-    actionContent: '',
+    entryContent: '',
     actionResult: '',
     jiraTicket: '',
     remarks: '',
@@ -79,6 +89,13 @@ const CustomerSupportLogsPage = () => {
   const [filterActionStatus, setFilterActionStatus] = useState<string>('');
   const [filterEngineer, setFilterEngineer] = useState<string>('');
   const [filteredLogs, setFilteredLogs] = useState<SupportLog[]>([]);
+
+  // 지원 내역 (세부내용 Dialog)
+  const todayStr = () => dayjs().format('YYYY-MM-DD');
+  const [newEntry, setNewEntry] = useState<SupportLogEntryDto>({ entryDate: todayStr(), content: '' });
+  const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
+  const [editEntry, setEditEntry] = useState<SupportLogEntryDto>({ entryDate: '', content: '' });
+  const [isSavingEntry, setIsSavingEntry] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!customerId) return;
@@ -154,7 +171,7 @@ const CustomerSupportLogsPage = () => {
 
     // 지원 엔지니어 필터
     if (filterEngineer) {
-      filtered = filtered.filter(log => log.creator?.name === filterEngineer);
+      filtered = filtered.filter(log => getEngineers(log).includes(filterEngineer));
     }
 
     setFilteredLogs(filtered);
@@ -172,8 +189,8 @@ const CustomerSupportLogsPage = () => {
 
   // 고유한 엔지니어 목록 추출
   const uniqueEngineers = Array.from(
-    new Set(supportLogs.map(log => log.creator?.name).filter(Boolean))
-  ) as string[];
+    new Set(supportLogs.flatMap(getEngineers))
+  );
 
   // 통계 계산
   const getStatistics = () => {
@@ -282,9 +299,9 @@ const CustomerSupportLogsPage = () => {
         log.title || '',
         log.userInfo || '',
         log.actionStatus || '',
-        log.creator?.name || '',
+        getEngineers(log).join(', '),
         log.inquiryContent || '',
-        log.actionContent || '',
+        formatProgress(log),
         log.actionResult || '',
         log.remarks || '',
       ]);
@@ -314,7 +331,44 @@ const CustomerSupportLogsPage = () => {
 
   const handleViewDetails = (log: SupportLog) => {
     setSelectedLog(log);
+    setNewEntry({ entryDate: todayStr(), content: '' });
+    setEditingEntryId(null);
     setViewDialogOpen(true);
+  };
+
+  const canModifyEntry = (entry: SupportLogEntry) => isAdmin || entry.createdByUserId === user?.id;
+
+  // 지원 내역 변경 후 Dialog와 목록을 함께 갱신
+  const runEntryAction = async (action: () => Promise<SupportLog>, failMessage: string) => {
+    setIsSavingEntry(true);
+    try {
+      setSelectedLog(await action());
+      await fetchData();
+      return true;
+    } catch (error) {
+      console.error(failMessage, error);
+      alert(failMessage);
+      return false;
+    } finally {
+      setIsSavingEntry(false);
+    }
+  };
+
+  const handleAddEntry = async () => {
+    if (!selectedLog || !newEntry.content.trim()) return;
+    const ok = await runEntryAction(() => supportLogsAPI.addEntry(selectedLog.id, newEntry), '지원 내역 추가에 실패했습니다.');
+    if (ok) setNewEntry({ entryDate: todayStr(), content: '' });
+  };
+
+  const handleUpdateEntry = async (entryId: number) => {
+    if (!selectedLog || !editEntry.content.trim()) return;
+    const ok = await runEntryAction(() => supportLogsAPI.updateEntry(selectedLog.id, entryId, editEntry), '지원 내역 수정에 실패했습니다.');
+    if (ok) setEditingEntryId(null);
+  };
+
+  const handleDeleteEntry = async (entryId: number) => {
+    if (!selectedLog || !window.confirm('이 지원 내역을 삭제하시겠습니까?')) return;
+    await runEntryAction(() => supportLogsAPI.deleteEntry(selectedLog.id, entryId), '지원 내역 삭제에 실패했습니다.');
   };
 
   const handleAddClick = () => {
@@ -327,7 +381,7 @@ const CustomerSupportLogsPage = () => {
       userInfo: '',
       actionStatus: '',
       inquiryContent: '',
-      actionContent: '',
+      entryContent: '',
       actionResult: '',
       jiraTicket: '',
       remarks: '',
@@ -347,7 +401,6 @@ const CustomerSupportLogsPage = () => {
       userInfo: log.userInfo || '',
       actionStatus: log.actionStatus || '',
       inquiryContent: log.inquiryContent || '',
-      actionContent: log.actionContent || '',
       actionResult: log.actionResult || '',
       jiraTicket: log.jiraTicket || '',
       remarks: log.remarks || '',
@@ -374,7 +427,7 @@ const CustomerSupportLogsPage = () => {
         userInfo: formData.userInfo,
         actionStatus: formData.actionStatus,
         inquiryContent: formData.inquiryContent,
-        actionContent: formData.actionContent,
+        entryContent: formData.entryContent,
         actionResult: formData.actionResult,
         jiraTicket: formData.jiraTicket,
         remarks: formData.remarks,
@@ -408,7 +461,6 @@ const CustomerSupportLogsPage = () => {
         userInfo: formData.userInfo,
         actionStatus: formData.actionStatus,
         inquiryContent: formData.inquiryContent,
-        actionContent: formData.actionContent,
         actionResult: formData.actionResult,
         jiraTicket: formData.jiraTicket,
         remarks: formData.remarks,
@@ -482,7 +534,7 @@ const CustomerSupportLogsPage = () => {
       field: 'creator',
       headerName: '지원 엔지니어',
       width: 120,
-      renderCell: (params) => params.row.creator?.name || '-',
+      renderCell: (params) => getEngineers(params.row).join(', ') || '-',
     },
     {
       field: 'actions',
@@ -826,11 +878,110 @@ const CustomerSupportLogsPage = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   진척 사항
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
-                  <Typography variant="body2" whiteSpace="pre-wrap">
-                    {selectedLog.actionContent || '-'}
-                  </Typography>
-                </Paper>
+                {selectedLog.actionContent && (
+                  <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      기존 기록 (읽기 전용)
+                    </Typography>
+                    <Typography variant="body2" whiteSpace="pre-wrap">
+                      {selectedLog.actionContent}
+                    </Typography>
+                  </Paper>
+                )}
+                {(selectedLog.entries || []).length > 0 && (
+                  <Table size="small" sx={{ mt: 1 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ width: 150, whiteSpace: 'nowrap' }}>지원일</TableCell>
+                        <TableCell sx={{ width: 110, whiteSpace: 'nowrap' }}>지원자</TableCell>
+                        <TableCell>내용</TableCell>
+                        <TableCell sx={{ width: 90 }} />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(selectedLog.entries || []).map((entry) =>
+                        editingEntryId === entry.id ? (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              <TextField
+                                type="date"
+                                size="small"
+                                value={editEntry.entryDate}
+                                onChange={(e) => setEditEntry({ ...editEntry, entryDate: e.target.value })}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{entry.authorName}</TableCell>
+                            <TableCell>
+                              <TextField
+                                size="small"
+                                multiline
+                                fullWidth
+                                value={editEntry.content}
+                                onChange={(e) => setEditEntry({ ...editEntry, content: e.target.value })}
+                                inputProps={{ maxLength: 5000 }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                              <IconButton size="small" aria-label="저장" onClick={() => handleUpdateEntry(entry.id)} disabled={isSavingEntry || !editEntry.entryDate || !editEntry.content.trim()}>
+                                <Save fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" aria-label="취소" onClick={() => setEditingEntryId(null)} disabled={isSavingEntry}>
+                                <Close fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          <TableRow key={entry.id}>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{entry.entryDate.slice(0, 10)}</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{entry.authorName}</TableCell>
+                            <TableCell sx={{ whiteSpace: 'pre-wrap' }}>{entry.content}</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                              {canModifyEntry(entry) && (
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="수정"
+                                    onClick={() => {
+                                      setEditingEntryId(entry.id);
+                                      setEditEntry({ entryDate: entry.entryDate.slice(0, 10), content: entry.content });
+                                    }}
+                                  >
+                                    <Edit fontSize="small" />
+                                  </IconButton>
+                                  <IconButton size="small" aria-label="삭제" onClick={() => handleDeleteEntry(entry.id)}>
+                                    <Delete fontSize="small" />
+                                  </IconButton>
+                                </>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ),
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+                <Box display="flex" gap={1} mt={1} alignItems="flex-start">
+                  <TextField
+                    type="date"
+                    size="small"
+                    label="지원일"
+                    value={newEntry.entryDate}
+                    onChange={(e) => setNewEntry({ ...newEntry, entryDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    size="small"
+                    multiline
+                    fullWidth
+                    label={`지원 내용 (지원자: ${user?.name || ''})`}
+                    value={newEntry.content}
+                    onChange={(e) => setNewEntry({ ...newEntry, content: e.target.value })}
+                    inputProps={{ maxLength: 5000 }}
+                  />
+                  <Button variant="contained" onClick={handleAddEntry} disabled={isSavingEntry || !newEntry.entryDate || !newEntry.content.trim()}>
+                    추가
+                  </Button>
+                </Box>
               </Box>
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
@@ -970,14 +1121,11 @@ const CustomerSupportLogsPage = () => {
               fullWidth
               multiline
               rows={4}
-              label="진척 사항"
-              placeholder="ex) [26-00-00]
-- VT-x 활성화 확인을 위해 관련 툴 전달드림
-
-[26-00-00]
-- 확인결과 가상화 상태가 비활성화라 활성화 방법 메일로 안내드림"
-              value={formData.actionContent}
-              onChange={(e) => setFormData({ ...formData, actionContent: e.target.value })}
+              label="진척 사항 (첫 지원 내역)"
+              placeholder="ex) VT-x 활성화 확인을 위해 관련 툴 전달드림"
+              helperText="지원날짜·로그인 사용자로 기록됩니다. 이후 지원은 세부내용에서 추가하세요."
+              value={formData.entryContent}
+              onChange={(e) => setFormData({ ...formData, entryContent: e.target.value })}
             />
             <TextField
               fullWidth
@@ -1100,19 +1248,6 @@ const CustomerSupportLogsPage = () => {
               placeholder="ex) 가상PC 구동 시 종료되는 증상 발생"
               value={formData.inquiryContent}
               onChange={(e) => setFormData({ ...formData, inquiryContent: e.target.value })}
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="진척 사항"
-              placeholder="ex) [26-00-00]
-- VT-x 활성화 확인을 위해 관련 툴 전달드림
-
-[26-00-00]
-- 확인결과 가상화 상태가 비활성화라 활성화 방법 메일로 안내드림"
-              value={formData.actionContent}
-              onChange={(e) => setFormData({ ...formData, actionContent: e.target.value })}
             />
             <TextField
               fullWidth

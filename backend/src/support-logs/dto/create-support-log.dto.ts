@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsInt, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateSupportLogDto {
@@ -52,4 +52,10 @@ export class CreateSupportLogDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  // 첫 지원 내역 (지원날짜·로그인 사용자로 함께 생성)
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  entryContent?: string;
 }

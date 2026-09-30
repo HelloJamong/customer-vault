@@ -171,15 +171,22 @@ test('unassigned internal users can create, update, and delete support logs', as
       calls.push(['remove', ...args]);
       return { message: 'removed' };
     },
+    addEntry: async (...args) => {
+      calls.push(['addEntry', ...args]);
+      return { id: 4 };
+    },
   });
   const createDto = { customerId: 7, supportDate: '2026-09-22', title: '지원' };
+  const entryDto = { entryDate: '2026-09-23', content: '후속 지원' };
 
   await controller.create(createDto, request);
+  await controller.addEntry(4, entryDto, request);
   await controller.update(4, { title: '후속 지원' }, request);
   await controller.remove(4, request);
 
   assert.deepEqual(calls, [
-    ['create', createDto, 99, '127.0.0.1'],
+    ['create', createDto, request.user, '127.0.0.1'],
+    ['addEntry', 4, entryDto, request.user, '127.0.0.1'],
     ['update', 4, { title: '후속 지원' }, 99, '127.0.0.1'],
     ['remove', 4, 99, '127.0.0.1'],
   ]);
@@ -216,7 +223,7 @@ test('support log changes keep existing audit history without consulting custome
     },
   );
 
-  await service.create({ customerId: 7, supportDate: '2026-09-22', title: '지원' }, 99, '127.0.0.1');
+  await service.create({ customerId: 7, supportDate: '2026-09-22', title: '지원' }, { id: 99, name: '테스트 사용자' }, '127.0.0.1');
   await service.update(4, { title: '후속 지원' }, 99, '127.0.0.1');
   await service.remove(4, 99, '127.0.0.1');
 

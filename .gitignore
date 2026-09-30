@@ -72,3 +72,8 @@ uploads_offline/
 
 # Export archives (배포용 압축 파일)
 *.tar.gz
+
+# 운영 데이터 변환 작업 파일 (고객 데이터·운영 구조 포함, 커밋 금지)
+/support-logs-export*.jsonl
+/support-log-conversion-*
+/prod-*.txt

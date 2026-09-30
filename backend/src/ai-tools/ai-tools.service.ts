@@ -94,6 +94,10 @@ export class AiToolsService {
         actionStatus: true,
         inquiryContent: true,
         actionContent: true,
+        entries: {
+          select: { entryDate: true, content: true },
+          orderBy: [{ entryDate: 'asc' }, { id: 'asc' }],
+        },
         jiraTicket: true,
         customer: { select: { name: true } },
       },
@@ -110,7 +114,11 @@ export class AiToolsService {
         title: supportLog.title,
         actionStatus: supportLog.actionStatus,
         inquiryContent: redactSupportText(supportLog.inquiryContent),
-        actionContent: redactSupportText(supportLog.actionContent),
+        // 기존 진척 사항 + 지원 내역을 한 텍스트로 합쳐 응답 형식을 유지
+        actionContent: redactSupportText([
+          supportLog.actionContent,
+          ...supportLog.entries.map((entry) => `[${entry.entryDate.toISOString().slice(0, 10)}] ${entry.content}`),
+        ].filter(Boolean).join('\n') || null),
         jiraTicket: supportLog.jiraTicket,
       })),
     };

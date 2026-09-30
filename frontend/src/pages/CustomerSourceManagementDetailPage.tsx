@@ -17,16 +17,23 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Edit, Download, ExpandMore } from '@mui/icons-material';
+import { ArrowBack, Edit, Download, ExpandMore, Autorenew } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
 import ExcelJS from 'exceljs';
 import { downloadBlob } from '@/utils/download';
 import { VIRTUAL_PC_CHECKLIST_LABELS } from '@/utils/virtual-pc-checklist';
+import { getApiErrorMessage } from '@/utils/api-error';
 
 interface ServerInfo {
   id?: number;
@@ -138,6 +145,36 @@ interface VirtualPcImage {
   installedPrograms: VirtualPcInstalledProgram[];
   checklistItems: VirtualPcChecklistItem[];
   verifierName?: string | null;
+  revision?: number;
+  revisions?: VirtualPcImageRevision[];
+}
+
+// 재제작 직전 판의 스냅샷
+interface VirtualPcImageRevision {
+  id: number;
+  revision: number;
+  reason: string;
+  rebuiltOn: string;
+  createdByName: string;
+  createdAt: string;
+  snapshot: {
+    osName: string;
+    osEdition: string;
+    osRelease: string;
+    cDiskCapacity: number | null;
+    dDiskCapacity?: number | null;
+    licenseStatus: string;
+    verifierName?: string | null;
+    installedPrograms: { name: string; version?: string | null }[];
+    checklistItems: {
+      itemKey: string;
+      checked: boolean;
+      checkedByName?: string | null;
+      verified: boolean;
+      verifiedByName?: string | null;
+      note?: string | null;
+    }[];
+  };
 }
 
 interface SourceManagement {
@@ -185,6 +222,34 @@ const CustomerSourceManagementDetailPage = () => {
   const [revealedAccessInfo, setRevealedAccessInfo] = useState<Set<number>>(new Set());
   const [revealedData, setRevealedData] = useState<SourceManagement | null>(null);
   const [isRevealLoading, setIsRevealLoading] = useState(false);
+  const [rebuildTarget, setRebuildTarget] = useState<VirtualPcImage | null>(null);
+  const [rebuildForm, setRebuildForm] = useState({ reason: '', rebuiltOn: '' });
+  const [isRebuilding, setIsRebuilding] = useState(false);
+
+  const openRebuildDialog = (image: VirtualPcImage) => {
+    setRebuildTarget(image);
+    setRebuildForm({ reason: '', rebuiltOn: new Date().toLocaleDateString('sv-SE') });
+  };
+
+  const handleRebuild = async () => {
+    if (!rebuildTarget?.id || !rebuildForm.reason.trim() || !rebuildForm.rebuiltOn) return;
+    setIsRebuilding(true);
+    try {
+      const response = await apiClient.post(
+        `/customers/${customerId}/source-management/virtual-pc-images/${rebuildTarget.id}/rebuild`,
+        { ...rebuildForm, revision: rebuildTarget.revision ?? 1 },
+      );
+      setSourceData(response.data);
+      setRebuildTarget(null);
+      if (window.confirm('재제작이 등록되었고 체크리스트가 초기화되었습니다.\n편집 화면에서 변경된 Windows 버전·설치 프로그램을 수정하시겠습니까?')) {
+        navigate(`/customers/${customerId}/source-management/edit`);
+      }
+    } catch (error) {
+      alert(getApiErrorMessage(error, '재제작 등록에 실패했습니다.'));
+    } finally {
+      setIsRebuilding(false);
+    }
+  };
 
   const handleRevealAccessInfo = async (index: number) => {
     setRevealedAccessInfo(new Set(revealedAccessInfo).add(index));
@@ -598,12 +663,22 @@ const CustomerSourceManagementDetailPage = () => {
             ) : virtualPcImages.map((image, imageIndex) => (
               <Paper key={image.id || imageIndex} variant="outlined" sx={{ p: 2, mb: 2 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="baseline" gap={2} flexWrap="wrap" mb={1}>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {image.name || `이미지 ${imageIndex + 1}`}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    최초 작성: {formatDateTime(image.createdAt)} / 수정: {formatDateTime(image.updatedAt)}
-                  </Typography>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {image.name || `이미지 ${imageIndex + 1}`}
+                    </Typography>
+                    {image.id && <Chip size="small" label={`rev.${image.revision ?? 1}`} />}
+                  </Box>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Typography variant="body2" color="text.secondary">
+                      최초 작성: {formatDateTime(image.createdAt)} / 수정: {formatDateTime(image.updatedAt)}
+                    </Typography>
+                    {image.id && (
+                      <Button size="small" variant="outlined" startIcon={<Autorenew />} onClick={() => openRebuildDialog(image)}>
+                        재제작
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                   <Grid xs={12} sm={4}><ImageInfoItem label="OS" value={`${image.osName} / ${image.osEdition} / ${image.osRelease}`} /></Grid>
@@ -668,6 +743,72 @@ const CustomerSourceManagementDetailPage = () => {
                     ) : <Typography variant="body2" color="text.secondary">등록된 체크리스트가 없습니다.</Typography>}
                   </AccordionDetails>
                 </Accordion>
+
+                {(image.revisions?.length ?? 0) > 0 && (
+                  <Accordion
+                    disableGutters
+                    elevation={0}
+                    sx={{ mt: 2, border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}
+                  >
+                    <AccordionSummary expandIcon={<ExpandMore />}>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        재제작 이력 ({image.revisions!.length})
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      {image.revisions!.map((revision) => {
+                        const items = revision.snapshot.checklistItems.filter((item) => item.itemKey !== 'vmft_hash_value');
+                        return (
+                          <Accordion
+                            key={revision.id}
+                            disableGutters
+                            elevation={0}
+                            sx={{ mb: 1, border: 1, borderColor: 'divider', '&:before': { display: 'none' } }}
+                          >
+                            <AccordionSummary expandIcon={<ExpandMore />}>
+                              <Typography variant="body2">
+                                <strong>rev.{revision.revision}</strong>
+                                {` · ${revision.snapshot.osName} / ${revision.snapshot.osEdition} / ${revision.snapshot.osRelease}`}
+                                {` · ${revision.rebuiltOn} ${revision.createdByName} 재제작: ${revision.reason}`}
+                              </Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <Grid container spacing={2} sx={{ mb: 2 }}>
+                                <Grid xs={12} sm={4}><ImageInfoItem label="C 드라이브" value={revision.snapshot.cDiskCapacity ? `${revision.snapshot.cDiskCapacity}GB` : '-'} /></Grid>
+                                <Grid xs={12} sm={4}><ImageInfoItem label="D 드라이브" value={revision.snapshot.dDiskCapacity ? `${revision.snapshot.dDiskCapacity}GB` : '없음'} /></Grid>
+                                <Grid xs={12} sm={4}><ImageInfoItem label="정품 인증" value={revision.snapshot.licenseStatus} /></Grid>
+                                <Grid xs={12}>
+                                  <ImageInfoItem
+                                    label="설치 프로그램"
+                                    value={revision.snapshot.installedPrograms.map((program) => (program.version ? `${program.name} (${program.version})` : program.name)).join(', ') || '없음'}
+                                  />
+                                </Grid>
+                              </Grid>
+                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                체크리스트 · 검증 담당자: {revision.snapshot.verifierName || '미지정'}
+                              </Typography>
+                              {items.length > 0 ? (
+                                <TableContainer>
+                                  <Table size="small">
+                                    <TableHead><TableRow><TableCell>항목</TableCell><TableCell>검토자</TableCell><TableCell>검증자</TableCell><TableCell>비고</TableCell></TableRow></TableHead>
+                                    <TableBody>{items.map((item) => (
+                                      <TableRow key={item.itemKey}>
+                                        <TableCell>{CHECKLIST_LABELS[item.itemKey] || item.itemKey}</TableCell>
+                                        <TableCell>{item.checked ? item.checkedByName || '검토' : '-'}</TableCell>
+                                        <TableCell>{item.verified ? item.verifiedByName || '검증' : '-'}</TableCell>
+                                        <TableCell>{item.note || '-'}</TableCell>
+                                      </TableRow>
+                                    ))}</TableBody>
+                                  </Table>
+                                </TableContainer>
+                              ) : <Typography variant="body2" color="text.secondary">체크리스트가 없습니다.</Typography>}
+                            </AccordionDetails>
+                          </Accordion>
+                        );
+                      })}
+                    </AccordionDetails>
+                  </Accordion>
+                )}
               </Paper>
             ))}
           </Paper>
@@ -1046,6 +1187,46 @@ const CustomerSourceManagementDetailPage = () => {
           </Paper>
         </>
       )}
+
+      <Dialog open={!!rebuildTarget} onClose={() => !isRebuilding && setRebuildTarget(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>가상PC 이미지 재제작 - {rebuildTarget?.name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            현재 판(rev.{rebuildTarget?.revision ?? 1})은 재제작 이력으로 보관되고, 체크리스트의 검토·검증 결과와 비고가 모두 초기화됩니다.
+          </Typography>
+          <Stack spacing={2}>
+            <TextField
+              type="date"
+              label="재제작일"
+              value={rebuildForm.rebuiltOn}
+              onChange={(e) => setRebuildForm({ ...rebuildForm, rebuiltOn: e.target.value })}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: new Date().toLocaleDateString('sv-SE') }}
+              required
+            />
+            <TextField
+              label="재제작 사유"
+              placeholder="ex) Windows 11 24H2 적용, 보안 프로그램 버전 변경"
+              value={rebuildForm.reason}
+              onChange={(e) => setRebuildForm({ ...rebuildForm, reason: e.target.value })}
+              multiline
+              minRows={2}
+              inputProps={{ maxLength: 2000 }}
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRebuildTarget(null)} disabled={isRebuilding}>취소</Button>
+          <Button
+            variant="contained"
+            onClick={handleRebuild}
+            disabled={isRebuilding || !rebuildForm.reason.trim() || !rebuildForm.rebuiltOn || rebuildForm.rebuiltOn > new Date().toLocaleDateString('sv-SE')}
+          >
+            재제작
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -38,6 +38,7 @@ test('source management response includes source and virtual PC image timestamps
         servers: [],
         accessInfo: [],
         hrMappings: [],
+        virtualPcImageRevisions: [],
         virtualPcImages: [{
           id: 2,
           name: '표준 이미지',
@@ -94,7 +95,9 @@ test('virtual PC image recreation preserves its original creation timestamp', ()
     osRelease: '11',
     cDiskCapacity: 100,
     licenseStatus: '진행완료',
-  }, 1, '김작성', undefined, originalCreatedAt);
+  }, 1, '김작성', undefined, { id: 30, createdAt: originalCreatedAt, revision: 3 });
 
   assert.equal(data.createdAt, originalCreatedAt);
+  assert.equal(data.id, 30);
+  assert.equal(data.revision, 3);
 });

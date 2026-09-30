@@ -5,6 +5,8 @@ import { Add, Visibility, Info, Code, SupportAgent, Summarize, Search, FilterAlt
 import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/customer.types';
+import type { SupportLogEntry } from '@/types/support-log.types';
+import { getEngineers, formatProgress } from '@/utils/support-log';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { logsApi } from '@/api/logs.api';
@@ -96,6 +98,7 @@ interface SupportExportLog {
   actionResult?: string;
   remarks?: string;
   creator?: { name?: string };
+  entries?: SupportLogEntry[];
   createdAt?: string;
 }
 
@@ -448,10 +451,10 @@ const CustomersPage = () => {
             log.userInfo || '-',
             log.actionStatus || '-',
             log.inquiryContent || '-',
-            log.actionContent || '-',
+            formatProgress(log) || '-',
             log.actionResult || '-',
             log.remarks || '-',
-            log.creator?.name || '-',
+            getEngineers(log).join(', ') || '-',
             log.createdAt ? new Date(log.createdAt).toLocaleDateString('ko-KR') : '-',
           ]);
         });

@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject, IsIn, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject, IsIn, ArrayMinSize, ArrayMaxSize, IsNotEmpty, MaxLength, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -314,6 +314,27 @@ export class VirtualPcImageDto {
   @IsOptional()
   @IsInt()
   verifierUserId?: number | null;
+
+  @ApiProperty({ required: false, description: '편집 시작 시점의 판 번호 (기존 이미지 저장 시 동시 재제작 감지용)' })
+  @IsOptional()
+  @IsInt()
+  revision?: number;
+}
+
+export class RebuildVirtualPcImageDto {
+  @ApiProperty({ required: true, description: '재제작 사유' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  reason: string;
+
+  @ApiProperty({ required: true, description: '재제작일 (YYYY-MM-DD)' })
+  @IsDateString({ strict: true })
+  rebuiltOn: string;
+
+  @ApiProperty({ required: true, description: '재제작 대상 판 번호 (현재 판)' })
+  @IsInt()
+  revision: number;
 }
 
 export class CreateSourceManagementDto {

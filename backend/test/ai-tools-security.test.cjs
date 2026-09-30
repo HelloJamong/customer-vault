@@ -87,6 +87,7 @@ test('unresolved support query limits statuses, selected fields, and result coun
           actionStatus: '진행 중',
           inquiryContent: '로그인 불가 (hong@example.com, 010-1234-5678, 192.168.1.10)',
           actionContent: '원인 분석 중, password:secret-value',
+          entries: [{ entryDate: new Date('2026-09-28T00:00:00.000Z'), content: '재현 확인, token=abc123' }],
           jiraTicket: 'CV-100',
           customer: { name: '고객사A' },
         }];
@@ -111,4 +112,7 @@ test('unresolved support query limits statuses, selected fields, and result coun
   assert.equal(results.items[0].customerName, '고객사A');
   assert.doesNotMatch(results.items[0].inquiryContent, /hong@example\.com|010-1234-5678|192\.168\.1\.10/);
   assert.doesNotMatch(results.items[0].actionContent, /password:secret-value/);
+  assert.equal(query.select.entries.select.authorName, undefined);
+  assert.match(results.items[0].actionContent, /\[2026-09-28\] 재현 확인/);
+  assert.doesNotMatch(results.items[0].actionContent, /abc123/);
 });

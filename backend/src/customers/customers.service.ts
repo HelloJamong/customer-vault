@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
-import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto } from './dto/source-management.dto';
+import { CreateSourceManagementDto, UpdateSourceManagementDto, VirtualPcImageDto, RebuildVirtualPcImageDto } from './dto/source-management.dto';
 import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeConsiderationDto, UpgradeProgressLogDto } from './dto/upgrade-plan.dto';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { isAdminRole } from '../common/utils/customer-access.util';
@@ -580,6 +580,7 @@ export class CustomersService {
         accessInfo: {
           orderBy: { id: 'asc' },
         },
+        virtualPcImageRevisions: { orderBy: { revision: 'desc' } },
         virtualPcImages: {
           orderBy: { id: 'asc' },
           include: {
@@ -661,6 +662,18 @@ export class CustomersService {
         hashValue: image.hashValue,
         verifierUserId: image.verifierUserId,
         verifierName: image.verifier?.name ?? null,
+        revision: image.revision,
+        revisions: sourceManagement.virtualPcImageRevisions
+          .filter((revision) => revision.virtualPcImageId === image.id)
+          .map((revision) => ({
+            id: revision.id,
+            revision: revision.revision,
+            reason: revision.reason,
+            rebuiltOn: revision.rebuiltOn.toISOString().slice(0, 10),
+            createdByName: revision.createdByName,
+            createdAt: revision.createdAt,
+            snapshot: revision.snapshot,
+          })),
         installedPrograms: image.installedPrograms.map(program => ({
           id: program.id,
           name: program.name,
@@ -806,10 +819,11 @@ export class CustomersService {
       verifiedByName: string | null;
       verifiedAt: Date | null;
     }>,
-    previousCreatedAt?: Date,
+    previous?: { id: number; createdAt: Date; revision: number },
   ) {
     return {
-      ...(previousCreatedAt ? { createdAt: previousCreatedAt } : {}),
+      // 저장 시 이미지를 삭제 후 재생성하므로 기존 이미지는 id·생성일·판 번호를 유지한다 (재제작 이력 연결용)
+      ...(previous ? { id: previous.id, createdAt: previous.createdAt, revision: previous.revision } : {}),
       name: image.name,
       osName: image.osName,
       osEdition: image.osEdition,
@@ -883,6 +897,10 @@ export class CustomersService {
     }
     if (images.length > 10) {
       throw new BadRequestException('가상PC 이미지는 최대 10개까지 등록할 수 있습니다');
+    }
+    const ids = images.map((image) => image.id).filter((id) => id != null);
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestException('가상PC 이미지 id가 중복되었습니다');
     }
     images.forEach((image, index) => {
       if (image.licenseStatus === '미진행' && !image.licenseNote?.trim()) {
@@ -1081,9 +1099,24 @@ export class CustomersService {
         }])),
       );
     });
-    const previousCreatedAtByImageId = new Map(
-      existing.virtualPcImages.map((image) => [image.id, image.createdAt]),
-    );
+    const existingImageById = new Map(existing.virtualPcImages.map((image) => [image.id, image]));
+    // 클라이언트가 보낸 id는 이 고객사의 기존 이미지일 때만 유지한다
+    const keptImageIds = (dto.virtualPcImages || [])
+      .map((image) => image.id)
+      .filter((id): id is number => typeof id === 'number' && existingImageById.has(id));
+    // 편집 중 재제작되면(판 번호 변경) 초기화된 체크리스트를 이전 상태로 덮어쓰지 않도록 저장을 거부한다
+    const assertNotRebuilt = (currentRevisionById: Map<number, number>) => {
+      for (const image of dto.virtualPcImages || []) {
+        if (!image.id || !existingImageById.has(image.id)) continue;
+        if (image.revision === undefined) {
+          throw new BadRequestException('가상PC 이미지 판 번호(revision)가 누락되었습니다. 새로고침 후 다시 저장해주세요');
+        }
+        if (currentRevisionById.get(image.id) !== image.revision) {
+          throw new ConflictException(`가상PC 이미지 '${image.name}'이(가) 편집 중 다른 사용자에 의해 재제작되었습니다.`);
+        }
+      }
+    };
+    assertNotRebuilt(new Map(existing.virtualPcImages.map((image) => [image.id, image.revision])));
 
     // 트랜잭션으로 서버 정보 및 접근 정보 업데이트
     // 각 목록은 dto에 해당 필드가 전달된 경우에만 삭제 후 재생성한다.
@@ -1096,8 +1129,16 @@ export class CustomersService {
       }
 
       if (dto.virtualPcImages) {
+        // 조회~트랜잭션 사이의 재제작을 잡기 위해 잠금 읽기로 판 번호를 다시 확인 (일반 조회는 스냅샷 읽기라 부족)
+        const locked = await tx.$queryRaw<Array<{ id: number; revision: number }>>`
+          SELECT id, revision FROM virtual_pc_images WHERE source_management_id = ${existing.id} FOR UPDATE`;
+        assertNotRebuilt(new Map(locked.map((row) => [Number(row.id), Number(row.revision)])));
         await tx.virtualPcImage.deleteMany({
           where: { sourceManagementId: existing.id },
+        });
+        // 목록에서 제거된 이미지의 재제작 이력은 함께 삭제
+        await tx.virtualPcImageRevision.deleteMany({
+          where: { sourceManagementId: existing.id, virtualPcImageId: { notIn: keptImageIds } },
         });
       }
 
@@ -1155,7 +1196,7 @@ export class CustomersService {
                 userId,
                 checker?.name || null,
                 image.id ? previousChecklistByImageId.get(image.id) : undefined,
-                image.id ? previousCreatedAtByImageId.get(image.id) : undefined,
+                image.id ? existingImageById.get(image.id) : undefined,
               )),
             },
           } : {}),
@@ -1226,6 +1267,124 @@ export class CustomersService {
     });
 
     return this.getSourceManagement(customerId, { revealSecrets: true });
+  }
+
+  // 가상PC 이미지 재제작: 현재 판을 이력으로 남기고 판 번호를 올린 뒤 체크리스트를 전체 초기화한다
+  async rebuildVirtualPcImage(
+    customerId: number,
+    imageId: number,
+    dto: RebuildVirtualPcImageDto,
+    user: { id: number; name?: string; username?: string },
+    ipAddress: string,
+  ) {
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('재제작 사유를 입력해주세요');
+    }
+    // 재제작 즉시 체크리스트가 초기화되므로 미래 날짜는 입력 실수로 본다 (KST 기준 오늘까지)
+    const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (dto.rebuiltOn.slice(0, 10) > todayKst) {
+      throw new BadRequestException('재제작일은 오늘 이후로 지정할 수 없습니다');
+    }
+
+    const image = await this.prisma.virtualPcImage.findFirst({
+      where: { id: imageId, sourceManagement: { customerId } },
+      include: {
+        verifier: { select: { name: true } },
+        installedPrograms: { orderBy: { id: 'asc' } },
+        checklistItems: {
+          orderBy: { displayOrder: 'asc' },
+          include: {
+            checkedBy: { select: { name: true } },
+            verifiedBy: { select: { name: true } },
+          },
+        },
+        sourceManagement: { select: { customer: { select: { name: true } } } },
+      },
+    });
+    if (!image) {
+      throw new NotFoundException('가상PC 이미지를 찾을 수 없습니다');
+    }
+    const conflictMessage = '다른 사용자가 먼저 재제작했습니다. 새로고침 후 다시 시도해주세요';
+    if (image.revision !== dto.revision) {
+      throw new ConflictException(conflictMessage);
+    }
+
+    const snapshot = {
+      name: image.name,
+      osName: image.osName,
+      osEdition: image.osEdition,
+      osRelease: image.osRelease,
+      cDiskCapacity: image.cDiskCapacity,
+      dDiskCapacity: image.dDiskCapacity,
+      licenseStatus: image.licenseStatus,
+      licenseNote: image.licenseNote,
+      hashValue: image.hashValue,
+      verifierName: image.verifier?.name ?? null,
+      installedPrograms: image.installedPrograms.map((program) => ({
+        name: program.name,
+        version: program.version,
+        description: program.description,
+      })),
+      checklistItems: image.checklistItems.map((item) => ({
+        itemKey: item.itemKey,
+        category: item.category,
+        checked: item.checked,
+        checkedByName: item.checkedBy?.name || item.checkedByName,
+        checkedAt: item.checkedAt,
+        verified: item.verified,
+        verifiedByName: item.verifiedBy?.name || item.verifiedByName,
+        verifiedAt: item.verifiedAt,
+        note: item.note,
+      })),
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      // 판 번호 조건부 증가로 동시 재제작을 막는다
+      const { count } = await tx.virtualPcImage.updateMany({
+        where: { id: imageId, revision: image.revision },
+        data: { revision: { increment: 1 } },
+      });
+      if (count === 0) {
+        throw new ConflictException(conflictMessage);
+      }
+      await tx.virtualPcImageRevision.create({
+        data: {
+          sourceManagementId: image.sourceManagementId,
+          virtualPcImageId: imageId,
+          revision: image.revision,
+          reason,
+          rebuiltOn: new Date(dto.rebuiltOn.slice(0, 10)),
+          snapshot,
+          createdByUserId: user.id,
+          createdByName: user.name || user.username || '',
+        },
+      }).catch((error) => {
+        // 같은 판 번호 이력이 이미 있으면(비정상 경쟁 상태) 500 대신 409
+        if (error?.code === 'P2002') throw new ConflictException(conflictMessage);
+        throw error;
+      });
+      await tx.virtualPcChecklistItem.updateMany({
+        where: { virtualPcImageId: imageId },
+        data: {
+          checked: false, checkedByUserId: null, checkedByName: null, checkedAt: null,
+          verified: false, verifiedByUserId: null, verifiedByName: null, verifiedAt: null,
+          note: null,
+        },
+      });
+    });
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정보',
+      action: '가상PC 이미지 재제작',
+      description: `고객사 ${image.sourceManagement.customer.name}의 가상PC 이미지 '${image.name}'을(를) 재제작했습니다 (rev.${image.revision} → rev.${image.revision + 1}): ${reason}`,
+      beforeValue: JSON.stringify(snapshot),
+      afterValue: null,
+      ipAddress,
+    });
+
+    return this.getSourceManagement(customerId);
   }
 
   private buildConsiderationCreateData(

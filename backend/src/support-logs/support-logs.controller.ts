@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -14,6 +15,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SupportLogsService } from './support-logs.service';
 import { CreateSupportLogDto } from './dto/create-support-log.dto';
 import { UpdateSupportLogDto } from './dto/update-support-log.dto';
+import { SupportLogEntryDto } from './dto/support-log-entry.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -50,7 +52,7 @@ export class SupportLogsController {
   @ApiOperation({ summary: '지원 로그 생성 (사내 사용자 공통)' })
   create(@Body() createDto: CreateSupportLogDto, @Request() req: any) {
     const ipAddress = getClientIp(req);
-    return this.supportLogsService.create(createDto, req.user.id, ipAddress);
+    return this.supportLogsService.create(createDto, req.user, ipAddress);
   }
 
   @Patch(':id')
@@ -71,5 +73,39 @@ export class SupportLogsController {
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const ipAddress = getClientIp(req);
     return this.supportLogsService.remove(id, req.user.id, ipAddress);
+  }
+
+  @Post(':id/entries')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '지원 내역 추가 (지원자: 로그인 사용자)' })
+  addEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SupportLogEntryDto,
+    @Request() req: any,
+  ) {
+    return this.supportLogsService.addEntry(id, dto, req.user, getClientIp(req));
+  }
+
+  @Put(':id/entries/:entryId')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '지원 내역 수정 (본인 기록 또는 관리자)' })
+  updateEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('entryId', ParseIntPipe) entryId: number,
+    @Body() dto: SupportLogEntryDto,
+    @Request() req: any,
+  ) {
+    return this.supportLogsService.updateEntry(id, entryId, dto, req.user, getClientIp(req));
+  }
+
+  @Delete(':id/entries/:entryId')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '지원 내역 삭제 (본인 기록 또는 관리자)' })
+  removeEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('entryId', ParseIntPipe) entryId: number,
+    @Request() req: any,
+  ) {
+    return this.supportLogsService.removeEntry(id, entryId, req.user, getClientIp(req));
   }
 }

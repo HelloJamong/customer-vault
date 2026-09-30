@@ -1,5 +1,5 @@
 import apiClient from './axios';
-import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto } from '@/types/support-log.types';
+import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto, SupportLogEntryDto } from '@/types/support-log.types';
 
 export interface PendingNotification {
   customerId: number;
@@ -46,5 +46,21 @@ export const supportLogsAPI = {
   // 지원 로그 삭제
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/support-logs/${id}`);
+  },
+
+  // 지원 내역 추가/수정/삭제 (갱신된 지원 로그 반환)
+  addEntry: async (id: number, dto: SupportLogEntryDto): Promise<SupportLog> => {
+    const { data } = await apiClient.post(`/support-logs/${id}/entries`, dto);
+    return data;
+  },
+
+  updateEntry: async (id: number, entryId: number, dto: SupportLogEntryDto): Promise<SupportLog> => {
+    const { data } = await apiClient.put(`/support-logs/${id}/entries/${entryId}`, dto);
+    return data;
+  },
+
+  deleteEntry: async (id: number, entryId: number): Promise<SupportLog> => {
+    const { data } = await apiClient.delete(`/support-logs/${id}/entries/${entryId}`);
+    return data;
   },
 };

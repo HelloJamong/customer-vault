@@ -15,7 +15,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/create-customer.dto';
-import { CreateSourceManagementDto, UpdateSourceManagementDto } from './dto/source-management.dto';
+import { CreateSourceManagementDto, UpdateSourceManagementDto, RebuildVirtualPcImageDto } from './dto/source-management.dto';
 import { CreateUpgradePlanDto, UpdateUpgradePlanDto, UpgradeProgressLogDto } from './dto/upgrade-plan.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -130,6 +130,18 @@ export class CustomersController {
   ) {
     const ipAddress = getClientIp(req);
     return this.customersService.createSourceManagement(id, dto, req.user.id, ipAddress);
+  }
+
+  @Post(':id/source-management/virtual-pc-images/:imageId/rebuild')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: '가상PC 이미지 재제작 (현재 판 이력 보관, 체크리스트 초기화)' })
+  rebuildVirtualPcImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('imageId', ParseIntPipe) imageId: number,
+    @Body() dto: RebuildVirtualPcImageDto,
+    @Request() req: any,
+  ) {
+    return this.customersService.rebuildVirtualPcImage(id, imageId, dto, req.user, getClientIp(req));
   }
 
   @Put(':id/source-management')

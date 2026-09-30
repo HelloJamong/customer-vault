@@ -1,8 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { CreateSupportLogDto } from './dto/create-support-log.dto';
 import { UpdateSupportLogDto } from './dto/update-support-log.dto';
+import { SupportLogEntryDto } from './dto/support-log-entry.dto';
+import { isAdminRole } from '../common/utils/customer-access.util';
+
+const entriesInclude = { orderBy: [{ entryDate: 'asc' as const }, { id: 'asc' as const }] };
 
 @Injectable()
 export class SupportLogsService {
@@ -133,6 +137,7 @@ export class SupportLogsService {
       where: { customerId },
       orderBy: { supportDate: 'desc' },
       include: {
+        entries: entriesInclude,
         creator: {
           select: {
             id: true,
@@ -148,6 +153,7 @@ export class SupportLogsService {
     const supportLog = await this.prisma.supportLog.findUnique({
       where: { id },
       include: {
+        entries: entriesInclude,
         customer: {
           select: {
             id: true,
@@ -173,9 +179,11 @@ export class SupportLogsService {
 
   async create(
     createDto: CreateSupportLogDto,
-    userId: number,
+    user: { id: number; name?: string; username?: string },
     ipAddress: string,
   ) {
+    const userId = user.id;
+    const entryContent = createDto.entryContent?.trim();
     const supportLog = await this.prisma.supportLog.create({
       data: {
         customerId: createDto.customerId,
@@ -192,8 +200,19 @@ export class SupportLogsService {
         jiraTicket: createDto.jiraTicket,
         remarks: createDto.remarks,
         createdBy: userId,
+        ...(entryContent && {
+          entries: {
+            create: {
+              entryDate: new Date(createDto.supportDate.slice(0, 10)),
+              authorName: user.name || user.username || '',
+              content: entryContent,
+              createdByUserId: userId,
+            },
+          },
+        }),
       },
       include: {
+        entries: entriesInclude,
         customer: {
           select: {
             id: true,
@@ -243,12 +262,12 @@ export class SupportLogsService {
         ...(updateDto.userInfo !== undefined && { userInfo: updateDto.userInfo }),
         ...(updateDto.actionStatus !== undefined && { actionStatus: updateDto.actionStatus }),
         ...(updateDto.inquiryContent !== undefined && { inquiryContent: updateDto.inquiryContent }),
-        ...(updateDto.actionContent !== undefined && { actionContent: updateDto.actionContent }),
         ...(updateDto.actionResult !== undefined && { actionResult: updateDto.actionResult }),
         ...(updateDto.jiraTicket !== undefined && { jiraTicket: updateDto.jiraTicket }),
         ...(updateDto.remarks !== undefined && { remarks: updateDto.remarks }),
       },
       include: {
+        entries: entriesInclude,
         customer: {
           select: {
             id: true,
@@ -297,5 +316,81 @@ export class SupportLogsService {
     });
 
     return { message: '지원 로그가 삭제되었습니다.' };
+  }
+
+  private toEntryData(dto: SupportLogEntryDto) {
+    const content = dto.content.trim();
+    if (!content) {
+      throw new BadRequestException('내용을 입력해주세요.');
+    }
+    return { entryDate: new Date(dto.entryDate.slice(0, 10)), content };
+  }
+
+  private async findEditableEntry(supportLogId: number, entryId: number, user: { id: number; role: string }) {
+    const entry = await this.prisma.supportLogEntry.findFirst({ where: { id: entryId, supportLogId } });
+    if (!entry) {
+      throw new NotFoundException('지원 내역을 찾을 수 없습니다.');
+    }
+    if (!isAdminRole(user.role) && entry.createdByUserId !== user.id) {
+      throw new ForbiddenException('본인이 작성한 지원 내역만 수정/삭제할 수 있습니다.');
+    }
+    return entry;
+  }
+
+  async addEntry(supportLogId: number, dto: SupportLogEntryDto, user: { id: number; name?: string; username?: string }, ipAddress: string) {
+    const supportLog = await this.findOne(supportLogId);
+    const entry = await this.prisma.supportLogEntry.create({
+      // 지원자는 로그인 사용자로 고정
+      data: { ...this.toEntryData(dto), supportLogId, authorName: user.name || user.username || '', createdByUserId: user.id },
+    });
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정상',
+      action: '지원 내역 추가',
+      description: `${supportLog.customer.name} 고객사 지원 로그에 지원 내역 추가`,
+      afterValue: JSON.stringify(entry),
+      ipAddress,
+    });
+
+    return this.findOne(supportLogId);
+  }
+
+  async updateEntry(supportLogId: number, entryId: number, dto: SupportLogEntryDto, user: { id: number; role: string }, ipAddress: string) {
+    const existing = await this.findEditableEntry(supportLogId, entryId, user);
+    const entry = await this.prisma.supportLogEntry.update({
+      where: { id: entryId },
+      data: this.toEntryData(dto),
+    });
+    const supportLog = await this.findOne(supportLogId);
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정상',
+      action: '지원 내역 수정',
+      description: `${supportLog.customer.name} 고객사 지원 내역 수정`,
+      beforeValue: JSON.stringify(existing),
+      afterValue: JSON.stringify(entry),
+      ipAddress,
+    });
+
+    return supportLog;
+  }
+
+  async removeEntry(supportLogId: number, entryId: number, user: { id: number; role: string }, ipAddress: string) {
+    const existing = await this.findEditableEntry(supportLogId, entryId, user);
+    await this.prisma.supportLogEntry.delete({ where: { id: entryId } });
+    const supportLog = await this.findOne(supportLogId);
+
+    await this.logsService.createServiceLog({
+      userId: user.id,
+      logType: '정상',
+      action: '지원 내역 삭제',
+      description: `${supportLog.customer.name} 고객사 지원 내역 삭제`,
+      beforeValue: JSON.stringify(existing),
+      ipAddress,
+    });
+
+    return supportLog;
   }
 }

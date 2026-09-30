@@ -30,6 +30,7 @@ import Grid from '@/mui-grid2';
 import { ArrowBack, Save, Add, Delete, ExpandMore } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import VerifierSelect from '@/components/checklist/VerifierSelect';
+import axios from 'axios';
 import apiClient from '@/api/axios';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useAuthStore } from '@/store/authStore';
@@ -146,6 +147,7 @@ interface VirtualPcImage {
   checklistItems: VirtualPcChecklistItem[];
   verifierUserId?: number | null;
   verifierName?: string | null;
+  revision?: number;
 }
 
 interface SourceManagement {
@@ -402,6 +404,7 @@ const CustomerSourceManagementEditPage = () => {
               displayOrder: item.displayOrder,
             })),
           verifierUserId: image.verifierUserId ?? null,
+          revision: image.revision, // 편집 중 재제작 감지용
         })),
         servers: formData.servers?.map((server) => ({
           ...server,
@@ -446,7 +449,11 @@ const CustomerSourceManagementEditPage = () => {
       navigate(`/customers/${customerId}/source-management`);
     } catch (error) {
       console.error('저장 실패:', error);
-      alert(getApiErrorMessage(error, '저장에 실패했습니다.'));
+      const message = getApiErrorMessage(error, '저장에 실패했습니다.');
+      // 편집 중 재제작(409): 폼은 유지되므로 입력 내용을 옮겨 적을 수 있게 안내
+      alert(axios.isAxiosError(error) && error.response?.status === 409
+        ? `${message}\n\n입력한 내용은 화면에 남아 있습니다. 필요한 내용을 복사해 두신 뒤 새로고침하고 다시 입력해주세요.`
+        : message);
     } finally {
       setIsSaving(false);
     }

@@ -1,3 +1,19 @@
+export interface SupportLogEntry {
+  id: number;
+  supportLogId: number;
+  entryDate: string;
+  authorName: string;
+  content: string;
+  createdByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportLogEntryDto {
+  entryDate: string;
+  content: string;
+}
+
 export interface SupportLog {
   id: number;
   customerId: number;
@@ -25,6 +41,7 @@ export interface SupportLog {
     name: string;
     username: string;
   };
+  entries?: SupportLogEntry[];
 }
 
 export interface CreateSupportLogDto {
@@ -41,6 +58,7 @@ export interface CreateSupportLogDto {
   actionResult?: string;
   jiraTicket?: string;
   remarks?: string;
+  entryContent?: string; // 첫 지원 내역
 }
 
 export interface UpdateSupportLogDto {

@@ -255,6 +255,7 @@ components:
         actionContent:
           type: string
           nullable: true
+          description: 기존 진척 사항과 날짜별 지원 내역을 `[YYYY-MM-DD] 내용` 줄로 합친 텍스트 (지원자 이름 미포함)
           example: 원인 확인 중
         jiraTicket:
           type: string

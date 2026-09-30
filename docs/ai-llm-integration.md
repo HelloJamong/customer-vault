@@ -168,7 +168,7 @@ curl -sS \
 | `title` | 제목 |
 | `actionStatus` | 현재 조치 상태 |
 | `inquiryContent` | 문의 내용 |
-| `actionContent` | 조치 내용 |
+| `actionContent` | 조치 내용 (기존 진척 사항과 날짜별 지원 내역을 `[YYYY-MM-DD] 내용` 줄로 합친 텍스트, 지원자 이름 미포함) |
 | `jiraTicket` | JIRA 티켓 번호 또는 URL |
 
 호출 예시:
