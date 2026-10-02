@@ -12,6 +12,7 @@ import NotificationBell from '@/components/layout/NotificationBell';
 import { NoticePopup } from '@/components/NoticePopup';
 import { noticesApi, type Notice } from '@/api/notices.api';
 import headerLogo from '@/assets/images/logo.svg';
+import { useCustomersPageStore } from '@/store/customersPageStore';
 
 // 다크모드에서도 알파 블렌딩으로 자연스럽게 배경에 녹아들도록 고정 색상 대신 투명도로 표현
 const NAV_ACTIVE_BG = alpha('#2563eb', 0.1);
@@ -255,7 +256,11 @@ const MainLayout = () => {
             {/* 고객사 관리 */}
             {canManageCustomers && (
               <Button
-                onClick={() => navigate('/customers')}
+                onClick={() => {
+                  // 메뉴로 진입할 때는 1페이지부터 (하위 페이지에서 돌아올 때만 보던 페이지 유지)
+                  useCustomersPageStore.getState().setPage(0);
+                  navigate('/customers');
+                }}
                 sx={{
                   px: 2,
                   py: 1,

@@ -158,6 +158,13 @@ const CustomersPage = () => {
   });
 
   const { customers, isLoading, createCustomer } = useCustomers(filters);
+
+  // 유지된 페이지가 범위를 벗어나면(고객사 삭제 등) 마지막 페이지로 보정
+  useEffect(() => {
+    if (isLoading) return;
+    const lastPage = Math.max(0, Math.ceil(customers.length / pageSize) - 1);
+    if (page > lastPage) setStorePage(lastPage);
+  }, [isLoading, customers.length, page, pageSize, setStorePage]);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [openSummaryDialog, setOpenSummaryDialog] = useState(false);

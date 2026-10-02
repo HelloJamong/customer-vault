@@ -61,7 +61,7 @@ const CustomerSupportLogsPage = () => {
   // Dialog states
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<SupportLog | null>(null);
 
   // Form state
@@ -333,6 +333,7 @@ const CustomerSupportLogsPage = () => {
     setSelectedLog(log);
     setNewEntry({ entryDate: todayStr(), content: '' });
     setEditingEntryId(null);
+    setIsEditing(false);
     setViewDialogOpen(true);
   };
 
@@ -391,7 +392,6 @@ const CustomerSupportLogsPage = () => {
   };
 
   const handleEditClick = (log: SupportLog) => {
-    setSelectedLog(log);
     setFormData({
       supportDate: log.supportDate.split('T')[0],
       inquirer: log.inquirer || '',
@@ -406,7 +406,7 @@ const CustomerSupportLogsPage = () => {
       remarks: log.remarks || '',
     });
     setSelectedDate(dayjs(log.supportDate));
-    setEditDialogOpen(true);
+    setIsEditing(true);
   };
 
   const handleAdd = async () => {
@@ -466,8 +466,8 @@ const CustomerSupportLogsPage = () => {
         remarks: formData.remarks,
       };
 
-      await supportLogsAPI.update(selectedLog.id, updateDto);
-      setEditDialogOpen(false);
+      setSelectedLog(await supportLogsAPI.update(selectedLog.id, updateDto));
+      setIsEditing(false);
       await fetchData();
       queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
       alert('지원 로그가 수정되었습니다.');
@@ -482,6 +482,7 @@ const CustomerSupportLogsPage = () => {
 
     try {
       await supportLogsAPI.delete(log.id);
+      setViewDialogOpen(false);
       await fetchData();
       queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
       alert('지원 로그가 삭제되었습니다.');
@@ -539,37 +540,138 @@ const CustomerSupportLogsPage = () => {
     {
       field: 'actions',
       headerName: '작업',
-      width: 320,
+      width: 100,
       sortable: false,
       renderCell: (params) => (
-        <Box display="flex" gap={1} alignItems="center" height="100%">
+        <Box display="flex" alignItems="center" height="100%">
           <Button
             size="small"
             variant="outlined"
             onClick={() => handleViewDetails(params.row)}
           >
-            세부내용
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="primary"
-            onClick={() => handleEditClick(params.row)}
-          >
-            수정
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            onClick={() => handleDelete(params.row)}
-          >
-            삭제
+            상세
           </Button>
         </Box>
       ),
     },
   ];
+
+  // 추가 Dialog와 상세 Dialog 편집 모드가 공유하는 폼 필드
+  const headFields = (
+    <>
+      <Box display="flex" gap={2}>
+        <DatePicker
+          label="지원날짜"
+          value={selectedDate}
+          onChange={(newValue) => setSelectedDate(newValue)}
+          slotProps={{
+            textField: {
+              fullWidth: true,
+            },
+          }}
+        />
+        <TextField
+          fullWidth
+          label="문의자"
+          value={formData.inquirer}
+          onChange={(e) => setFormData({ ...formData, inquirer: e.target.value })}
+        />
+      </Box>
+      <Box display="flex" gap={2}>
+        <FormControl fullWidth>
+          <InputLabel>대상</InputLabel>
+          <Select
+            value={formData.target || ''}
+            label="대상"
+            onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+          >
+            <MenuItem value="서버">서버</MenuItem>
+            <MenuItem value="클라이언트">클라이언트</MenuItem>
+            <MenuItem value="기타">기타</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>구분</InputLabel>
+          <Select
+            value={formData.category || ''}
+            label="구분"
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+          >
+            <MenuItem value="이슈">이슈</MenuItem>
+            <MenuItem value="문의">문의</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+      <Box display="flex" gap={2}>
+        <TextField
+          fullWidth
+          label="사용자 정보"
+          value={formData.userInfo || ''}
+          onChange={(e) => setFormData({ ...formData, userInfo: e.target.value })}
+        />
+        <FormControl fullWidth>
+          <InputLabel>조치 여부</InputLabel>
+          <Select
+            value={formData.actionStatus || ''}
+            label="조치 여부"
+            onChange={(e) => setFormData({ ...formData, actionStatus: e.target.value })}
+          >
+            <MenuItem value="조치 완료">조치 완료</MenuItem>
+            <MenuItem value="진행 중">진행 중</MenuItem>
+            <MenuItem value="보류">보류</MenuItem>
+            <MenuItem value="진행 불가">진행 불가</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+      <TextField
+        fullWidth
+        label="제목"
+        placeholder="ex) 가상PC 구동 불가 이슈"
+        value={formData.title || ''}
+        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+      />
+      <TextField
+        fullWidth
+        multiline
+        rows={4}
+        label="문의 내용"
+        placeholder="ex) 가상PC 구동 시 종료되는 증상 발생"
+        value={formData.inquiryContent}
+        onChange={(e) => setFormData({ ...formData, inquiryContent: e.target.value })}
+      />
+    </>
+  );
+  const tailFields = (
+    <>
+      <TextField
+        fullWidth
+        multiline
+        rows={4}
+        label="조치 결과"
+        placeholder="ex) VT-x 활성화 후 정상 구동 확인됨"
+        value={formData.actionResult}
+        onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
+      />
+      {jiraEnabled && jiraBaseUrl && (
+        <TextField
+          fullWidth
+          label="JIRA 티켓"
+          placeholder="ex) MTC-1234"
+          value={formData.jiraTicket || ''}
+          onChange={(e) => setFormData({ ...formData, jiraTicket: e.target.value })}
+          helperText="JIRA 티켓 번호를 입력하세요 (예: MTC-1234)"
+        />
+      )}
+      <TextField
+        fullWidth
+        multiline
+        rows={3}
+        label="비고"
+        value={formData.remarks}
+        onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+      />
+    </>
+  );
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
@@ -796,87 +898,101 @@ const CustomerSupportLogsPage = () => {
           />
         </Paper>
 
-        {/* 세부 내용 보기 Dialog */}
+        {/* 상세 Dialog (보기/편집) */}
         <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
-          <DialogTitle>지원 로그 세부 내용</DialogTitle>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box flex={1}>{isEditing ? '지원 로그 수정' : '지원 로그 세부 내용'}</Box>
+            {!isEditing && selectedLog && (
+              <IconButton aria-label="수정" onClick={() => handleEditClick(selectedLog)}>
+                <Edit />
+              </IconButton>
+            )}
+            <IconButton aria-label="닫기" onClick={() => setViewDialogOpen(false)}>
+              <Close />
+            </IconButton>
+          </DialogTitle>
           <DialogContent>
           {selectedLog && (
             <Stack spacing={2} sx={{ pt: 2 }}>
-              <Box display="flex" gap={2}>
-                <Box flex={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    지원날짜
-                  </Typography>
-                  <Typography variant="body1">
-                    {formatDate(selectedLog.supportDate)}
-                  </Typography>
-                </Box>
-                <Box flex={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    문의자
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedLog.inquirer || '-'}
-                  </Typography>
-                </Box>
-              </Box>
-              <Box display="flex" gap={2}>
-                <Box flex={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    대상
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedLog.target || '-'}
-                  </Typography>
-                </Box>
-                <Box flex={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    구분
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedLog.category || '-'}
-                  </Typography>
-                </Box>
-              </Box>
-              <Box display="flex" gap={2}>
-                <Box flex={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    사용자 정보
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedLog.userInfo || '-'}
-                  </Typography>
-                </Box>
-                <Box flex={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    조치 여부
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedLog.actionStatus || '-'}
-                  </Typography>
-                </Box>
-              </Box>
+              {isEditing ? headFields : (
+                <>
+                  <Box display="flex" gap={2}>
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        지원날짜
+                      </Typography>
+                      <Typography variant="body1">
+                        {formatDate(selectedLog.supportDate)}
+                      </Typography>
+                    </Box>
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        문의자
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedLog.inquirer || '-'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box display="flex" gap={2}>
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        대상
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedLog.target || '-'}
+                      </Typography>
+                    </Box>
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        구분
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedLog.category || '-'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box display="flex" gap={2}>
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        사용자 정보
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedLog.userInfo || '-'}
+                      </Typography>
+                    </Box>
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        조치 여부
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedLog.actionStatus || '-'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      제목
+                    </Typography>
+                    <Typography variant="body1">
+                      {selectedLog.title || '-'}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      문의 내용
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
+                      <Typography variant="body2" whiteSpace="pre-wrap">
+                        {selectedLog.inquiryContent || '-'}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                </>
+              )}
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
-                  제목
-                </Typography>
-                <Typography variant="body1">
-                  {selectedLog.title || '-'}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  문의 내용
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
-                  <Typography variant="body2" whiteSpace="pre-wrap">
-                    {selectedLog.inquiryContent || '-'}
-                  </Typography>
-                </Paper>
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  진척 사항
+                  진척 사항{isEditing && ' (항목별로 즉시 저장되며, 취소해도 유지됩니다)'}
                 </Typography>
                 {selectedLog.actionContent && (
                   <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
@@ -983,52 +1099,70 @@ const CustomerSupportLogsPage = () => {
                   </Button>
                 </Box>
               </Box>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  조치 결과
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
-                  <Typography variant="body2" whiteSpace="pre-wrap">
-                    {selectedLog.actionResult || '-'}
-                  </Typography>
-                </Paper>
-              </Box>
-              {jiraEnabled && jiraBaseUrl && (
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    JIRA 티켓
-                  </Typography>
-                  {selectedLog.jiraTicket ? (
-                    <Typography
-                      variant="body1"
-                      component="a"
-                      href={`${jiraBaseUrl}/browse/${selectedLog.jiraTicket}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{ color: 'primary.main', textDecoration: 'underline', cursor: 'pointer' }}
-                    >
-                      {selectedLog.jiraTicket}
+              {isEditing ? tailFields : (
+                <>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      조치 결과
                     </Typography>
-                  ) : (
-                    <Typography variant="body1">-</Typography>
+                    <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
+                      <Typography variant="body2" whiteSpace="pre-wrap">
+                        {selectedLog.actionResult || '-'}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                  {jiraEnabled && jiraBaseUrl && (
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        JIRA 티켓
+                      </Typography>
+                      {selectedLog.jiraTicket ? (
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`${jiraBaseUrl}/browse/${selectedLog.jiraTicket}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{ color: 'primary.main', textDecoration: 'underline', cursor: 'pointer' }}
+                        >
+                          {selectedLog.jiraTicket}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body1">-</Typography>
+                      )}
+                    </Box>
                   )}
-                </Box>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      비고
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
+                      <Typography variant="body2" whiteSpace="pre-wrap">
+                        {selectedLog.remarks || '-'}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                </>
               )}
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  비고
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'action.hover' }}>
-                  <Typography variant="body2" whiteSpace="pre-wrap">
-                    {selectedLog.remarks || '-'}
-                  </Typography>
-                </Paper>
-              </Box>
             </Stack>
           )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setViewDialogOpen(false)}>닫기</Button>
+            {isEditing ? (
+              <>
+                <Button onClick={() => setIsEditing(false)}>취소</Button>
+                <Button onClick={handleUpdate} variant="contained">
+                  저장
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button color="error" startIcon={<Delete />} onClick={() => selectedLog && handleDelete(selectedLog)} sx={{ mr: 'auto' }}>
+                  삭제
+                </Button>
+                <Button onClick={() => setViewDialogOpen(false)}>닫기</Button>
+              </>
+            )}
           </DialogActions>
         </Dialog>
 
@@ -1037,86 +1171,7 @@ const CustomerSupportLogsPage = () => {
           <DialogTitle>지원 로그 추가</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ pt: 2 }}>
-            <Box display="flex" gap={2}>
-              <DatePicker
-                label="지원날짜"
-                value={selectedDate}
-                onChange={(newValue) => setSelectedDate(newValue)}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                  },
-                }}
-              />
-              <TextField
-                fullWidth
-                label="문의자"
-                value={formData.inquirer}
-                onChange={(e) => setFormData({ ...formData, inquirer: e.target.value })}
-              />
-            </Box>
-            <Box display="flex" gap={2}>
-              <FormControl fullWidth>
-                <InputLabel>대상</InputLabel>
-                <Select
-                  value={formData.target || ''}
-                  label="대상"
-                  onChange={(e) => setFormData({ ...formData, target: e.target.value })}
-                >
-                  <MenuItem value="서버">서버</MenuItem>
-                  <MenuItem value="클라이언트">클라이언트</MenuItem>
-                  <MenuItem value="기타">기타</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>구분</InputLabel>
-                <Select
-                  value={formData.category || ''}
-                  label="구분"
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  <MenuItem value="이슈">이슈</MenuItem>
-                  <MenuItem value="문의">문의</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            <Box display="flex" gap={2}>
-              <TextField
-                fullWidth
-                label="사용자 정보"
-                value={formData.userInfo || ''}
-                onChange={(e) => setFormData({ ...formData, userInfo: e.target.value })}
-              />
-              <FormControl fullWidth>
-                <InputLabel>조치 여부</InputLabel>
-                <Select
-                  value={formData.actionStatus || ''}
-                  label="조치 여부"
-                  onChange={(e) => setFormData({ ...formData, actionStatus: e.target.value })}
-                >
-                  <MenuItem value="조치 완료">조치 완료</MenuItem>
-                  <MenuItem value="진행 중">진행 중</MenuItem>
-                  <MenuItem value="보류">보류</MenuItem>
-                  <MenuItem value="진행 불가">진행 불가</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            <TextField
-              fullWidth
-              label="제목"
-              placeholder="ex) 가상PC 구동 불가 이슈"
-              value={formData.title || ''}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="문의 내용"
-              placeholder="ex) 가상PC 구동 시 종료되는 증상 발생"
-              value={formData.inquiryContent}
-              onChange={(e) => setFormData({ ...formData, inquiryContent: e.target.value })}
-            />
+            {headFields}
             <TextField
               fullWidth
               multiline
@@ -1127,161 +1182,13 @@ const CustomerSupportLogsPage = () => {
               value={formData.entryContent}
               onChange={(e) => setFormData({ ...formData, entryContent: e.target.value })}
             />
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="조치 결과"
-              placeholder="ex) VT-x 활성화 후 정상 구동 확인됨"
-              value={formData.actionResult}
-              onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
-            />
-            {jiraEnabled && jiraBaseUrl && (
-              <TextField
-                fullWidth
-                label="JIRA 티켓"
-                placeholder="ex) MTC-1234"
-                value={formData.jiraTicket || ''}
-                onChange={(e) => setFormData({ ...formData, jiraTicket: e.target.value })}
-                helperText="JIRA 티켓 번호를 입력하세요 (예: MTC-1234)"
-              />
-            )}
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="비고"
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            />
+            {tailFields}
             </Stack>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setAddDialogOpen(false)}>취소</Button>
             <Button onClick={handleAdd} variant="contained">
               추가
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* 수정 Dialog */}
-        <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
-          <DialogTitle>지원 로그 수정</DialogTitle>
-          <DialogContent>
-            <Stack spacing={2} sx={{ pt: 2 }}>
-            <Box display="flex" gap={2}>
-              <DatePicker
-                label="지원날짜"
-                value={selectedDate}
-                onChange={(newValue) => setSelectedDate(newValue)}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                  },
-                }}
-              />
-              <TextField
-                fullWidth
-                label="문의자"
-                value={formData.inquirer}
-                onChange={(e) => setFormData({ ...formData, inquirer: e.target.value })}
-              />
-            </Box>
-            <Box display="flex" gap={2}>
-              <FormControl fullWidth>
-                <InputLabel>대상</InputLabel>
-                <Select
-                  value={formData.target || ''}
-                  label="대상"
-                  onChange={(e) => setFormData({ ...formData, target: e.target.value })}
-                >
-                  <MenuItem value="서버">서버</MenuItem>
-                  <MenuItem value="클라이언트">클라이언트</MenuItem>
-                  <MenuItem value="기타">기타</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>구분</InputLabel>
-                <Select
-                  value={formData.category || ''}
-                  label="구분"
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  <MenuItem value="이슈">이슈</MenuItem>
-                  <MenuItem value="문의">문의</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            <Box display="flex" gap={2}>
-              <TextField
-                fullWidth
-                label="사용자 정보"
-                value={formData.userInfo || ''}
-                onChange={(e) => setFormData({ ...formData, userInfo: e.target.value })}
-              />
-              <FormControl fullWidth>
-                <InputLabel>조치 여부</InputLabel>
-                <Select
-                  value={formData.actionStatus || ''}
-                  label="조치 여부"
-                  onChange={(e) => setFormData({ ...formData, actionStatus: e.target.value })}
-                >
-                  <MenuItem value="조치 완료">조치 완료</MenuItem>
-                  <MenuItem value="진행 중">진행 중</MenuItem>
-                  <MenuItem value="보류">보류</MenuItem>
-                  <MenuItem value="진행 불가">진행 불가</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            <TextField
-              fullWidth
-              label="제목"
-              placeholder="ex) 가상PC 구동 불가 이슈"
-              value={formData.title || ''}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="문의 내용"
-              placeholder="ex) 가상PC 구동 시 종료되는 증상 발생"
-              value={formData.inquiryContent}
-              onChange={(e) => setFormData({ ...formData, inquiryContent: e.target.value })}
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="조치 결과"
-              placeholder="ex) VT-x 활성화 후 정상 구동 확인됨"
-              value={formData.actionResult}
-              onChange={(e) => setFormData({ ...formData, actionResult: e.target.value })}
-            />
-            {jiraEnabled && jiraBaseUrl && (
-              <TextField
-                fullWidth
-                label="JIRA 티켓"
-                placeholder="ex) MTC-1234"
-                value={formData.jiraTicket || ''}
-                onChange={(e) => setFormData({ ...formData, jiraTicket: e.target.value })}
-                helperText="JIRA 티켓 번호를 입력하세요 (예: MTC-1234)"
-              />
-            )}
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="비고"
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            />
-            </Stack>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setEditDialogOpen(false)}>취소</Button>
-            <Button onClick={handleUpdate} variant="contained">
-              수정
             </Button>
           </DialogActions>
         </Dialog>

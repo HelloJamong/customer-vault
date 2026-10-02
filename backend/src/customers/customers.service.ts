@@ -895,8 +895,8 @@ export class CustomersService {
     if (images.length === 0) {
       throw new BadRequestException('가상PC 이미지는 최소 1개 이상 등록해야 합니다');
     }
-    if (images.length > 10) {
-      throw new BadRequestException('가상PC 이미지는 최대 10개까지 등록할 수 있습니다');
+    if (images.length > 30) {
+      throw new BadRequestException('가상PC 이미지는 최대 30개까지 등록할 수 있습니다');
     }
     const ids = images.map((image) => image.id).filter((id) => id != null);
     if (new Set(ids).size !== ids.length) {

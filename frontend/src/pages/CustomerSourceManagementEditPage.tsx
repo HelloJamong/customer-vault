@@ -27,7 +27,7 @@ import {
   TableRow,
 } from '@mui/material';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Save, Add, Delete, ExpandMore } from '@mui/icons-material';
+import { ArrowBack, Save, Add, Delete, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import VerifierSelect from '@/components/checklist/VerifierSelect';
 import axios from 'axios';
@@ -49,6 +49,10 @@ interface ServerDiskGroup {
   diskCapacityGb?: number | '';
   diskCapacityUnit: DiskCapacityUnit;
 }
+
+const MAX_VIRTUAL_PC_IMAGES = 30;
+// 이미지가 이 개수를 넘으면 나머지는 접어서 표시
+const VISIBLE_IMAGE_COUNT = 5;
 
 interface ServerInfo {
   id?: number;
@@ -242,6 +246,7 @@ const CustomerSourceManagementEditPage = () => {
   const currentUser = useAuthStore((state) => state.user);
   const [customerName, setCustomerName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllImages, setShowAllImages] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
 
@@ -364,6 +369,7 @@ const CustomerSourceManagementEditPage = () => {
     );
 
     if (invalidImageIndex >= 0) {
+      if (invalidImageIndex >= VISIBLE_IMAGE_COUNT) setShowAllImages(true);
       alert(`가상PC 이미지 #${invalidImageIndex + 1}의 필수 정보를 확인해주세요. (C 드라이브 용량 및 정품 인증 비고 포함)`);
       return;
     }
@@ -589,7 +595,8 @@ const CustomerSourceManagementEditPage = () => {
   };
 
   const handleAddVirtualPcImage = () => {
-    if (formData.virtualPcImages.length >= 10) return;
+    if (formData.virtualPcImages.length >= MAX_VIRTUAL_PC_IMAGES) return;
+    setShowAllImages(true);
     setFormData({
       ...formData,
       virtualPcImages: [...formData.virtualPcImages, createVirtualPcImage()],
@@ -754,14 +761,14 @@ const CustomerSourceManagementEditPage = () => {
               가상PC 이미지 관리
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              이미지 {formData.virtualPcImages.length}/10개
+              이미지 {formData.virtualPcImages.length}/{MAX_VIRTUAL_PC_IMAGES}개
             </Typography>
           </Box>
           <Button
             variant="outlined"
             startIcon={<Add />}
             onClick={handleAddVirtualPcImage}
-            disabled={formData.virtualPcImages.length >= 10}
+            disabled={formData.virtualPcImages.length >= MAX_VIRTUAL_PC_IMAGES}
             size="small"
           >
             이미지 정보 추가
@@ -769,7 +776,7 @@ const CustomerSourceManagementEditPage = () => {
         </Box>
         <Divider sx={{ mb: 3 }} />
 
-        {formData.virtualPcImages.map((image, imageIndex) => {
+        {formData.virtualPcImages.slice(0, showAllImages ? undefined : VISIBLE_IMAGE_COUNT).map((image, imageIndex) => {
           const getChecklistItem = (itemKey: string) =>
             image.checklistItems.find((item) => item.itemKey === itemKey) || {
               itemKey,
@@ -1014,6 +1021,11 @@ const CustomerSourceManagementEditPage = () => {
             </Paper>
           );
         })}
+        {formData.virtualPcImages.length > VISIBLE_IMAGE_COUNT && (
+          <Button fullWidth onClick={() => setShowAllImages(!showAllImages)} endIcon={showAllImages ? <ExpandLess /> : <ExpandMore />}>
+            {showAllImages ? '접기' : `나머지 ${formData.virtualPcImages.length - VISIBLE_IMAGE_COUNT}개 펼치기`}
+          </Button>
+        )}
       </Paper>
 
       {/* 관리웹 정보 */}

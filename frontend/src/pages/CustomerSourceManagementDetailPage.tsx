@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import Grid from '@/mui-grid2';
-import { ArrowBack, Edit, Download, ExpandMore, Autorenew } from '@mui/icons-material';
+import { ArrowBack, Edit, Download, ExpandMore, ExpandLess, Autorenew } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
 import { logsApi } from '@/api/logs.api';
@@ -34,6 +34,9 @@ import ExcelJS from 'exceljs';
 import { downloadBlob } from '@/utils/download';
 import { VIRTUAL_PC_CHECKLIST_LABELS } from '@/utils/virtual-pc-checklist';
 import { getApiErrorMessage } from '@/utils/api-error';
+
+// 이미지가 이 개수를 넘으면 나머지는 접어서 표시
+const VISIBLE_IMAGE_COUNT = 5;
 
 interface ServerInfo {
   id?: number;
@@ -218,6 +221,7 @@ const CustomerSourceManagementDetailPage = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const [customerName, setCustomerName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllImages, setShowAllImages] = useState(false);
   const [sourceData, setSourceData] = useState<SourceManagement | null>(null);
   const [revealedAccessInfo, setRevealedAccessInfo] = useState<Set<number>>(new Set());
   const [revealedData, setRevealedData] = useState<SourceManagement | null>(null);
@@ -660,7 +664,7 @@ const CustomerSourceManagementDetailPage = () => {
             <Divider sx={{ mb: 3 }} />
             {virtualPcImages.length === 0 ? (
               <Typography color="text.secondary">등록된 가상PC 이미지가 없습니다.</Typography>
-            ) : virtualPcImages.map((image, imageIndex) => (
+            ) : virtualPcImages.slice(0, showAllImages ? undefined : VISIBLE_IMAGE_COUNT).map((image, imageIndex) => (
               <Paper key={image.id || imageIndex} variant="outlined" sx={{ p: 2, mb: 2 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="baseline" gap={2} flexWrap="wrap" mb={1}>
                   <Box display="flex" alignItems="center" gap={1}>
@@ -811,6 +815,11 @@ const CustomerSourceManagementDetailPage = () => {
                 )}
               </Paper>
             ))}
+            {virtualPcImages.length > VISIBLE_IMAGE_COUNT && (
+              <Button fullWidth onClick={() => setShowAllImages(!showAllImages)} endIcon={showAllImages ? <ExpandLess /> : <ExpandMore />}>
+                {showAllImages ? '접기' : `나머지 ${virtualPcImages.length - VISIBLE_IMAGE_COUNT}개 펼치기`}
+              </Button>
+            )}
           </Paper>
 
           {/* 관리웹 정보 */}

@@ -368,10 +368,10 @@ export class CreateSourceManagementDto {
   @IsString()
   virtualPcImageInfo?: string;
 
-  @ApiProperty({ required: false, type: [VirtualPcImageDto], description: '가상PC 이미지 목록 (최대 10개)' })
+  @ApiProperty({ required: false, type: [VirtualPcImageDto], description: '가상PC 이미지 목록 (최대 30개)' })
   @IsOptional()
   @ArrayMinSize(1)
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(30)
   @ValidateNested({ each: true })
   @Type(() => VirtualPcImageDto)
   virtualPcImages?: VirtualPcImageDto[];

@@ -58,7 +58,6 @@ export const useCustomersPageStore = create<CustomersPageState>()(
         inspectionCycleFilter: initialState.inspectionCycleFilter,
         inspectionStatusFilter: initialState.inspectionStatusFilter,
         contractTypeFilter: initialState.contractTypeFilter,
-        page: initialState.page,
       }),
     }),
     {
