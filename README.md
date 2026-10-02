@@ -184,3 +184,4 @@ customer-vault/
 - [원격 SFTP 백업](docs/backup_remote_setup_guide.md)
 - [Backend 테스트·E2E](docs/backend_testing.md)
 - [릴리즈 절차](docs/RELEASE_GUIDE.md)
+- [사용자/관리자 매뉴얼](docs/manual/README.md)
