@@ -4,7 +4,6 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { CustomLoggerService } from './common/logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
-import * as express from 'express';
 import * as cors from 'cors';
 import { SessionActivityInterceptor } from './auth/interceptors/session-activity.interceptor';
 import { getTrustProxySetting } from './common/utils/trust-proxy.util';

@@ -526,39 +526,6 @@ export class CustomersService {
     return false;
   }
 
-  // 이번 달 점검 대상 여부 확인
-  async isInspectionCompletedThisMonth(customerId: number): Promise<boolean> {
-    const customer = await this.findOne(customerId);
-
-    if (!this.isInspectionNeededThisMonth(customer)) {
-      return false;
-    }
-
-    const targetIds = customer.inspectionTargets.map((t) => t.id);
-    if (targetIds.length === 0) {
-      return false;
-    }
-
-    const now = new Date();
-    const periodStart = getInspectionPeriodStart(customer.inspectionCycleType, now);
-    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-    const completedTargets = await this.prisma.document.findMany({
-      where: {
-        customerId,
-        inspectionTargetId: { in: targetIds },
-        inspectionDate: {
-          gte: periodStart,
-          lt: startOfNextMonth,
-        },
-      },
-      select: { inspectionTargetId: true },
-      distinct: ['inspectionTargetId'],
-    });
-
-    return completedTargets.length === targetIds.length;
-  }
-
   // 저장된 값이 있으면 마스킹, revealSecrets일 때만 실제 복호화 값을 반환
   private maskOrReveal(value: string | null, revealSecrets: boolean): string | null {
     if (!value) return null;

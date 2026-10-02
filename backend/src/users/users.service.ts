@@ -67,22 +67,6 @@ export class UsersService {
     return '정상';
   }
 
-  async findAllActiveUsers() {
-    const users = await this.prisma.user.findMany({
-      where: {
-        isActive: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        department: true,
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    return users;
-  }
-
   async findAllActiveUsersByDepartment() {
     const users = await this.prisma.user.findMany({
       where: {

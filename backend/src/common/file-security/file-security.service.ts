@@ -8,10 +8,10 @@ import { promises as fsp } from 'fs';
 import * as net from 'net';
 import * as path from 'path';
 
-export type SupportedUploadType = 'pdf' | 'doc' | 'docx' | 'hwp' | 'hwpx' | 'ppt' | 'pptx';
-export type FileSecurityFailureReason = 'format_mismatch' | 'malware_detected' | 'scanner_unavailable';
+type SupportedUploadType = 'pdf' | 'doc' | 'docx' | 'hwp' | 'hwpx' | 'ppt' | 'pptx';
+type FileSecurityFailureReason = 'format_mismatch' | 'malware_detected' | 'scanner_unavailable';
 
-export class FileSecurityException extends BadRequestException {
+class FileSecurityException extends BadRequestException {
   readonly fileSecurity = true;
 
   constructor(message: string, readonly reason: FileSecurityFailureReason) {
@@ -19,7 +19,7 @@ export class FileSecurityException extends BadRequestException {
   }
 }
 
-export class FileSecurityUnavailableException extends ServiceUnavailableException {
+class FileSecurityUnavailableException extends ServiceUnavailableException {
   readonly fileSecurity = true;
   readonly reason: FileSecurityFailureReason = 'scanner_unavailable';
 
@@ -49,7 +49,7 @@ const ZIP_TYPES = new Set<SupportedUploadType>(['docx', 'hwpx', 'pptx']);
 const PDF_SIGNATURE = Buffer.from('%PDF-');
 const OLE_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 
-export function getUploadType(filename: string): SupportedUploadType {
+function getUploadType(filename: string): SupportedUploadType {
   const extension = path.extname(filename || '').toLowerCase().replace('.', '') as SupportedUploadType;
 
   if (!SUPPORTED_EXTENSIONS.has(extension)) {

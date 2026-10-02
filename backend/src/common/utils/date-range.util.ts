@@ -7,7 +7,7 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
  * 시작/종료 중 한쪽만 있어도 해당 방향만 적용한다. 둘 다 없으면 undefined.
  * (ISO 문자열이 오면 그대로 파싱)
  */
-export function buildKstDateRange(
+function buildKstDateRange(
   startDate?: string,
   endDate?: string,
 ): { gte?: Date; lte?: Date } | undefined {

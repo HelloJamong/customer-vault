@@ -1,4 +1,4 @@
-export interface MfaPolicySettings {
+interface MfaPolicySettings {
   otpEnabled?: boolean;
   otpApplyToAdministrators?: boolean;
   otpApplyToTechDepartment?: boolean;
@@ -6,7 +6,7 @@ export interface MfaPolicySettings {
   otpApplyToDevDepartment?: boolean;
 }
 
-export interface MfaPolicyUser {
+interface MfaPolicyUser {
   role?: string | null;
   department?: string | null;
 }

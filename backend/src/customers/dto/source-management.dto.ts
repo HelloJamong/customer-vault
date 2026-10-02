@@ -2,7 +2,7 @@ import { IsString, IsBoolean, IsInt, IsOptional, Min, ValidateNested, IsObject, 
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
-export class ServerDiskGroupDto {
+class ServerDiskGroupDto {
   @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
   @IsInt()
@@ -32,7 +32,7 @@ export class ServerDiskGroupDto {
   diskCapacityUnit?: string;
 }
 
-export class ServerInfoDto {
+class ServerInfoDto {
   @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
   @IsInt()
@@ -166,7 +166,7 @@ class HRIntegrationDto {
   departmentSyncQuery?: string;
 }
 
-export class VirtualPcInstalledProgramDto {
+class VirtualPcInstalledProgramDto {
   @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
   @IsInt()
@@ -187,7 +187,7 @@ export class VirtualPcInstalledProgramDto {
   description?: string;
 }
 
-export class VirtualPcChecklistItemDto {
+class VirtualPcChecklistItemDto {
   @ApiProperty({ required: true, description: '체크리스트 항목 키' })
   @IsString()
   itemKey: string;
@@ -213,7 +213,7 @@ export class VirtualPcChecklistItemDto {
   displayOrder?: number;
 }
 
-export class HrIntegrationMappingDto {
+class HrIntegrationMappingDto {
   @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
   @IsInt()
@@ -416,7 +416,7 @@ export class CreateSourceManagementDto {
   accessInfo?: ServerAccessInfoDto[];
 }
 
-export class ServerAccessInfoDto {
+class ServerAccessInfoDto {
   @ApiProperty({ required: false, description: 'ID (편집 시에만 사용)' })
   @IsOptional()
   @IsInt()

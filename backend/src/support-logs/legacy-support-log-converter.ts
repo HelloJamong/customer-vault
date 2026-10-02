@@ -10,7 +10,7 @@ export interface ConversionPlanItem {
   title?: string; // 빈 제목일 때 채울 제안 제목
 }
 
-export type ConversionOutcome =
+type ConversionOutcome =
   | 'converted' // 지원 내역 생성 (+ 제목)
   | 'title_only' // 진척 사항은 비어 있고 제목만 채움
   | 'nothing_to_do'
@@ -19,7 +19,7 @@ export type ConversionOutcome =
   | 'skipped_has_entries' // 이미 지원 내역 있음 (재실행)
   | 'skipped_warning'; // 자동 분리 불가
 
-export interface ConversionReport {
+interface ConversionReport {
   apply: boolean;
   outcomes: Record<ConversionOutcome, number[]>;
   entryCount: number;

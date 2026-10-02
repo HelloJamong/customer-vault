@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 
-const LEGACY_IV_LENGTH = 16;
 const GCM_IV_LENGTH = 12;
 const V2_PREFIX = 'v2';
 

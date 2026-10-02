@@ -2,7 +2,7 @@ import { cleanIpAddress } from '../common/utils/ip.util';
 
 type AllowedIp = string | { ipAddress: string };
 
-export interface IpRestrictedUser {
+interface IpRestrictedUser {
   allowedIps?: AllowedIp[];
 }
 

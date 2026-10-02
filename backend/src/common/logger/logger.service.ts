@@ -109,51 +109,6 @@ export class CustomLoggerService implements LoggerService {
     logger.error(logData);
   }
 
-  /**
-   * 웹 에러 로그
-   */
-  logWebError(message: string, error?: Error, meta?: any) {
-    this.logError(LogType.WEB_ERROR, message, error, meta);
-  }
-
-  /**
-   * DB 에러 로그
-   */
-  logDbError(message: string, error?: Error, meta?: any) {
-    this.logError(LogType.DB_ERROR, message, error, meta);
-  }
-
-  /**
-   * 인증 에러 로그
-   */
-  logAuthError(message: string, error?: Error, meta?: any) {
-    this.logError(LogType.AUTH_ERROR, message, error, meta);
-  }
-
-  /**
-   * API 에러 로그
-   */
-  logApiError(message: string, error?: Error, meta?: any) {
-    this.logError(LogType.API_ERROR, message, error, meta);
-  }
-
-  /**
-   * 시스템 에러 로그
-   */
-  logSystemError(message: string, error?: Error, meta?: any) {
-    this.logError(LogType.SYSTEM_ERROR, message, error, meta);
-  }
-
-  /**
-   * 접근 로그 (성공적인 요청)
-   */
-  logAccess(message: string, meta?: any) {
-    const logger = this.loggers.get(LogType.ACCESS);
-    if (logger) {
-      logger.info({ message, ...meta });
-    }
-  }
-
   // NestJS LoggerService 인터페이스 구현
   log(message: any, context?: string) {
     this.defaultLogger.info(message, { context });

@@ -2,13 +2,13 @@
 // 머리줄 예: "@고석준-[26-08-25]", "@안용욱 [26-01-05]", "[2026.01.05]", "@VMS[26-01-15~26-02-11]", "26-01-05"
 // 원문 문구는 바꾸지 않고 줄 단위로만 나눈다.
 
-export interface LegacyProgressEntry {
+interface LegacyProgressEntry {
   entryDate: string; // YYYY-MM-DD
   label: string | null; // 머리줄의 @이름 (없으면 null)
   content: string;
 }
 
-export interface LegacyProgressParseResult {
+interface LegacyProgressParseResult {
   entries: LegacyProgressEntry[];
   warnings: string[]; // 비어 있지 않으면 자동 변환하지 않고 확인 필요로 분류
 }

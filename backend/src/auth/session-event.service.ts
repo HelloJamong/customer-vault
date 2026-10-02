@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
 
-export interface SessionEvent {
+interface SessionEvent {
   userId: number;
   sessionId: string;
   type: 'logout' | 'keepalive';
@@ -52,12 +52,5 @@ export class SessionEventService {
       stream.complete();
       this.eventStreams.delete(userId);
     }
-  }
-
-  /**
-   * 연결된 클라이언트 수 반환
-   */
-  getActiveConnectionCount(): number {
-    return this.eventStreams.size;
   }
 }

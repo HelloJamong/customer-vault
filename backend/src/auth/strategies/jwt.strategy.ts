@@ -8,7 +8,7 @@ import { getClientIp } from '../../common/utils/ip.util';
 import { isIpAllowedForUser, isSessionIpMatch } from '../ip-policy';
 import { isMfaRequiredForUser } from '../mfa-policy';
 
-export interface JwtPayload {
+interface JwtPayload {
   sub: number;
   username: string;
   role: string;
@@ -26,7 +26,7 @@ interface RequestLike {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private configService: ConfigService,
+    configService: ConfigService,
     private prisma: PrismaService,
   ) {
     super({
