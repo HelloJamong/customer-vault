@@ -25,9 +25,9 @@ interface SystemLogsResponse {
   };
 }
 
-export type { SystemLogEntry, SystemLogsResponse };
+export type { SystemLogEntry };
 
-export interface SystemLogsFilters {
+interface SystemLogsFilters {
   username?: string;
   logType?: string;
   searchText?: string;

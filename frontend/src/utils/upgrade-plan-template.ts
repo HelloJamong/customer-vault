@@ -1,6 +1,6 @@
-export type UpgradePlanCommonCategory = '클라이언트' | '관리서버';
+type UpgradePlanCommonCategory = '클라이언트' | '관리서버';
 
-export interface UpgradePlanConsiderationTemplate {
+interface UpgradePlanConsiderationTemplate {
   category: UpgradePlanCommonCategory;
   feature: string;
   description: string;

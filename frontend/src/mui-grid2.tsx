@@ -12,7 +12,7 @@ type BreakpointValue = number | 'auto';
 
 const BREAKPOINTS: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 
-export type Grid2Props = ComponentProps<typeof MuiGrid> & {
+type Grid2Props = ComponentProps<typeof MuiGrid> & {
   item?: boolean;
   xs?: BreakpointValue;
   sm?: BreakpointValue;

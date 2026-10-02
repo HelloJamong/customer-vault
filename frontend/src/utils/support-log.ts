@@ -6,7 +6,7 @@ type LogSource = { creator?: { name?: string }; actionContent?: string; entries?
 export const getEngineers = (log: LogSource) =>
   Array.from(new Set([log.creator?.name, ...(log.entries || []).map((e) => e.authorName)].filter(Boolean))) as string[];
 
-export const formatEntry = (entry: SupportLogEntry) =>
+const formatEntry = (entry: SupportLogEntry) =>
   `[${entry.entryDate.slice(0, 10)} ${entry.authorName}]\n${entry.content}`;
 
 // 기존 기록(actionContent) + 지원 내역을 엑셀용 한 텍스트로

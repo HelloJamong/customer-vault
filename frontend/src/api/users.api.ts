@@ -8,7 +8,7 @@ export interface UserAssignmentStatus {
   description: string;
 }
 
-export interface AssignmentStatusResponse {
+interface AssignmentStatusResponse {
   users: UserAssignmentStatus[];
 }
 

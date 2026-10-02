@@ -1,7 +1,7 @@
 import apiClient from './axios';
 import type { SupportLog, CreateSupportLogDto, UpdateSupportLogDto, SupportLogEntryDto } from '@/types/support-log.types';
 
-export interface PendingNotification {
+interface PendingNotification {
   customerId: number;
   customerName: string;
   inProgressCount: number;

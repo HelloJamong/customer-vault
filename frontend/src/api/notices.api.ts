@@ -14,12 +14,12 @@ export interface Notice {
   };
 }
 
-export interface CreateNoticeDto {
+interface CreateNoticeDto {
   title: string;
   content: string;
 }
 
-export interface UpdateNoticeDto {
+interface UpdateNoticeDto {
   title?: string;
   content?: string;
 }

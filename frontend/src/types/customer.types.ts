@@ -139,14 +139,3 @@ export interface CreateCustomerDto {
 
 export type UpdateCustomerDto = Partial<CreateCustomerDto>;
 
-export interface CreateInspectionTargetDto {
-  customerId: number;
-  targetType: string;
-  productName?: string;
-}
-
-export interface UpdateInspectionTargetDto {
-  targetType?: string;
-  productName?: string;
-  displayOrder?: number;
-}

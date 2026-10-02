@@ -46,12 +46,6 @@ export interface MfaSetupResponse {
   periodSeconds: number;
 }
 
-export interface MfaChallengeResponse {
-  mfaRequired: true;
-  mfaChallengeToken: string;
-  user: Pick<User, 'id' | 'username' | 'name'>;
-}
-
 export interface SessionPolicy {
   timeoutMinutes: number;
   warningEnabled: boolean;

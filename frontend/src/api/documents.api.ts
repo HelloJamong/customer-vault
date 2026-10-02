@@ -19,7 +19,7 @@ export interface UploadInspectionDocumentDto {
   file: File;
 }
 
-export interface UploadInspectionDocumentResponse {
+interface UploadInspectionDocumentResponse {
   message?: string;
 }
 

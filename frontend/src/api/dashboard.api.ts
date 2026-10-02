@@ -1,6 +1,6 @@
 import apiClient from './axios';
 
-export interface DashboardStats {
+interface DashboardStats {
   totalUsers: number;
   adminUsers: number;
   regularUsers: number;
@@ -32,7 +32,7 @@ export interface DashboardStats {
   };
 }
 
-export interface IncompleteInspection {
+interface IncompleteInspection {
   id: number;
   name: string;
   primaryEngineer: string;
